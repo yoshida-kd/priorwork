@@ -1,0 +1,232 @@
+{
+  "name": "priorwork",
+  "displayName": "Prior Work",
+  "description": "%extension.description%",
+  "version": "0.1.0",
+  "publisher": "yoshida-kd",
+  "license": "MIT",
+  "icon": "media/icon.png",
+  "galleryBanner": { "color": "#1f3a5f", "theme": "dark" },
+  "homepage": "https://github.com/yoshida-kd/priorwork/tree/HEAD/vscode-extension#readme",
+  "bugs": { "url": "https://github.com/yoshida-kd/priorwork/issues" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yoshida-kd/priorwork.git",
+    "directory": "vscode-extension"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Education"
+  ],
+  "keywords": [
+    "literature review",
+    "systematic review",
+    "prior work",
+    "social science",
+    "semantic scholar",
+    "openalex",
+    "zotero",
+    "ssci",
+    "research"
+  ],
+  "activationEvents": [
+    "workspaceContains:.priorwork/config.json",
+    "workspaceContains:.priorwork/surveys",
+    "workspaceContains:.lit/surveys"
+  ],
+  "main": "./out/extension.js",
+  "l10n": "./l10n",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        { "id": "priorwork", "title": "Prior Work", "icon": "media/priorwork.svg" }
+      ]
+    },
+    "views": {
+      "priorwork": [
+        { "id": "priorwork.surveys", "name": "%view.surveys.name%" }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "priorwork.surveys",
+        "contents": "%welcome.noWorkspace%",
+        "when": "!priorwork.hasWorkspace && !priorwork.legacy"
+      },
+      {
+        "view": "priorwork.surveys",
+        "contents": "%welcome.legacy%",
+        "when": "priorwork.legacy"
+      },
+      {
+        "view": "priorwork.surveys",
+        "contents": "%welcome.noSurveys%",
+        "when": "priorwork.hasWorkspace && !priorwork.hasSurveys"
+      }
+    ],
+    "commands": [
+      { "command": "priorwork.refresh", "title": "%command.refresh%", "category": "Prior Work", "icon": "$(refresh)" },
+      { "command": "priorwork.initWorkspace", "title": "%command.initWorkspace%", "category": "Prior Work", "icon": "$(new-folder)" },
+      { "command": "priorwork.setupEnvironment", "title": "%command.setupEnvironment%", "category": "Prior Work", "icon": "$(package)" },
+      { "command": "priorwork.migrate", "title": "%command.migrate%", "category": "Prior Work" },
+      { "command": "priorwork.newSurvey", "title": "%command.newSurvey%", "category": "Prior Work", "icon": "$(add)" },
+      { "command": "priorwork.editScope", "title": "%command.editScope%", "category": "Prior Work", "icon": "$(settings)" },
+      { "command": "priorwork.search", "title": "%command.search%", "category": "Prior Work", "icon": "$(search)" },
+      { "command": "priorwork.snowball", "title": "%command.snowball%", "category": "Prior Work", "icon": "$(references)" },
+      { "command": "priorwork.addPaper", "title": "%command.addPaper%", "category": "Prior Work", "icon": "$(diff-added)" },
+      { "command": "priorwork.screen", "title": "%command.screen%", "category": "Prior Work", "icon": "$(checklist)" },
+      { "command": "priorwork.openPaper", "title": "%command.openPaper%", "category": "Prior Work" },
+      { "command": "priorwork.include", "title": "%command.include%", "category": "Prior Work", "icon": "$(check)" },
+      { "command": "priorwork.maybe", "title": "%command.maybe%", "category": "Prior Work", "icon": "$(question)" },
+      { "command": "priorwork.exclude", "title": "%command.exclude%", "category": "Prior Work", "icon": "$(close)" },
+      { "command": "priorwork.reset", "title": "%command.reset%", "category": "Prior Work", "icon": "$(discard)" },
+      { "command": "priorwork.fulltext", "title": "%command.fulltext%", "category": "Prior Work", "icon": "$(file-text)" },
+      { "command": "priorwork.openDoi", "title": "%command.openDoi%", "category": "Prior Work", "icon": "$(link-external)" },
+      { "command": "priorwork.openReport", "title": "%command.openReport%", "category": "Prior Work", "icon": "$(go-to-file)" },
+      { "command": "priorwork.exportReport", "title": "%command.exportReport%", "category": "Prior Work", "icon": "$(open-preview)" },
+      { "command": "priorwork.check", "title": "%command.check%", "category": "Prior Work", "icon": "$(pass)" },
+      { "command": "priorwork.doctor", "title": "%command.doctor%", "category": "Prior Work", "icon": "$(pulse)" },
+      { "command": "priorwork.sync", "title": "%command.sync%", "category": "Prior Work" },
+      { "command": "priorwork.upgrade", "title": "%command.upgrade%", "category": "Prior Work" },
+      { "command": "priorwork.openEnv", "title": "%command.openEnv%", "category": "Prior Work", "icon": "$(key)" },
+      { "command": "priorwork.showOutput", "title": "%command.showOutput%", "category": "Prior Work" },
+      { "command": "priorwork.runStep", "title": "%command.runStep%", "category": "Prior Work" }
+    ],
+    "menus": {
+      "view/title": [
+        { "command": "priorwork.newSurvey", "when": "view == priorwork.surveys && priorwork.hasWorkspace", "group": "navigation@1" },
+        { "command": "priorwork.refresh", "when": "view == priorwork.surveys", "group": "navigation@2" },
+        { "command": "priorwork.openEnv", "when": "view == priorwork.surveys && priorwork.hasWorkspace", "group": "1_setup@1" },
+        { "command": "priorwork.doctor", "when": "view == priorwork.surveys", "group": "1_setup@2" },
+        { "command": "priorwork.setupEnvironment", "when": "view == priorwork.surveys && priorwork.hasWorkspace", "group": "1_setup@3" },
+        { "command": "priorwork.sync", "when": "view == priorwork.surveys && priorwork.hasWorkspace", "group": "2_engine@1" },
+        { "command": "priorwork.upgrade", "when": "view == priorwork.surveys && priorwork.hasWorkspace", "group": "2_engine@2" },
+        { "command": "priorwork.showOutput", "when": "view == priorwork.surveys", "group": "3_output@1" }
+      ],
+      "view/item/context": [
+        { "command": "priorwork.search", "when": "view == priorwork.surveys && viewItem == priorwork.survey", "group": "inline@1" },
+        { "command": "priorwork.screen", "when": "view == priorwork.surveys && viewItem == priorwork.survey", "group": "inline@2" },
+        { "command": "priorwork.search", "when": "view == priorwork.surveys && viewItem == priorwork.survey", "group": "1_find@1" },
+        { "command": "priorwork.snowball", "when": "view == priorwork.surveys && viewItem == priorwork.survey", "group": "1_find@2" },
+        { "command": "priorwork.addPaper", "when": "view == priorwork.surveys && viewItem == priorwork.survey", "group": "1_find@3" },
+        { "command": "priorwork.screen", "when": "view == priorwork.surveys && viewItem == priorwork.survey", "group": "2_screen@1" },
+        { "command": "priorwork.editScope", "when": "view == priorwork.surveys && viewItem == priorwork.survey", "group": "2_screen@2" },
+        { "command": "priorwork.openReport", "when": "view == priorwork.surveys && viewItem == priorwork.survey", "group": "3_report@1" },
+        { "command": "priorwork.check", "when": "view == priorwork.surveys && viewItem == priorwork.survey", "group": "3_report@2" },
+        { "command": "priorwork.exportReport", "when": "view == priorwork.surveys && viewItem == priorwork.survey", "group": "3_report@3" },
+
+        { "command": "priorwork.include", "when": "view == priorwork.surveys && viewItem =~ /^priorwork\\.paper\\.(candidate|maybe|excluded)$/", "group": "inline@1" },
+        { "command": "priorwork.maybe", "when": "view == priorwork.surveys && viewItem =~ /^priorwork\\.paper\\.(candidate|included|excluded)$/", "group": "inline@2" },
+        { "command": "priorwork.exclude", "when": "view == priorwork.surveys && viewItem =~ /^priorwork\\.paper\\.(candidate|maybe|included)$/", "group": "inline@3" },
+        { "command": "priorwork.include", "when": "view == priorwork.surveys && viewItem =~ /^priorwork\\.paper\\.(candidate|maybe|excluded)$/", "group": "1_decide@1" },
+        { "command": "priorwork.maybe", "when": "view == priorwork.surveys && viewItem =~ /^priorwork\\.paper\\.(candidate|included|excluded)$/", "group": "1_decide@2" },
+        { "command": "priorwork.exclude", "when": "view == priorwork.surveys && viewItem =~ /^priorwork\\.paper\\.(candidate|maybe|included)$/", "group": "1_decide@3" },
+        { "command": "priorwork.reset", "when": "view == priorwork.surveys && viewItem =~ /^priorwork\\.paper\\.(maybe|included|excluded)$/", "group": "1_decide@4" },
+        { "command": "priorwork.openDoi", "when": "view == priorwork.surveys && viewItem =~ /^priorwork\\.paper\\./", "group": "2_paper@1" },
+        { "command": "priorwork.fulltext", "when": "view == priorwork.surveys && viewItem == priorwork.paper.included", "group": "2_paper@2" }
+      ],
+      "commandPalette": [
+        { "command": "priorwork.openPaper", "when": "false" },
+        { "command": "priorwork.runStep", "when": "false" },
+        { "command": "priorwork.include", "when": "false" },
+        { "command": "priorwork.maybe", "when": "false" },
+        { "command": "priorwork.exclude", "when": "false" },
+        { "command": "priorwork.reset", "when": "false" },
+        { "command": "priorwork.openDoi", "when": "false" },
+        { "command": "priorwork.fulltext", "when": "false" },
+        { "command": "priorwork.migrate", "when": "priorwork.legacy" },
+        { "command": "priorwork.newSurvey", "when": "priorwork.hasWorkspace" },
+        { "command": "priorwork.editScope", "when": "priorwork.hasSurveys" },
+        { "command": "priorwork.search", "when": "priorwork.hasSurveys" },
+        { "command": "priorwork.snowball", "when": "priorwork.hasSurveys" },
+        { "command": "priorwork.addPaper", "when": "priorwork.hasSurveys" },
+        { "command": "priorwork.screen", "when": "priorwork.hasSurveys" },
+        { "command": "priorwork.openReport", "when": "priorwork.hasSurveys" },
+        { "command": "priorwork.exportReport", "when": "priorwork.hasSurveys" },
+        { "command": "priorwork.check", "when": "priorwork.hasSurveys" },
+        { "command": "priorwork.sync", "when": "priorwork.hasWorkspace" },
+        { "command": "priorwork.upgrade", "when": "priorwork.hasWorkspace" },
+        { "command": "priorwork.openEnv", "when": "priorwork.hasWorkspace" },
+        { "command": "priorwork.setupEnvironment", "when": "priorwork.hasWorkspace" }
+      ]
+    },
+    "configuration": {
+      "title": "Prior Work",
+      "properties": {
+        "priorwork.command": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "%config.command%"
+        },
+        "priorwork.python": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "%config.python%"
+        },
+        "priorwork.autoAdvance": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.autoAdvance%"
+        }
+      }
+    },
+    "walkthroughs": [
+      {
+        "id": "start",
+        "title": "%walkthrough.title%",
+        "description": "%walkthrough.description%",
+        "steps": [
+          {
+            "id": "workspace",
+            "title": "%walkthrough.workspace.title%",
+            "description": "%walkthrough.workspace.description%",
+            "media": { "image": "media/icon.png", "altText": "Prior Work" },
+            "completionEvents": ["onContext:priorwork.hasWorkspace"]
+          },
+          {
+            "id": "keys",
+            "title": "%walkthrough.keys.title%",
+            "description": "%walkthrough.keys.description%",
+            "media": { "image": "media/icon.png", "altText": "Prior Work" },
+            "completionEvents": ["onCommand:priorwork.openEnv"]
+          },
+          {
+            "id": "survey",
+            "title": "%walkthrough.survey.title%",
+            "description": "%walkthrough.survey.description%",
+            "media": { "image": "media/icon.png", "altText": "Prior Work" },
+            "completionEvents": ["onContext:priorwork.hasSurveys"]
+          },
+          {
+            "id": "screen",
+            "title": "%walkthrough.screen.title%",
+            "description": "%walkthrough.screen.description%",
+            "media": { "image": "media/icon.png", "altText": "Prior Work" },
+            "completionEvents": ["onCommand:priorwork.screen"]
+          },
+          {
+            "id": "agent",
+            "title": "%walkthrough.agent.title%",
+            "description": "%walkthrough.agent.description%",
+            "media": { "image": "media/icon.png", "altText": "Prior Work" }
+          }
+        ]
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile && node scripts/check-media.mjs",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.2.0",
+    "typescript": "^5.4.0"
+  }
+}

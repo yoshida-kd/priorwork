@@ -1,0 +1,7 @@
+#!/bin/sh
+# 開発用: エンジンのリポジトリから `bin/priorwork <command>` で、このチェックアウトのコードを動かす（.venv があればそれを使う）。
+# ワークスペースの中で試すときは PRIORWORK_WORKSPACE を渡すか、ワークスペースに cd してから絶対パスで呼ぶ
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+PY="$ROOT/.venv/bin/python"
+[ -x "$PY" ] || PY=python3
+PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}" exec "$PY" -m priorwork "$@"

@@ -1,0 +1,87 @@
+/* 論文のページ。色は VS Code のテーマの変数だけを使う（明るい・暗いテーマの両方で読めるように）。 */
+body {
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  color: var(--vscode-foreground);
+  background: var(--vscode-editor-background);
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: 0 1rem 3rem;
+  line-height: 1.6;
+}
+nav {
+  position: sticky;
+  top: 0;
+  display: flex;
+  gap: .4rem;
+  align-items: center;
+  padding: .6rem 0;
+  background: var(--vscode-editor-background);
+  border-bottom: 1px solid var(--vscode-panel-border);
+  z-index: 1;
+}
+nav .spacer { flex: 1; }
+h1 { font-size: 1.35rem; line-height: 1.35; margin: .3rem 0 .6rem; }
+header p { margin: .25rem 0; }
+a { color: var(--vscode-textLink-foreground); }
+button {
+  font: inherit;
+  color: var(--vscode-button-secondaryForeground);
+  background: var(--vscode-button-secondaryBackground);
+  border: 1px solid transparent;
+  border-radius: 3px;
+  padding: .3rem .7rem;
+  cursor: pointer;
+}
+button:hover { background: var(--vscode-button-secondaryHoverBackground); }
+button:focus-visible, input:focus-visible { outline: 1px solid var(--vscode-focusBorder); }
+button.include { color: var(--vscode-button-foreground); background: var(--vscode-button-background); }
+button.include:hover { background: var(--vscode-button-hoverBackground); }
+button.current { border-color: var(--vscode-focusBorder); }
+kbd {
+  font-family: var(--vscode-editor-font-family);
+  font-size: .8em;
+  opacity: .7;
+  margin-left: .2rem;
+}
+.decide {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  align-items: center;
+  margin: 1rem 0;
+  padding: .8rem;
+  background: var(--vscode-editorWidget-background);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 4px;
+}
+.exclude-group { display: inline-flex; gap: .3rem; flex: 1; min-width: 16rem; }
+input {
+  flex: 1;
+  font: inherit;
+  color: var(--vscode-input-foreground);
+  background: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 3px;
+  padding: .3rem .5rem;
+}
+input.missing { border-color: var(--vscode-inputValidation-errorBorder); }
+.reasons { width: 100%; display: flex; flex-wrap: wrap; gap: .3rem; }
+button.chip { font-size: .85em; padding: .1rem .5rem; border-radius: 1rem; }
+.criteria {
+  margin: .8rem 0;
+  padding: .4rem .8rem;
+  border-left: 3px solid var(--vscode-textLink-foreground);
+  background: var(--vscode-textBlockQuote-background);
+}
+.criteria p { margin: .2rem 0; }
+.criteria summary { cursor: pointer; font-weight: 600; }
+.status { font-weight: 600; }
+.s-included { color: var(--vscode-testing-iconPassed); }
+.s-maybe { color: var(--vscode-list-warningForeground); }
+.s-excluded { color: var(--vscode-disabledForeground); }
+.warning { color: var(--vscode-editorWarning-foreground); }
+.error { color: var(--vscode-errorForeground); }
+.muted { color: var(--vscode-descriptionForeground); }
+.abstract { white-space: pre-wrap; }
+.keys { font-size: .85em; margin-top: 2rem; }

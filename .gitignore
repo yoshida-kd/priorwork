@@ -1,0 +1,47 @@
+# Environment variables
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+
+# Clarivate journal lists (licensed data; keep local)
+data/*.csv
+
+# Extracted full texts (from Zotero / OA PDFs; keep local)
+.priorwork/
+
+# 拡張機能の開発用の起動設定（F5）は共有する
+!vscode-extension/.vscode/

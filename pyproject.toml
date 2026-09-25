@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "priorwork"
+version = "0.1.0"
+description = "Build literature reviews for the social sciences in conversation with an AI agent (Semantic Scholar + OpenAlex + SSCI)"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "yoshida-kd" }]
+requires-python = ">=3.10"
+keywords = ["literature review", "systematic review", "social science", "semantic scholar", "openalex", "ssci", "zotero"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Intended Audience :: Science/Research",
+  "Natural Language :: English",
+  "Natural Language :: Japanese",
+  "Programming Language :: Python :: 3",
+  "Topic :: Scientific/Engineering",
+]
+dependencies = [
+  "requests>=2.31",
+  "python-dotenv>=1.0",
+  "pypdf>=4.0",
+  "markdown-it-py>=3.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.urls]
+Homepage = "https://github.com/yoshida-kd/priorwork"
+Issues = "https://github.com/yoshida-kd/priorwork/issues"
+Changelog = "https://github.com/yoshida-kd/priorwork/blob/main/vscode-extension/CHANGELOG.md"
+
+[project.scripts]
+priorwork = "priorwork.cli:main"
+
+# assets/ 以下（AGENTS.md・スキル・雛形）はデータだけのパッケージとして同梱する
+[tool.setuptools.packages.find]
+include = ["priorwork", "priorwork.*"]
+
+[tool.setuptools.package-data]
+"*" = ["*.md", "env.example"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

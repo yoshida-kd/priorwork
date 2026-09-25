@@ -1,0 +1,91 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# テストは英語の原文を突き合わせるものと、日本語を見るもの（conftest が PRIORWORK_LANG=ja にする）がある。
+# ランナーのロケールで揺れないよう、既定はここで英語に固定する。
+env:
+  PRIORWORK_LANG: en
+
+jobs:
+  pytest:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        python-version: ['3.10', '3.11', '3.12', '3.13', '3.14']
+        # Windows は未確認（ワークスペースの .claude/skills がシンボリックリンク、./priorwork が sh のため）
+        include:
+          - os: macos-latest
+            python-version: '3.14'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m pip install -e ".[dev]"
+      - run: python -m pytest -q
+
+  # pip で入れたときに同梱物（assets/）が付いてくるか。リポジトリの外で init から export まで通す
+  # （中で走らせると手元の priorwork/ を拾ってしまい、wheel に入っていなくても通る）。
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - name: Build the wheel and sdist
+        run: |
+          python -m pip install --quiet build
+          python -m build
+          ls -l dist
+      - name: Install it and run a workspace from scratch
+        run: |
+          python -m venv /tmp/venv
+          /tmp/venv/bin/pip install --quiet dist/*.whl
+          export PATH=/tmp/venv/bin:$PATH
+          cd /tmp
+          priorwork --version
+          for lang in en ja; do
+            priorwork init ws-$lang --lang $lang
+            cd ws-$lang
+            test -f AGENTS.md && test -f .agent/skills/survey-new/SKILL.md && test -x priorwork
+            priorwork new "Minimum wages" --slug mw
+            priorwork status --json > status.json
+            python -c "import json; d=json.load(open('status.json')); assert d['lang'] == '$lang' and len(d['surveys']) == 1"
+            priorwork check mw --offline
+            priorwork export mw
+            ls reports/*_mw.html
+            ./priorwork doctor || true
+            cd /tmp
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: priorwork-dist
+          path: dist/*
+
+  # VS Code の拡張機能がコンパイルでき、.vsix にまとまるか。strict + noUnused* なので使われない変数1つでも落ちる。
+  # Node 22 なのは @vscode/vsce の依存が node >= 22 を要求するため。
+  extension:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: vscode-extension
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: vscode-extension/package-lock.json
+      - run: npm ci
+      # vsce package が vscode:prepublish（compile と media の構文検査）も走らせる
+      - run: npx vsce package -o priorwork.vsix
+      - uses: actions/upload-artifact@v4
+        with:
+          name: priorwork-vsix
+          path: vscode-extension/priorwork.vsix

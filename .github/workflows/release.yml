@@ -1,0 +1,100 @@
+name: release
+
+# 公開用リポジトリ（yoshida-kd/priorwork）に v<版> のタグが push されたら、CLI を PyPI に、
+# 拡張機能を VS Code Marketplace に出し、GitHub Release を作る。タグは priorwork-dev 側の
+# tools/release.py が作る（1版＝1コミット）。Octavo の release.yml と同じ形。
+#
+# 開発用の priorwork-dev でも同じファイルが動くが、repository の条件で何もしない。
+#
+# 前もって要るもの（公開側のリポジトリの Settings と、各サービスで）:
+#   - PyPI: Trusted Publishing（pending publisher）に このリポジトリ / release.yml / 環境 pypi を登録
+#   - Marketplace: secret VSCE_PAT（Azure DevOps の Personal Access Token、Marketplace: Manage）。
+#     publisher yoshida-kd は Octavo で作ってある
+#   - 環境 pypi（Settings → Environments）
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  check:
+    if: github.repository == 'yoshida-kd/priorwork'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        name: The tag, the CLI and the extension name the same version
+        run: |
+          py=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' priorwork/__init__.py)
+          ext=$(node -p "require('./vscode-extension/package.json').version")
+          tag="${GITHUB_REF_NAME#v}"
+          echo "tag=$tag priorwork=$py extension=$ext"
+          test "$tag" = "$py" && test "$tag" = "$ext"
+          echo "version=$tag" >> "$GITHUB_OUTPUT"
+
+  pypi:
+    needs: check
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write          # Trusted Publishing（トークンを置かない）
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - run: python3 -m pip install --quiet build && python3 -m build
+      - uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/*
+
+  marketplace:
+    needs: check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: vscode-extension
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npx vsce package -o priorwork-${{ needs.check.outputs.version }}.vsix
+      - name: Publish (skipped until VSCE_PAT is set)
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          if [ -z "$VSCE_PAT" ]; then
+            echo "::notice::not published to the Marketplace (VSCE_PAT is not set)"
+            exit 0
+          fi
+          npx vsce publish --packagePath priorwork-${{ needs.check.outputs.version }}.vsix
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vsix
+          path: vscode-extension/*.vsix
+
+  github-release:
+    needs: [check, pypi, marketplace]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      # 本文は CHANGELOG のその版の節（公開側の履歴は版ごとの1コミットなので、コミットから作ると中身が無い）
+      - name: Create the release with the wheel, sdist and .vsix attached
+        env:
+          GH_TOKEN: ${{ github.token }}
+          V: ${{ needs.check.outputs.version }}
+        run: |
+          awk -v v="## $V" '$0 == v {on=1; next} /^## / {on=0} on' vscode-extension/CHANGELOG.md > notes.md
+          gh release create "$GITHUB_REF_NAME" out/* --repo "$GITHUB_REPOSITORY" --title "Prior Work $V" --notes-file notes.md
