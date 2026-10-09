@@ -65,7 +65,7 @@ jobs:
           node-version: '22'
       - run: npm ci
       - run: npx vsce package -o priorwork-${{ needs.check.outputs.version }}.vsix
-      - name: Publish (skipped until VSCE_PAT is set)
+      - name: Publish to the Marketplace (with a notice instead, if VSCE_PAT is not set)
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
         run: |

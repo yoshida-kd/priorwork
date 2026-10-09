@@ -1,5 +1,4 @@
 {
-  "The priorwork command was not found ({0}).": "priorwork コマンドが見つかりません（{0}）。",
   "priorwork {0} failed.": "priorwork {0} が失敗しました。",
   "Open a Prior Work workspace folder first.": "先に Prior Work のワークスペースのフォルダを開いてください。",
   "Show the output": "出力を表示",
@@ -196,5 +195,8 @@
   "Install uv": "uv を入れる",
   "Prior Work needs Python 3.10 or later, which was not found. It can install uv (a small tool from Astral, into your home folder, without administrator rights), which then downloads Python for the workspace.": "Prior Work には Python 3.10 以上が必要ですが、見つかりませんでした。uv（Astral の小さなツール。ホームフォルダーに入り、管理者権限は要りません）を入れれば、uv がワークスペース用の Python を取ってきます。",
   "Prior Work: installing uv": "Prior Work: uv を入れています",
-  "Prior Work: could not install uv. Install Python 3.10 or later (python.org), then try again.": "Prior Work: uv を入れられませんでした。Python 3.10 以上（python.org）を入れてから、もう一度試してください。"
+  "Prior Work: could not install uv. Install Python 3.10 or later (python.org), then try again.": "Prior Work: uv を入れられませんでした。Python 3.10 以上（python.org）を入れてから、もう一度試してください。",
+  "The priorwork command was not found ({0}). Correct the setting priorwork.command, or clear it.": "priorwork コマンドが見つかりません（{0}）。設定 priorwork.command を直すか、空にしてください。",
+  "The priorwork command was not found ({0}). Set up the Python environment (.venv): it installs priorwork into this workspace.": "priorwork コマンドが見つかりません（{0}）。「Python の環境（.venv）を用意する」を実行してください。このワークスペースに priorwork を入れます。",
+  "The priorwork command was not found ({0}). Create a workspace: it installs priorwork into the workspace folder.": "priorwork コマンドが見つかりません（{0}）。「ワークスペースを作る」を実行してください。ワークスペースのフォルダに priorwork を入れます。"
 }

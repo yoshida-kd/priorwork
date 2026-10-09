@@ -3,6 +3,13 @@
 Prior Work's command-line tool (`priorwork` on PyPI) and this extension are
 released together, under one version number.
 
+## 0.1.2
+
+- Creating a workspace no longer stops at "the priorwork command was not
+  found": the extension mistook its own error for priorwork's version, so it
+  skipped setting up the workspace's `.venv`. The message, when it does
+  appear, now says what to do.
+
 ## 0.1.1
 
 - A guide and a web page: <https://yoshida-kd.github.io/priorwork/>.

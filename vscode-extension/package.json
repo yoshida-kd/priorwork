@@ -2,7 +2,7 @@
   "name": "priorwork",
   "displayName": "Prior Work",
   "description": "%extension.description%",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "yoshida-kd",
   "license": "MIT",
   "icon": "media/icon.png",

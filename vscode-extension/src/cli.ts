@@ -264,6 +264,17 @@ export interface RunResult {
     stderr: string;
 }
 
+/** priorwork が見つからないときの文言。何をすればよいかまで言う。 */
+function notFound(root: string | undefined, command: string): string {
+    const L = vscode.l10n;
+    if ((cfg().get<string>('command', '') || '').trim()) {
+        return L.t('The priorwork command was not found ({0}). Correct the setting priorwork.command, or clear it.', command);
+    }
+    return root
+        ? L.t('The priorwork command was not found ({0}). Set up the Python environment (.venv): it installs priorwork into this workspace.', command)
+        : L.t('The priorwork command was not found ({0}). Create a workspace: it installs priorwork into the workspace folder.', command);
+}
+
 /** priorwork を走らせて、出力をまるごと返す。token で取り消すと子プロセスを止める。 */
 export function run(root: string | undefined, args: string[], opts: RunOptions = {}): Promise<RunResult> {
     const command = resolveCommand(root);
@@ -296,9 +307,7 @@ export function run(root: string | undefined, args: string[], opts: RunOptions =
             resolve({ code, stdout, stderr: stderr + extra });
         };
         child.on('error', (e: NodeJS.ErrnoException) => {
-            done(null, e.code === 'ENOENT'
-                ? vscode.l10n.t('The priorwork command was not found ({0}).', command)
-                : e.message);
+            done(null, e.code === 'ENOENT' ? notFound(root, command) : e.message);
         });
         child.on('close', (code) => done(code));
     });
@@ -339,7 +348,8 @@ export async function runText(root: string | undefined, args: string[], opts: Ru
 /** `priorwork --version` → '0.1.0'。無ければ undefined。 */
 export async function cliVersion(root: string | undefined): Promise<string | undefined> {
     const r = await run(root, ['--version'], { timeoutMs: 30000 });
-    const m = /priorwork (\S+)/.exec(r.stdout + r.stderr);
+    // 標準出力だけを見る。見つからないときの文言（stderr）も「priorwork …」で始まり、版と取り違える
+    const m = r.code === 0 ? /^priorwork (\d\S*)/m.exec(r.stdout) : null;
     return m ? m[1] : undefined;
 }
 
