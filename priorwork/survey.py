@@ -377,6 +377,17 @@ class Survey:
             raise SurveyError(t("depth is one of {choices}: {depth}", choices=" / ".join(DEPTHS), depth=depth))
         self.data["depth"] = depth
 
+    @property
+    def zotero_collection(self) -> Dict[str, str]:
+        """結び付けた Zotero のコレクション（{key, name}）。無ければ空の dict（キーは任意。無い状態ファイルもそのまま読める）。"""
+        return self.data.get("zotero_collection") or {}
+
+    def set_zotero_collection(self, key: str, name: str):
+        if key:
+            self.data["zotero_collection"] = {"key": key, "name": name}
+        else:
+            self.data.pop("zotero_collection", None)
+
     def update_scope(self, **scope: Optional[str]):
         for k, v in scope.items():
             if v is not None:
@@ -740,8 +751,11 @@ def render_references(included: List[Dict[str, Any]], labels: Optional[Dict[str,
 def _flow_line(data: Dict[str, Any], papers: List[Dict[str, Any]], counts: Dict[str, int], lang: str) -> str:
     """検索 → 重複を除いた候補 → 採否 の流れ（PRISMA 風の件数）。"""
     runs = {k: [s for s in data["searches"] if s["kind"] in kinds]
-            for k, kinds in (("search", ("search", "bulk")), ("snowball", ("snowball",)), ("manual", ("manual",)))}
-    first = {k: sum(1 for e in papers if e["found_by"][:1] == [k]) for k in runs}
+            for k, kinds in (("search", ("search", "bulk")), ("snowball", ("snowball",)),
+                             ("manual", ("manual", "zotero")))}
+    # Zotero のコレクションから取り込んだものは「手で追加」に数える（ユーザーが選んで入れたもの）
+    first = {k: sum(1 for e in papers if e["found_by"][:1] in ([k], ["zotero"] if k == "manual" else [k]))
+             for k in runs}
     hits = sum(s["hits"] for s in runs["search"] + runs["snowball"])
     return (f"- **{tl(lang, 'Flow')}**: "
             + tl(lang, "{searches|# search|# searches} and {snowballs|# citation chase|# citation chases} "

@@ -61,7 +61,7 @@ jobs:
           for lang in en ja; do
             priorwork init ws-$lang --lang $lang
             cd ws-$lang
-            test -f AGENTS.md && test -f .agent/skills/survey-new/SKILL.md && test -x priorwork
+            test -f AGENTS.md && test -f .agent/skills/priorwork/SKILL.md && test -x priorwork
             priorwork new "Minimum wages" --slug mw
             priorwork status --json > status.json
             python -c "import json; d=json.load(open('status.json')); assert d['lang'] == '$lang' and len(d['surveys']) == 1"

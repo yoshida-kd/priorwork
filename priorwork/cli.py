@@ -28,6 +28,11 @@ from .workspace import ROOT, meta_dir, workspace_lang
 from .zotero import ZoteroClient, ZoteroError
 
 SORTS = ("citations", "relevance", "recent", "cpy")
+# --limit の既定。full のサーベイでは多めに取る（少ない件数から選別すると、ほとんど残らない）
+DEFAULT_LIMIT = {"quick": 10, "full": 25}
+# full のサーベイで「検索が足りない」とみなす目安（次にやることに出す）
+FULL_MIN_QUERIES = 6
+FULL_MIN_FOUND = 80
 # サブコマンドの説明（英語が原文。t() で訳す）
 STATUS_COMMANDS = [("include", "include"), ("exclude", "exclude (--reason is required)"), ("maybe", "maybe"),
                    ("reset", "back to candidate")]
@@ -57,6 +62,7 @@ USAGE_LINES = [
     "  check SURVEY               find empty fields, unregistered citations and DOI mismatches",
     "  fulltext SURVEY N          get the full text (Zotero / open-access PDF)",
     "  zotero [SURVEY]            check the Zotero link / which included papers are in Zotero",
+    "  zotero SURVEY --collection NAME   link a Zotero collection (--import registers its papers, --dois lists the DOIs to add)",
     "",
     "Finding literature",
     "  search QUERY [--into SURVEY]   search (--into registers the results as candidates)",
@@ -240,7 +246,7 @@ def cmd_upgrade(args, client):
 
 # ---------------- Survey commands ----------------
 
-def next_steps(s: Survey, zotero_missing: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def next_steps(s: Survey, zotero_missing: List[Dict[str, Any]], zotero_pending: int = 0) -> List[Dict[str, Any]]:
     """次にやること。id は VS Code の拡張機能がボタンに結びつける。"""
     c = s.counts()
     sc = s.data["scope"]
@@ -254,6 +260,14 @@ def next_steps(s: Survey, zotero_missing: List[Dict[str, Any]]) -> List[Dict[str
         step("scope", t("Set the scope"), ["scope", s.name, "--question", "..."])
     if not s.data["searches"]:
         step("search", t("Search"), ["search", "<English query>", "--into", s.name])
+    elif s.depth == "full":
+        queries = sum(1 for q in s.data["searches"] if q["kind"] in ("search", "bulk") and q.get("hits"))
+        found = len(s.papers)
+        if queries < FULL_MIN_QUERIES or found < FULL_MIN_FOUND:
+            step("search_more", t("Search more: a full survey usually needs {min_q}+ queries and {min_n}+ papers "
+                                  "(now {queries|# query|# queries}, {n|# paper|# papers})",
+                                  min_q=FULL_MIN_QUERIES, min_n=FULL_MIN_FOUND, queries=queries, n=found),
+                 ["search", "<English query>", "--into", s.name])
     if c[CANDIDATE] or c[MAYBE]:
         step("screen", t("Screen {n|# candidate|# candidates}", n=c[CANDIDATE] + c[MAYBE]),
              ["list", s.name, "--status", "candidate", "maybe", "--abstract"])
@@ -262,6 +276,10 @@ def next_steps(s: Survey, zotero_missing: List[Dict[str, Any]]) -> List[Dict[str
             step("snowball", t("Chase citations to find what was missed"), ["snowball", s.name])
         else:
             step("snowball", t("(Optional) chase citations if you worry about missed papers"), ["snowball", s.name])
+    if zotero_pending:
+        step("zotero_import", t("Register {n|# paper|# papers} from the Zotero collection \"{name}\" as candidates",
+                                n=zotero_pending, name=s.zotero_collection.get("name", "")),
+             ["zotero", s.name, "--import"])
     if zotero_missing:
         step("zotero", t("Add {n|# included paper|# included papers} to Zotero ({numbers})", n=len(zotero_missing),
                          numbers=", ".join(f"#{e['number']}" for e in zotero_missing[:10])), ["zotero", s.name])
@@ -297,9 +315,10 @@ def cmd_status(args, client):
 
     s = Survey.load(args.survey)
     zotero_missing = zotero_unregistered(s)
-    steps = next_steps(s, zotero_missing)
+    pending = zotero_pending(s)
+    steps = next_steps(s, zotero_missing, pending)
     if args.json:
-        return dump_json({**survey_summary(s), "scope": s.data["scope"],
+        return dump_json({**survey_summary(s), "scope": s.data["scope"], "zotero_collection": s.zotero_collection or None,
                           "unfilled": [e["number"] for e in s.unfilled()],
                           "zotero_missing": [e["number"] for e in zotero_missing],
                           "sync": scaffold.sync_status(ROOT), "next": steps})
@@ -324,12 +343,17 @@ def _shell(arg: str) -> str:
 
 
 def zotero_unregistered(s: Survey) -> List[Dict[str, Any]]:
-    """Zotero 連携が設定されていれば、Zotero 未登録の採用論文を返す（失敗しても status 等は止めない）。"""
+    """Zotero 連携が設定されていれば、Zotero 未登録の採用論文を返す（失敗しても status 等は止めない）。
+
+    サーベイに Zotero のコレクションを結び付けていれば、そのコレクションに無いものを返す。
+    """
     z = ZoteroClient.from_env()
     if z is None:
         return []
+    coll = s.zotero_collection.get("key", "")
     try:
-        return [e for e in s.by_status(INCLUDED) if not z.status(e["record"])["registered"]]
+        return [e for e in s.by_status(INCLUDED)
+                if not (st := z.status(e["record"], coll))["registered"] or (coll and not st["in_collection"])]
     except ZoteroError as e:
         print(f"[Notice] {e}", file=sys.stderr)
         return []
@@ -508,16 +532,49 @@ def cmd_fulltext(args, client):
     print(t("* Extracted text can garble columns, tables and formulas. Check numbers against the page in the PDF too."))
 
 
+def zotero_pending(s: Survey) -> int:
+    """結び付けたコレクションにあって、サーベイにまだ無い論文の数（失敗しても status は止めない）。"""
+    z = ZoteroClient.from_env()
+    if z is None or not s.zotero_collection:
+        return 0
+    try:
+        return len(zotero_to_import(s, z))
+    except ZoteroError as e:
+        print(f"[Notice] {e}", file=sys.stderr)
+        return 0
+
+
+def zotero_to_import(s: Survey, z: ZoteroClient) -> List[Dict[str, Any]]:
+    """結び付けたコレクションにあって、サーベイにまだ無い論文（Zotero のアイテム）。"""
+    coll = s.zotero_collection.get("key")
+    if not coll:
+        return []
+    known_dois = {(e["record"].get("doi") or "").lower() for e in s.papers} - {""}
+    known_titles = {ssci.normalize_title(e["record"]["title"]) for e in s.papers}
+    return [i for i in z.collection_items(coll)
+            if i["doi"] not in known_dois and ssci.normalize_title(i["title"]) not in known_titles]
+
+
 def cmd_zotero(args, client):
     z = ZoteroClient.from_env()
     if z is None:
         sys.exit(t("Error: {message}", message=t("Zotero is not set up. Set ZOTERO_API_KEY and ZOTERO_USER_ID in .env")))
     index = z.sync(force=args.refresh)
-    items = index["items"].values()
-    parents = [i for i in items if not i["parentItem"] and i["itemType"] != "attachment"]
-    pdfs = [i for i in items if i["contentType"] == "application/pdf"]
+
+    if args.collections:
+        cols = z.collections()
+        if args.json:
+            return dump_json({"collections": cols})
+        for c in cols:
+            print(f"{c['path']}  ({t('{n|# item|# items}', n=c['items'])}, key {c['key']})")
+        if not cols:
+            print(t("No collections in the Zotero library"))
+        return
 
     if not args.survey:
+        items = index["items"].values()
+        parents = [i for i in items if not i["parentItem"] and i["itemType"] != "attachment"]
+        pdfs = [i for i in items if i["contentType"] == "application/pdf"]
         print(t("Zotero library: {n|# item|# items} ({doi} with a DOI) / {pdfs|# PDF attached|# PDFs attached} | "
                 "library version {version} | synced {synced}", n=len(parents),
                 doi=sum(1 for i in parents if i["doi"]), pdfs=len(pdfs), version=index["version"],
@@ -526,33 +583,108 @@ def cmd_zotero(args, client):
         return
 
     s = Survey.load(args.survey)
+    if args.collection is not None:
+        found = z.find_collection(args.collection) if args.collection.strip() else {"key": "", "path": ""}
+        s.set_zotero_collection(found["key"], found["path"])
+        s.save()
+        if not args.json:
+            print(t("Linked the Zotero collection \"{name}\" to {survey}", name=found["path"], survey=s.name)
+                  if found["key"] else t("Unlinked the Zotero collection from {survey}", survey=s.name))
+    coll = s.zotero_collection
+    z.prefer_collection = coll.get("key", "")
+
+    imported: List[tuple] = []
+    no_doi: List[Dict[str, Any]] = []
+    if args.import_collection:
+        if not coll:
+            raise ZoteroError(t("No Zotero collection is linked to {survey}. Link one with "
+                                "`priorwork zotero {survey} --collection \"<name>\"`", survey=s.name))
+        for item in zotero_to_import(s, z):
+            if not item["doi"]:
+                no_doi.append(item)
+                continue
+            try:
+                rec = client.get_paper(item["doi"])
+            except ApiError as e:
+                print(f"[Notice] {item['doi']}: {e}", file=sys.stderr)
+                no_doi.append(item)
+                continue
+            imported.append(s.upsert(rec, "zotero"))
+        if imported:
+            s.log_search("zotero", coll["name"], {}, len(imported), sum(1 for _, n in imported if n))
+        render_and_report(s)
+
     statuses = args.status or [INCLUDED]
     entries = [e for e in s.papers if e["status"] in statuses]
-    missing = 0
-    print(t("{name}: Zotero status of {n|# paper|# papers} ({statuses})", name=s.name, n=len(entries),
-            statuses=" / ".join(status_label(x) for x in statuses)) + "\n")
+    rows = []
     for e in entries:
-        st = z.status(e["record"])
+        st = z.status(e["record"], coll.get("key", ""))
         r = e["record"]
-        mark = ((("✅ " + t("in Zotero ({n|# PDF|# PDFs})", n=st["pdfs"])) if st["pdfs"]
-                 else "🟡 " + t("in Zotero (no PDF)")) if st["registered"] else "❌ " + t("not in Zotero"))
-        missing += not st["registered"]
-        link = f"https://doi.org/{r['doi']}" if r.get("doi") else (r.get("url") or "")
-        print(f"#{e['number']} {mark} | {author_short(r['authors'])} ({r.get('year') or 'n.d.'}) {r['title']}")
-        if not st["registered"]:
-            print(f"    {link}")
-    print("\n" + t("{n|# paper is|# papers are} not in Zotero", n=missing)
+        rows.append({"number": e["number"], "title": r["title"], "doi": r.get("doi") or "",
+                     "link": f"https://doi.org/{r['doi']}" if r.get("doi") else (r.get("url") or ""),
+                     "registered": st["registered"], "in_collection": st["in_collection"], "pdfs": st["pdfs"],
+                     "missing": not st["registered"] or bool(coll and not st["in_collection"]), "entry": e})
+    missing = [r for r in rows if r["missing"]]
+    pending = zotero_to_import(s, z)
+
+    if args.json:
+        return dump_json({"survey": s.name, "collection": coll or None,
+                          "papers": [{k: v for k, v in r.items() if k != "entry"} for r in rows],
+                          "missing_dois": [r["doi"] for r in missing if r["doi"]],
+                          "to_import": len(pending),
+                          "imported": added_json(imported), "no_doi": [i["title"] for i in no_doi]})
+    if args.dois:
+        for r in missing:
+            if r["doi"]:
+                print(r["doi"])
+        return
+
+    if imported or no_doi:
+        print(t("Imported from the Zotero collection: {n|# paper|# papers} ({new} new)", n=len(imported),
+                new=sum(1 for _, n in imported if n)))
+        for item in no_doi:
+            print("  " + t("not imported (no DOI, or not found): {title}", title=item["title"]))
+        print()
+    print(t("{name}: Zotero status of {n|# paper|# papers} ({statuses})", name=s.name, n=len(entries),
+            statuses=" / ".join(status_label(x) for x in statuses))
+          + (" | " + t("collection: {name}", name=coll["name"]) if coll else "") + "\n")
+    for r in rows:
+        e = r["entry"]
+        if not r["registered"]:
+            mark = "❌ " + t("not in Zotero")
+        elif coll and not r["in_collection"]:
+            mark = "🟡 " + t("in Zotero, not in the collection")
+        else:
+            mark = ("✅ " + t("in Zotero ({n|# PDF|# PDFs})", n=r["pdfs"])) if r["pdfs"] else "🟡 " + t("in Zotero (no PDF)")
+        print(f"#{r['number']} {mark} | {author_short(e['record']['authors'])} ({e['record'].get('year') or 'n.d.'}) "
+              f"{r['title']}")
+        if r["missing"] and r["link"]:
+            print(f"    {r['link']}")
+    print("\n" + t("{n|# paper is|# papers are} not in Zotero", n=len(missing))
           + (t(" (add them to Zotero by hand; this command picks them up the next time it runs)") if missing else ""))
+    if any(r["doi"] for r in missing):
+        print(t("To add them at once: copy the DOIs from `priorwork zotero {name} --dois` and paste them into Zotero's "
+                "\"Add Item by Identifier\" (the magic wand){where}", name=s.name,
+                where=t(" with the collection \"{name}\" selected", name=coll["name"]) if coll else ""))
+    if pending:
+        print(t("{n|# paper is|# papers are} in the collection but not in the survey yet: "
+                "`priorwork zotero {name} --import` registers them as candidates", n=len(pending), name=s.name))
 
 
 # ---------------- Discovery commands ----------------
 
 def cmd_search(args, client):
     warn_if_no_ssci_list()
+    s = Survey.load(args.into) if args.into else None
+    limit = args.limit or DEFAULT_LIMIT["full" if s and s.depth == "full" else "quick"]
     # 除外・重複統合で件数が減るので多めに取得する
-    fetch_limit = min(max(args.limit * 4, 20), 100)
+    fetch_limit = min(max(limit * 4, 20), 100)
     papers = client.search(args.query, limit=fetch_limit, year=args.year, bulk=args.bulk)
-    results = rank_and_filter(papers, args.include_preprints, args.ssci_only, args.sort)[: args.limit]
+    results = rank_and_filter(papers, args.include_preprints, args.ssci_only, args.sort)[:limit]
+    if not results:
+        print("[Notice] " + (t("No hits. Bulk search takes + (AND), | (OR), - (NOT) and \"phrases\"; "
+                                "try fewer terms or synonyms") if args.bulk
+                              else t("No hits. Try fewer terms, synonyms or --bulk")), file=sys.stderr)
 
     if not args.into:
         if args.json:
@@ -562,11 +694,10 @@ def cmd_search(args, client):
             print_paper(p, f"[{i}]")
         return
 
-    s = Survey.load(args.into)
     added = add_records(s, results, "search")
     new = sum(1 for _, is_new in added if is_new)
     s.log_search("bulk" if args.bulk else "search", args.query,
-                 {"year": args.year, "sort": args.sort, "ssci_only": args.ssci_only, "limit": args.limit},
+                 {"year": args.year, "sort": args.sort, "ssci_only": args.ssci_only, "limit": limit},
                  len(results), new)
     render_and_report(s)
     if args.json:
@@ -583,7 +714,8 @@ def cmd_snowball(args, client):
                               min_links=args.min_links)
     if not stats["seeds"]:
         sys.exit(t("Error: {message}", message=t("No paper is included yet. Include some with `priorwork include` first")))
-    records = rank_and_filter(records, args.include_preprints, args.ssci_only, "relevance")[: args.limit]
+    limit = args.limit or DEFAULT_LIMIT["full" if s.depth == "full" else "quick"]
+    records = rank_and_filter(records, args.include_preprints, args.ssci_only, "relevance")[:limit]
     added = add_records(s, records, "snowball")
     new = sum(1 for _, is_new in added if is_new)
     s.log_search("snowball", t("citations of {n|# included paper|# included papers} ({direction})", n=stats["seeds"],
@@ -667,7 +799,7 @@ def build_parser() -> argparse.ArgumentParser:
     as_json.add_argument("--json", action="store_true", help=t("print JSON (for the VS Code extension and scripts)"))
 
     filters = argparse.ArgumentParser(add_help=False)
-    filters.add_argument("--limit", type=int, default=10, help=t("number of papers (default: 10)"))
+    filters.add_argument("--limit", type=int, help=t("number of papers (default: 25 for a full survey, else 10)"))
     filters.add_argument("--ssci-only", action="store_true", help=t("only papers in SSCI journals (including guessed ones)"))
     filters.add_argument("--include-preprints", action="store_true",
                          help=t("also include working papers, preprints, books and unknown venues"))
@@ -760,8 +892,16 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("number", type=int, help=t("the paper number"))
     p.add_argument("--pdf", help=t("the path of the PDF"))
 
-    p = sub.add_parser("zotero", parents=[common], help=t("check the Zotero link / which included papers are in Zotero"))
+    p = sub.add_parser("zotero", parents=[common, as_json],
+                       help=t("check the Zotero link / which included papers are in Zotero"))
     p.add_argument("survey", nargs="?")
+    p.add_argument("--collections", action="store_true", help=t("list the collections of the Zotero library"))
+    p.add_argument("--collection", metavar="NAME",
+                   help=t("link a Zotero collection (name, path or key) to the survey; \"\" unlinks it"))
+    p.add_argument("--import", dest="import_collection", action="store_true",
+                   help=t("register the papers of the linked collection as candidates"))
+    p.add_argument("--dois", action="store_true",
+                   help=t("print only the DOIs of the papers not in Zotero (for the magic wand)"))
     p.add_argument("--status", nargs="+", choices=list(STATUSES), help=t("which papers (default: included only)"))
     p.add_argument("--refresh", action="store_true", help=t("reload the whole library instead of the changes"))
 

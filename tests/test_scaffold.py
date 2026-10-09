@@ -9,7 +9,7 @@ def test_init_creates_workspace_and_sync_is_idempotent(tmp_path):
     root = tmp_path / "ws"
     scaffold.init(root)
     for rel in ("AGENTS.md", "CLAUDE.md", ".env.example", "priorwork", "AGENTS.local.md", "requirements.txt",
-                ".agent/skills/survey-new/SKILL.md", ".priorwork/sync.json", ".priorwork/config.json"):
+                ".agent/skills/priorwork-new/SKILL.md", ".priorwork/sync.json", ".priorwork/config.json"):
         assert (root / rel).exists(), rel
     assert (root / ".claude" / "skills").is_symlink()
     assert (root / "reports").is_dir() and (root / ".priorwork" / "surveys").is_dir()
@@ -44,12 +44,12 @@ def test_sync_removes_skills_that_the_engine_dropped(tmp_path):
     root = tmp_path / "ws"
     scaffold.init(root)
     m = json.loads(scaffold._manifest_path(root).read_text())
-    m["files"].append(".agent/skills/survey-old/SKILL.md")
+    m["files"].append(".agent/skills/priorwork-old/SKILL.md")
     scaffold._manifest_path(root).write_text(json.dumps(m))
-    (root / ".agent/skills/survey-old").mkdir()
-    (root / ".agent/skills/survey-old/SKILL.md").write_text("x")
-    assert ".agent/skills/survey-old/SKILL.md" in scaffold.sync(root).removed
-    assert not (root / ".agent/skills/survey-old").exists()
+    (root / ".agent/skills/priorwork-old").mkdir()
+    (root / ".agent/skills/priorwork-old/SKILL.md").write_text("x")
+    assert ".agent/skills/priorwork-old/SKILL.md" in scaffold.sync(root).removed
+    assert not (root / ".agent/skills/priorwork-old").exists()
 
 
 def test_gitignore_tracks_state_but_ignores_cache(tmp_path):
@@ -106,18 +106,18 @@ def test_upgrade_restores_requirements_when_pip_fails(tmp_path, monkeypatch):
 def test_sync_does_not_overwrite_local_edits_of_managed_files(tmp_path):
     root = tmp_path / "ws"
     scaffold.init(root)
-    (root / ".agent/skills/survey-new/SKILL.md").write_text("my tweak")
+    (root / ".agent/skills/priorwork-new/SKILL.md").write_text("my tweak")
 
-    assert "survey-new/SKILL.md" in scaffold.sync_status(root)
+    assert "priorwork-new/SKILL.md" in scaffold.sync_status(root)
     res = scaffold.sync(root)
-    assert ".agent/skills/survey-new/SKILL.md" in res.modified
-    assert (root / ".agent/skills/survey-new/SKILL.md").read_text() == "my tweak"
+    assert ".agent/skills/priorwork-new/SKILL.md" in res.modified
+    assert (root / ".agent/skills/priorwork-new/SKILL.md").read_text() == "my tweak"
     assert scaffold.sync_status(root) is not None            # 警告し続ける
 
     assert "my tweak" in scaffold.diff(root)                  # --diff は書き換えずに差分を示す
-    assert (root / ".agent/skills/survey-new/SKILL.md").read_text() == "my tweak"
+    assert (root / ".agent/skills/priorwork-new/SKILL.md").read_text() == "my tweak"
 
-    assert ".agent/skills/survey-new/SKILL.md" in scaffold.sync(root, force=True).written
+    assert ".agent/skills/priorwork-new/SKILL.md" in scaffold.sync(root, force=True).written
     assert scaffold.sync_status(root) is None and scaffold.diff(root) == ""
 
 

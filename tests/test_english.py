@@ -18,7 +18,7 @@ def english(tmp_path, monkeypatch):
 
 def test_init_writes_english_assets(english):
     assert (english / "AGENTS.md").read_text().startswith("# Instructions for agents")
-    assert "Start a new survey" in (english / ".agent/skills/survey-new/SKILL.md").read_text()
+    assert "Start a new survey" in (english / ".agent/skills/priorwork-new/SKILL.md").read_text()
     assert "Instructions for agents specific" in (english / "AGENTS.local.md").read_text()
     assert scaffold.sync_status(english) is None
 

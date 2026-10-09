@@ -13,6 +13,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import {
     CheckReport, CliError, DoctorReport, Entry, ExportReport, runJson, runText, SearchReport, Status, SurveySummary,
+    ZoteroCollections, ZoteroReport,
 } from './cli';
 import { Model } from './model';
 import { doiUrl, PaperPanel } from './paper';
@@ -21,10 +22,17 @@ import { Setup } from './setup';
 import { Node, SurveyTree } from './tree';
 
 /** エージェントに頼める仕事（文面は askAgent）。 */
-type AgentTask = 'fill' | 'screen' | 'snowball' | 'write' | 'check';
+type AgentTask = 'survey' | 'search' | 'screen' | 'snowball' | 'fill' | 'write' | 'check';
+
+/** エージェントのチャットを開くコマンド（入っているものだけ出す）。 */
+const AGENT_CHATS: { command: string; label: string }[] = [
+    { command: 'claude-vscode.sidebar.open', label: 'Claude Code' },
+    { command: 'antigravity.panel.focus', label: 'Antigravity' },
+    { command: 'workbench.action.chat.open', label: 'Copilot Chat' },
+];
 
 export function activate(context: vscode.ExtensionContext): void {
-    const output = vscode.window.createOutputChannel('Prior Work');
+    const output = vscode.window.createOutputChannel('Priorwork');
     const log = (s: string): void => output.appendLine(s);
     const model = new Model(log);
     const tree = new SurveyTree(model);
@@ -47,7 +55,7 @@ export function activate(context: vscode.ExtensionContext): void {
     // -- 共通 -----------------------------------------------------------------
     function root(): string | undefined {
         if (!model.root) {
-            void vscode.window.showWarningMessage(vscode.l10n.t('Open a Prior Work workspace folder first.'));
+            void vscode.window.showWarningMessage(vscode.l10n.t('Open a Priorwork workspace folder first.'));
         }
         return model.root;
     }
@@ -58,13 +66,13 @@ export function activate(context: vscode.ExtensionContext): void {
             log(e.output);
         }
         const show = vscode.l10n.t('Show the output');
-        void vscode.window.showErrorMessage(`Prior Work: ${msg}`, show).then((p) => { if (p === show) { output.show(); } });
+        void vscode.window.showErrorMessage(`Priorwork: ${msg}`, show).then((p) => { if (p === show) { output.show(); } });
     }
 
     /** 長くかかるもの（検索など）。進み具合（CLI の stderr）を通知に出し、取り消せる。 */
     function busy<T>(title: string, task: (opts: { token: vscode.CancellationToken; onOutput: (s: string) => void }) => Promise<T>): Thenable<T> {
         return vscode.window.withProgress(
-            { location: vscode.ProgressLocation.Notification, title: `Prior Work: ${title}`, cancellable: true },
+            { location: vscode.ProgressLocation.Notification, title: `Priorwork: ${title}`, cancellable: true },
             (progress, token) => task({
                 token,
                 onOutput: (s: string) => {
@@ -117,7 +125,7 @@ export function activate(context: vscode.ExtensionContext): void {
         try {
             await runJson(model.root, ['card', survey, String(number), '--set', ...pairs]);
             model.refresh();
-            vscode.window.setStatusBarMessage(vscode.l10n.t('Prior Work: saved the card of #{0}.', number), 4000);
+            vscode.window.setStatusBarMessage(vscode.l10n.t('Priorwork: saved the card of #{0}.', number), 4000);
             return true;
         } catch (e) {
             fail(e);
@@ -127,45 +135,71 @@ export function activate(context: vscode.ExtensionContext): void {
 
     /**
      * エージェントに頼む文面をクリップボードに写す。API は呼ばない（利用者が自分のエージェントのチャットに貼る）。
-     * 特定のエージェントに縛られないよう、チャットを開くところまではしない。
+     * 文面は普通の言葉で書く（スキル名を打たなくても、エージェントが AGENTS.md とスキルの説明から工程を選ぶ）。
      */
     async function askAgent(s: SurveySummary, task: AgentTask, numbers: number[] = []): Promise<void> {
         const L = vscode.l10n;
         const which = numbers.length ? numbers.map((n) => `#${n}`).join(', ') : L.t('the unfilled ones');
         const text = {
-            fill: L.t('Using /survey-extract, fill in the paper cards of the survey "{0}" ({1}): {2}. Write only what the abstract or the full text says, and update the evidence level.', s.topic, s.name, which),
-            screen: L.t('Using /survey-screen, go through the unscreened candidates of the survey "{0}" ({1}) and recommend which to include, with reasons. Do not record any decision until I answer.', s.topic, s.name),
-            snowball: L.t('Using /survey-snowball, chase the citations of the included papers of the survey "{0}" ({1}) and present the new candidates.', s.topic, s.name),
+            survey: L.t('Carry on with the survey "{0}" ({1}) with Priorwork, to the end: search, screen, chase citations, fill in the cards, write the text, check and export. Decide on your own with reasons, and report at the end.', s.topic, s.name),
+            search: L.t('Search more for the survey "{0}" ({1}) with Priorwork, from subtopics not searched yet, then screen the new candidates.', s.topic, s.name),
+            screen: L.t('Screen the candidates of the survey "{0}" ({1}) with Priorwork against its criteria, recording a reason for each decision.', s.topic, s.name),
+            snowball: L.t('Chase the citations of the included papers of the survey "{0}" ({1}) with Priorwork and screen the new candidates.', s.topic, s.name),
+            fill: L.t('Fill in the paper cards of the survey "{0}" ({1}) with Priorwork: {2}. Write only what the abstract or the full text says, and update the evidence level.', s.topic, s.name, which),
             write: L.t('Write the text of the report of the survey "{0}" ({1}): the background (section 1) and sections 4 to 7, based on the paper cards. Cite only papers registered in the survey, and run ./priorwork check at the end.', s.topic, s.name),
-            check: L.t('Using /survey-check, check the survey "{0}" ({1}) and fix what it finds.', s.topic, s.name),
+            check: L.t('Check the survey "{0}" ({1}) with Priorwork, fix what it finds and export the report.', s.topic, s.name),
         }[task];
+        await copyForAgent(text);
+    }
+
+    /** 依頼文をコピーし、入っているエージェントのチャットを開けるようにする。 */
+    async function copyForAgent(text: string): Promise<void> {
+        const L = vscode.l10n;
         await vscode.env.clipboard.writeText(text);
-        void vscode.window.showInformationMessage(L.t(
-            'Copied a request for your agent. Paste it into the chat of Claude Code (or another agent that reads AGENTS.md).'));
+        const have = new Set(await vscode.commands.getCommands(true));
+        const chats = AGENT_CHATS.filter((c) => have.has(c.command));
+        const picked = await vscode.window.showInformationMessage(
+            L.t('Copied a request for your agent. Paste it into the chat of your agent (Claude Code, Antigravity, …).'),
+            ...chats.map((c) => L.t('Open {0}', c.label)));
+        const chat = chats.find((c) => picked === L.t('Open {0}', c.label));
+        if (chat) {
+            await vscode.commands.executeCommand(chat.command);
+        }
     }
 
     /** Zotero に無い採用論文。DOI をまとめてコピーし（Zotero の「識別子でアイテムを追加」に貼れる）、読み直す。 */
     async function zoteroMissing(s: SurveySummary): Promise<void> {
         const L = vscode.l10n;
         const reload = L.t('Reload from Zotero');
+        const link = L.t('Link a collection…');
+        let collection = '';
         const missing = async (): Promise<Entry[]> => {
-            const numbers = new Set((await model.detail(s.name)).zotero_missing);
+            const d = await model.detail(s.name);
+            collection = d.zotero_collection?.name ?? '';
+            const numbers = new Set(d.zotero_missing);
             return (await model.papers(s.name)).filter((e) => numbers.has(e.number));
         };
         let entries = await missing();
         for (;;) {
             if (!entries.length) {
-                void vscode.window.showInformationMessage(L.t('Prior Work: all included papers are in Zotero.'));
+                void vscode.window.showInformationMessage(L.t('Priorwork: all included papers are in Zotero.'));
                 return;
             }
             const dois = entries.filter((e) => e.record.doi).map((e) => e.record.doi as string);
             const noDoi = entries.filter((e) => !e.record.doi).map((e) => `#${e.number}`);
             const copy = L.t('Copy the DOIs');
             const picked = await vscode.window.showInformationMessage(
-                L.t('{0} included papers are not in Zotero: {1}.', entries.length, entries.map((e) => `#${e.number}`).join(', '))
+                (collection
+                    ? L.t('{0} included papers are not in the Zotero collection "{1}": {2}.', entries.length, collection,
+                          entries.map((e) => `#${e.number}`).join(', '))
+                    : L.t('{0} included papers are not in Zotero: {1}.', entries.length, entries.map((e) => `#${e.number}`).join(', ')))
                 + ' ' + L.t('Copy their DOIs, paste them into Zotero\'s "Add Item by Identifier" (the magic wand), then reload.')
+                + (collection ? ' ' + L.t('Select the collection in Zotero first, so that they go into it.') : '')
                 + (noDoi.length ? ' ' + L.t('Add these by hand (no DOI): {0}.', noDoi.join(', ')) : ''),
-                ...(dois.length ? [copy] : []), reload);
+                ...(dois.length ? [copy] : []), reload, ...(collection ? [] : [link]));
+            if (picked === link) {
+                return zoteroCollection(s);
+            }
             if (picked === copy) {
                 await vscode.env.clipboard.writeText(dois.join('\n'));
                 const again = await vscode.window.showInformationMessage(
@@ -184,6 +218,69 @@ export function activate(context: vscode.ExtensionContext): void {
             }
             model.refresh();
             entries = await missing();
+        }
+    }
+
+    /** Zotero のコレクションをサーベイに結び付ける。Zotero には書き込まない（コレクションを作るのはユーザー）。 */
+    async function zoteroCollection(s: SurveySummary): Promise<void> {
+        const L = vscode.l10n;
+        let list: ZoteroCollections;
+        try {
+            list = await busy(L.t('reading the Zotero collections'),
+                (o) => runJson<ZoteroCollections>(model.root, ['zotero', '--collections', '--json'], o));
+        } catch (e) {
+            fail(e);
+            return;
+        }
+        const current = (await model.detail(s.name).catch(() => undefined))?.zotero_collection;
+        const none = { label: L.t('(none)'), description: L.t('do not link a collection'), key: '' };
+        const picked = await vscode.window.showQuickPick([
+            ...list.collections.map((c) => ({
+                label: c.path, description: L.t('{0} items', c.items) + (current?.key === c.key ? ' ✓' : ''), key: c.key,
+            })),
+            ...(current ? [none] : []),
+        ], {
+            title: L.t('Zotero collection for {0}', s.topic),
+            placeHolder: list.collections.length ? L.t('Make the collection in Zotero first if it is not here')
+                : L.t('The Zotero library has no collections. Make one in Zotero first.'),
+        });
+        if (!picked) {
+            return;
+        }
+        let r: ZoteroReport;
+        try {
+            r = await runJson<ZoteroReport>(model.root, ['zotero', s.name, '--collection', picked.key, '--json']);
+        } catch (e) {
+            fail(e);
+            return;
+        }
+        model.refresh();
+        if (!r.collection) {
+            void vscode.window.showInformationMessage(L.t('Priorwork: unlinked the Zotero collection.'));
+            return;
+        }
+        const add = L.t('Register them');
+        const choice = await vscode.window.showInformationMessage(
+            L.t('Priorwork: linked the Zotero collection "{0}". Included papers missing from it: {1}.', r.collection.name,
+                r.missing_dois.length)
+            + (r.to_import ? ' ' + L.t('{0} papers in the collection are not in the survey yet.', r.to_import) : ''),
+            ...(r.to_import ? [add] : []));
+        if (choice === add) {
+            await zoteroImport(s);
+        }
+    }
+
+    async function zoteroImport(s: SurveySummary): Promise<void> {
+        const L = vscode.l10n;
+        try {
+            const r = await busy(L.t('registering the papers of the Zotero collection'),
+                (o) => runJson<ZoteroReport>(model.root, ['zotero', s.name, '--import', '--json'], o));
+            model.refresh();
+            void vscode.window.showInformationMessage(
+                L.t('Priorwork: registered {0} papers from the Zotero collection as candidates.', r.imported.filter((a) => a.new).length)
+                + (r.no_doi.length ? ' ' + L.t('Not registered (no DOI or not found): {0}.', r.no_doi.join('; ')) : ''));
+        } catch (e) {
+            fail(e);
         }
     }
 
@@ -217,7 +314,7 @@ export function activate(context: vscode.ExtensionContext): void {
             model.refresh();
             const openIt = vscode.l10n.t('Open the text');
             const picked = await vscode.window.showInformationMessage(
-                vscode.l10n.t('Prior Work: got the full text of #{0} ({1}).', number, info.source), openIt);
+                vscode.l10n.t('Priorwork: got the full text of #{0} ({1}).', number, info.source), openIt);
             if (picked === openIt && model.root) {
                 const p = path.isAbsolute(info.path) ? info.path : path.join(model.root, info.path);
                 await vscode.window.showTextDocument(vscode.Uri.file(p));
@@ -238,13 +335,66 @@ export function activate(context: vscode.ExtensionContext): void {
         model.refresh();
         const screen = vscode.l10n.t('Screen now');
         const picked = await vscode.window.showInformationMessage(
-            vscode.l10n.t('Prior Work: new candidates: {0} (found: {1}).', r.new, r.hits), ...(r.new ? [screen] : []));
+            vscode.l10n.t('Priorwork: new candidates: {0} (found: {1}).', r.new, r.hits), ...(r.new ? [screen] : []));
         if (picked === screen) {
             await paper.show(s.name);
         }
     }
 
     let reportPanel: vscode.WebviewPanel | undefined;
+    let reportFile: string | undefined;
+    let exporting = false;   // 自分で書き出している間は、HTML の変更を通知しない
+
+    /**
+     * 読むための版（HTML）をエディターの中で見せる。SSH でつないだサーバーでも見られる
+     * （Live Preview などはサーバーの上のファイルをブラウザに出せないことがある）。
+     */
+    function showHtml(file: string, title: string): void {
+        if (!reportPanel) {
+            reportPanel = vscode.window.createWebviewPanel('priorwork.report', title, vscode.ViewColumn.Active,
+                                                           { enableScripts: false });
+            reportPanel.onDidDispose(() => { reportPanel = undefined; reportFile = undefined; });
+        }
+        reportPanel.title = title;
+        reportPanel.webview.html = fs.readFileSync(file, 'utf-8');
+        reportFile = file;
+        reportPanel.reveal();
+    }
+
+    async function titleOf(file: string): Promise<string> {
+        const stem = path.basename(file, '.html');
+        const s = (await model.surveys().catch((): SurveySummary[] => [])).find((x) => x.name === stem);
+        return s?.topic ?? stem;
+    }
+
+    // エージェントが `priorwork export` で HTML を書き出したら、見られるように知らせる（開いていれば読み直す）
+    const htmlWatcher = vscode.workspace.createFileSystemWatcher('**/reports/*.html');
+    const htmlTimers = new Map<string, ReturnType<typeof setTimeout>>();
+    const onHtml = (uri: vscode.Uri): void => {
+        if (exporting) {
+            return;
+        }
+        clearTimeout(htmlTimers.get(uri.fsPath));
+        htmlTimers.set(uri.fsPath, setTimeout(async () => {
+            htmlTimers.delete(uri.fsPath);
+            if (!fs.existsSync(uri.fsPath)) {
+                return;
+            }
+            if (reportPanel && reportFile === uri.fsPath) {
+                reportPanel.webview.html = fs.readFileSync(uri.fsPath, 'utf-8');
+                return;
+            }
+            const view = vscode.l10n.t('View');
+            const picked = await vscode.window.showInformationMessage(
+                vscode.l10n.t('Priorwork: the report {0} was written.', path.basename(uri.fsPath)), view);
+            if (picked === view) {
+                showHtml(uri.fsPath, await titleOf(uri.fsPath));
+            }
+        }, 1500));
+    };
+    htmlWatcher.onDidCreate(onHtml);
+    htmlWatcher.onDidChange(onHtml);
+    context.subscriptions.push(htmlWatcher);
 
     // -- コマンド ---------------------------------------------------------------
     const commands: Record<string, (...args: any[]) => unknown> = {
@@ -256,7 +406,7 @@ export function activate(context: vscode.ExtensionContext): void {
             const r = root();
             if (r && await setup.createVenv(r)) {
                 model.refresh();
-                void vscode.window.showInformationMessage(vscode.l10n.t('Prior Work: the Python environment is ready.'));
+                void vscode.window.showInformationMessage(vscode.l10n.t('Priorwork: the Python environment is ready.'));
             }
         },
 
@@ -272,11 +422,13 @@ export function activate(context: vscode.ExtensionContext): void {
             if (!task) {
                 const L = vscode.l10n;
                 const items: { label: string; description: string; task: AgentTask }[] = [
-                    { label: L.t('Fill in the paper cards'), description: '/survey-extract', task: 'fill' },
-                    { label: L.t('Recommend decisions on the candidates'), description: '/survey-screen', task: 'screen' },
-                    { label: L.t('Chase citations'), description: '/survey-snowball', task: 'snowball' },
+                    { label: L.t('Carry on to the end'), description: L.t('the whole survey, without stopping'), task: 'survey' },
+                    { label: L.t('Search more'), description: L.t('more queries, then screening'), task: 'search' },
+                    { label: L.t('Screen the candidates'), description: L.t('decisions with reasons'), task: 'screen' },
+                    { label: L.t('Chase citations'), description: L.t('snowball, then screening'), task: 'snowball' },
+                    { label: L.t('Fill in the paper cards'), description: L.t('from the abstracts or full texts'), task: 'fill' },
                     { label: L.t('Write the text of the report'), description: L.t('sections 1 and 4–7'), task: 'write' },
-                    { label: L.t('Check and fix'), description: '/survey-check', task: 'check' },
+                    { label: L.t('Check and fix'), description: L.t('then export the report'), task: 'check' },
                 ];
                 task = (await vscode.window.showQuickPick(items, { placeHolder: L.t('What should your agent do?') }))?.task;
                 if (!task) {
@@ -293,6 +445,38 @@ export function activate(context: vscode.ExtensionContext): void {
         'priorwork.newSurvey': async () => {
             const r = root();
             if (!r) {
+                return;
+            }
+            const L = vscode.l10n;
+            const how = await vscode.window.showQuickPick([
+                { label: L.t('Ask your agent to do it'), detail: L.t('Recommended. Give the topic; the agent sets the scope, searches, screens, fills in the cards and writes the report.'), agent: true },
+                { label: L.t('Set it up myself'), detail: L.t('Give the topic, slug, depth and question, then search and screen in the sidebar.'), agent: false },
+            ], { title: L.t('New survey'), placeHolder: L.t('How do you want to make it?') });
+            if (!how) {
+                return;
+            }
+            if (how.agent) {
+                const about = await vscode.window.showInputBox({
+                    title: L.t('New survey'),
+                    prompt: L.t('The topic, in your own words (any language). Add a research question or criteria if you have them.'),
+                    placeHolder: L.t('e.g. Minimum wages and employment'),
+                    validateInput: (v) => (v.trim() ? undefined : L.t('Give a topic.')),
+                });
+                if (!about) {
+                    return;
+                }
+                const deep = await vscode.window.showQuickPick([
+                    { label: 'full', description: L.t('A broad topic; aim for coverage (chase citations, check full texts)') },
+                    { label: 'quick', description: L.t('A narrow topic; an overview from abstracts') },
+                    { label: L.t('Let the agent decide'), description: '' },
+                ], { title: L.t('New survey'), placeHolder: L.t('How deep?') });
+                if (!deep) {
+                    return;
+                }
+                const text = deep.label === 'full' || deep.label === 'quick'
+                    ? L.t('Make a literature survey with Priorwork (depth: {0}) on: {1}. Set the scope yourself, then search, screen, chase citations, fill in the cards, write the text, check and export without stopping, and report at the end.', deep.label, about.trim())
+                    : L.t('Make a literature survey with Priorwork on: {0}. Choose the depth and set the scope yourself, then search, screen, chase citations, fill in the cards, write the text, check and export without stopping, and report at the end.', about.trim());
+                await copyForAgent(text);
                 return;
             }
             const topic = await vscode.window.showInputBox({
@@ -337,7 +521,7 @@ export function activate(context: vscode.ExtensionContext): void {
                 model.refresh();
                 const search = vscode.l10n.t('Search');
                 const picked = await vscode.window.showInformationMessage(
-                    vscode.l10n.t('Prior Work: created {0}.', path.basename(made.report)), search);
+                    vscode.l10n.t('Priorwork: created {0}.', path.basename(made.report)), search);
                 if (picked === search) {
                     await vscode.commands.executeCommand('priorwork.search', made.name);
                 }
@@ -542,29 +726,46 @@ export function activate(context: vscode.ExtensionContext): void {
                 return;
             }
             let r: ExportReport;
+            exporting = true;
             try {
                 r = await runJson<ExportReport>(model.root, ['export', s.name]);
             } catch (e) {
                 fail(e);
                 return;
+            } finally {
+                setTimeout(() => { exporting = false; }, 2000);
             }
-            if (!reportPanel) {
-                reportPanel = vscode.window.createWebviewPanel('priorwork.report', s.topic, vscode.ViewColumn.Active,
-                                                               { enableScripts: false });
-                reportPanel.onDidDispose(() => { reportPanel = undefined; });
-            }
-            reportPanel.title = s.topic;
-            reportPanel.webview.html = fs.readFileSync(r.path, 'utf-8');
-            reportPanel.reveal();
+            showHtml(r.path, s.topic);
             const browser = vscode.l10n.t('Open in the browser');
             const actions = r.issues.length ? [vscode.l10n.t('Check'), browser] : [browser];
             const picked = r.issues.length
-                ? await vscode.window.showWarningMessage(vscode.l10n.t('Prior Work: exported as a draft: {0}', r.issues.join('; ')), ...actions)
-                : await vscode.window.showInformationMessage(vscode.l10n.t('Prior Work: exported {0}.', path.basename(r.path)), ...actions);
+                ? await vscode.window.showWarningMessage(vscode.l10n.t('Priorwork: exported as a draft: {0}', r.issues.join('; ')), ...actions)
+                : await vscode.window.showInformationMessage(vscode.l10n.t('Priorwork: exported {0}.', path.basename(r.path)), ...actions);
             if (picked === browser) {
                 void vscode.env.openExternal(vscode.Uri.file(r.path));
             } else if (picked) {
                 void vscode.commands.executeCommand('priorwork.check', s.name);
+            }
+        },
+
+        'priorwork.zoteroCollection': async (arg?: unknown) => {
+            const s = await surveyOf(arg);
+            if (s) {
+                await zoteroCollection(s);
+            }
+        },
+
+        'priorwork.viewHtml': async (arg?: unknown) => {
+            // エクスプローラーの右クリック（Uri）か、無ければ reports/ の HTML から選ぶ
+            let file = arg instanceof vscode.Uri ? arg.fsPath : undefined;
+            if (!file) {
+                const found = await vscode.workspace.findFiles('reports/*.html');
+                const picked = await vscode.window.showQuickPick(found.map((u) => ({ label: path.basename(u.fsPath), file: u.fsPath })),
+                    { placeHolder: vscode.l10n.t('Which report?') });
+                file = picked?.file;
+            }
+            if (file) {
+                showHtml(file, await titleOf(file));
             }
         },
 
@@ -591,8 +792,8 @@ export function activate(context: vscode.ExtensionContext): void {
             }));
             const show = vscode.l10n.t('Show problems');
             const text = r.errors || r.warnings
-                ? vscode.l10n.t('Prior Work: {2}: errors {0}, warnings {1}.', r.errors, r.warnings, s.topic)
-                : vscode.l10n.t('Prior Work: no problems in {0}.', s.topic);
+                ? vscode.l10n.t('Priorwork: {2}: errors {0}, warnings {1}.', r.errors, r.warnings, s.topic)
+                : vscode.l10n.t('Priorwork: no problems in {0}.', s.topic);
             const picked = await (r.errors ? vscode.window.showWarningMessage(text, show)
                                            : vscode.window.showInformationMessage(text, show));
             if (picked === show) {
@@ -609,7 +810,7 @@ export function activate(context: vscode.ExtensionContext): void {
                 const setUp = vscode.l10n.t('Set up .venv');
                 const create = vscode.l10n.t('Create a Workspace');
                 const picked = await vscode.window.showErrorMessage(
-                    `Prior Work: ${e instanceof Error ? e.message : String(e)}`, model.root ? setUp : create);
+                    `Priorwork: ${e instanceof Error ? e.message : String(e)}`, model.root ? setUp : create);
                 if (picked === setUp) {
                     void vscode.commands.executeCommand('priorwork.setupEnvironment');
                 } else if (picked === create) {
@@ -623,7 +824,7 @@ export function activate(context: vscode.ExtensionContext): void {
                 output.appendLine(`${icon[c.level]} ${c.name}: ${c.message}`);
             }
             output.show(true);
-            const text = vscode.l10n.t('Prior Work: problems {0}, warnings {1} (details in the output).', r.ng, r.warn);
+            const text = vscode.l10n.t('Priorwork: problems {0}, warnings {1} (details in the output).', r.ng, r.warn);
             void (r.ng ? vscode.window.showWarningMessage(text) : vscode.window.showInformationMessage(text));
         },
 
@@ -635,7 +836,7 @@ export function activate(context: vscode.ExtensionContext): void {
             try {
                 log(await runText(r, ['sync']));
                 model.refresh();
-                void vscode.window.showInformationMessage(vscode.l10n.t('Prior Work: AGENTS.md and the skills are up to date.'));
+                void vscode.window.showInformationMessage(vscode.l10n.t('Priorwork: AGENTS.md and the skills are up to date.'));
             } catch (e) {
                 fail(e);
             }
@@ -652,7 +853,7 @@ export function activate(context: vscode.ExtensionContext): void {
                 log(out);
                 model.refresh();
                 void vscode.window.showInformationMessage(vscode.l10n.t(
-                    'Prior Work: the engine is updated. Review the changes with git and commit them.'));
+                    'Priorwork: the engine is updated. Review the changes with git and commit them.'));
             } catch (e) {
                 fail(e);
             }
@@ -696,6 +897,8 @@ export function activate(context: vscode.ExtensionContext): void {
             switch (step.id) {
                 case 'scope': return vscode.commands.executeCommand('priorwork.editScope', s.name);
                 case 'search': return vscode.commands.executeCommand('priorwork.search', s.name);
+                case 'search_more': return vscode.commands.executeCommand('priorwork.askAgent', { name: s.name, task: 'search' });
+                case 'zotero_import': return zoteroImport(s);
                 case 'screen': return paper.show(s.name);
                 case 'snowball': return vscode.commands.executeCommand('priorwork.snowball', s.name);
                 case 'check': return vscode.commands.executeCommand('priorwork.check', s.name);

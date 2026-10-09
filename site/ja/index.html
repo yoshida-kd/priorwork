@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Prior Work</title>
-<meta name="description" content="Prior Work: AI エージェントと作る社会科学の先行研究サーベイ。検索・選別・論文カード・検査を VS Code のサイドバーで。ターミナルは不要。">
+<title>Priorwork</title>
+<meta name="description" content="Priorwork: 社会科学の先行研究サーベイを AI エージェントに任せる。検索・選別・論文カード・文章はエージェントが行い、あなたは VS Code のサイドバーで確かめて直す。ターミナルは不要。">
 <link rel="alternate" hreflang="ja" href="../ja/">
 <link rel="alternate" hreflang="en" href="../">
 <link rel="alternate" hreflang="x-default" href="../">
@@ -26,7 +26,7 @@ document.addEventListener('click', function (e) {
   <div class="wrap">
     <a class="brand" href="./">
       <svg viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="5" fill="#1f3a5f"/><rect x="5" y="6" width="10.5" height="13" rx="1.2" fill="#fff"/><path d="M7.2 9.5h6M7.2 12h6M7.2 14.5h4" stroke="#1f3a5f" stroke-width="1.1" stroke-linecap="round" opacity=".6"/><circle cx="16.5" cy="16.5" r="4.2" fill="#2e9e6a" stroke="#1f3a5f" stroke-width="1"/><path d="M14.8 16.6l1.2 1.2 2.3-2.5" fill="none" stroke="#fff" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      Prior Work
+      Priorwork
     </a>
     <nav>
       <a href="#install">インストール</a>
@@ -40,9 +40,9 @@ document.addEventListener('click', function (e) {
 <main>
 <div class="hero">
   <div class="wrap">
-    <h1>Prior Work</h1>
-    <p class="tagline">AI エージェントと作る、社会科学の先行研究サーベイ</p>
-    <p class="lead">Semantic Scholar と OpenAlex で探し、候補を選別し、エージェントが記入した論文カードを確かめ、どの論文にも対応しない引用を見つける。すべて VS Code のサイドバーで、ターミナルは使いません。エージェントにはチャットで頼み、決めるのはあなたです。</p>
+    <h1>Priorwork</h1>
+    <p class="tagline">先行研究サーベイを AI エージェントに任せて、確かめる</p>
+    <p class="lead">エージェント（Claude Code・Antigravity など）にテーマを伝えるだけ。範囲を決め、Semantic Scholar と OpenAlex で探し、理由を残しながら選別し、引用をたどり、論文ごとのカードを書き、サーベイの文章を書いて、すべての引用を検査します。あなたは結果を読み、VS Code のサイドバーで覆したり直したりします。ターミナルも、覚えるコマンドもありません。</p>
     <div class="actions">
       <a class="button primary" href="https://marketplace.visualstudio.com/items?itemName=yoshida-kd.priorwork">VS Code の拡張機能を入れる</a>
       <a class="button secondary" href="guide/">手引きを読む</a>
@@ -52,14 +52,14 @@ document.addEventListener('click', function (e) {
 
 <section class="alt">
   <div class="wrap">
-    <h2>サーベイの流れ</h2>
+    <h2>エージェントが止まらずに進めること</h2>
     <ol class="chapters">
       <li><b>範囲</b> <span>— RQ・期間・採否の基準・深さ</span></li>
       <li><b>検索</b> <span>— Semantic Scholar ＋ OpenAlex</span></li>
-      <li><b>選別</b> <span>— 論文ごとのページ、キー 1 つ</span></li>
+      <li><b>選別</b> <span>— 採否の基準に照らし、理由つきで</span></li>
       <li><b>引用をたどる</b> <span>— 参考文献と被引用</span></li>
-      <li><b>カード</b> <span>— エージェントが記入し、あなたが確かめる</span></li>
-      <li><b>文章</b> <span>— カードをもとにエージェントが書く</span></li>
+      <li><b>カード</b> <span>— 要旨と本文から</span></li>
+      <li><b>文章</b> <span>— 背景・論争点・研究の空白まで、カードから</span></li>
       <li><b>検査と書き出し</b> <span>— 引用・DOI・未確認のカード。HTML に</span></li>
     </ol>
   </div>
@@ -70,8 +70,8 @@ document.addEventListener('click', function (e) {
     <h2>できること</h2>
     <div class="features">
       <div class="feature">
-        <h3>キー 1 つで選別</h3>
-        <p>候補ごとのページに、要旨・SSCI の判定・警告・採否の基準。<b>I</b> 採用、<b>M</b> 保留、<b>X</b> 理由つきで除外。決めたら次の候補へ。</p>
+        <h3>普通の言葉で頼むだけ</h3>
+        <p>エージェントのチャットで「〇〇について先行研究を full でまとめて」、またはサイドバーの「新しいサーベイ → エージェントに任せる」。コマンドもスキル名も要りません。最後まで進め、何を決めたかを報告します。</p>
       </div>
       <div class="feature">
         <h3>確かめられる論文カード</h3>
@@ -86,12 +86,12 @@ document.addEventListener('click', function (e) {
         <p>文章中の「著者 (年)」はすべて登録済みの論文に、DOI は正しい論文に。そうなるまで、書き出しには「下書き」と出ます。</p>
       </div>
       <div class="feature">
-        <h3>書くのはエージェント、決めるのはあなた</h3>
-        <p>「エージェントに頼む…」が、カードの記入・文章・検査と修正の依頼文をコピーします。Claude Code などのチャットに貼るだけ。拡張機能が自分で AI のサービスを呼ぶことはありません。</p>
+        <h3>キー 1 つで覆せる</h3>
+        <p>論文ごとのページに、要旨・SSCI の判定・警告・採否の基準と、エージェントが残した理由。<b>I</b> 採用、<b>M</b> 保留、<b>X</b> 除外。カードも直して保存。エージェントはあなたの変更に従います。</p>
       </div>
       <div class="feature">
-        <h3>ターミナルも準備も不要</h3>
-        <p>拡張機能を入れてワークスペースを作るだけ。Python は自動で用意され（無ければ uv で）、キーは設定のページに、ワークスペースはサイドバーから GitHub の非公開リポジトリへ。</p>
+        <h3>レポート・Zotero・サーバー</h3>
+        <p>レポートは VS Code の中で開けます（SSH でつないだサーバーでも）。Zotero のコレクションをサーベイに結び付ければ、足す DOI はコピー 1 回、本文はそこの PDF から先に読みます。拡張機能が自分で AI のサービスを呼ぶことはありません。</p>
       </div>
     </div>
   </div>
@@ -101,8 +101,8 @@ document.addEventListener('click', function (e) {
   <div class="wrap two">
     <div>
       <h2>インストール</h2>
-      <p>VS Code に <a href="https://marketplace.visualstudio.com/items?itemName=yoshida-kd.priorwork">Prior Work の拡張機能</a>を入れ、サイドバーの <strong>ワークスペースを作る</strong> を押します。始めるのにほかに入れるものはありません。Python 3.10 以上があればそれを使い、無ければ uv を入れて Python を取ってきます（ホームフォルダーに入り、管理者権限は要りません）。</p>
-      <p>Linux と macOS で。Windows では WSL の中で。文章を書くには、VS Code で動く AI エージェント（Claude Code など）を。</p>
+      <p>VS Code に <a href="https://marketplace.visualstudio.com/items?itemName=yoshida-kd.priorwork">Priorwork の拡張機能</a>を入れ、サイドバーの <strong>ワークスペースを作る</strong> を押します。始めるのにほかに入れるものはありません。Python 3.10 以上があればそれを使い、無ければ uv を入れて Python を取ってきます（ホームフォルダーに入り、管理者権限は要りません）。</p>
+      <p>Linux と macOS で。Windows では WSL の中で。それと、VS Code で動く AI エージェント（Claude Code・Antigravity など）を。</p>
     </div>
     <div>
       <h2>ターミナルから</h2>
@@ -124,15 +124,16 @@ document.addEventListener('click', function (e) {
       <li><a href="guide/#1-はじめに">はじめに</a> <span>— できること・必要なもの</span></li>
       <li><a href="guide/#2-インストール">インストール</a> <span>— VS Code・WSL・SSH のサーバー</span></li>
       <li><a href="guide/#3-ワークスペースを作る">ワークスペースを作る</a> <span>— 設定・GitHub・別のマシン</span></li>
-      <li><a href="guide/#4-サーベイの流れ">サーベイの流れ</a> <span>— 範囲から書き出しまで</span></li>
-      <li><a href="guide/#5-論文カード">論文カード</a> <span>— 欄・確認レベル・本文の取得</span></li>
-      <li><a href="guide/#6-検査">検査</a></li>
-      <li><a href="guide/#7-設定">設定</a> <span>— API キー・Zotero・SSCI リスト</span></li>
-      <li><a href="guide/#8-エージェントと進める">エージェントと進める</a></li>
-      <li><a href="guide/#9-ワークスペースの中身">ワークスペースの中身</a></li>
-      <li><a href="guide/#10-エンジンを更新する">エンジンを更新する</a></li>
-      <li><a href="guide/#11-コマンドラインで使う">コマンドラインで使う</a></li>
-      <li><a href="guide/#12-困ったとき">困ったとき</a></li>
+      <li><a href="guide/#4-ai-に任せる">AI に任せる</a> <span>— 頼み方・レポートを見る・確かめて直す・Zotero</span></li>
+      <li><a href="guide/#5-自分で操作する">自分で操作する</a> <span>— サイドバーで検索・選別</span></li>
+      <li><a href="guide/#6-論文カード">論文カード</a> <span>— 欄・確認レベル・本文の取得</span></li>
+      <li><a href="guide/#7-検査">検査</a></li>
+      <li><a href="guide/#8-設定">設定</a> <span>— API キー・Zotero・SSCI リスト</span></li>
+      <li><a href="guide/#9-エージェントへの指示">エージェントへの指示</a></li>
+      <li><a href="guide/#10-ワークスペースの中身">ワークスペースの中身</a></li>
+      <li><a href="guide/#11-エンジンを更新する">エンジンを更新する</a></li>
+      <li><a href="guide/#12-コマンドラインで使う">コマンドラインで使う</a></li>
+      <li><a href="guide/#13-困ったとき">困ったとき</a></li>
     </ol>
   </div>
 </section>
@@ -140,7 +141,7 @@ document.addEventListener('click', function (e) {
 
 <footer>
   <div class="wrap">
-    <span>Prior Work · MIT License · by <a href="https://github.com/yoshida-kd">yoshida-kd</a></span>
+    <span>Priorwork · MIT License · by <a href="https://github.com/yoshida-kd">yoshida-kd</a></span>
     <span><a href="https://github.com/yoshida-kd/priorwork">Source</a> ·
     <a href="https://pypi.org/project/priorwork/">PyPI</a> ·
     <a href="https://github.com/yoshida-kd/priorwork/issues">Issues</a></span>

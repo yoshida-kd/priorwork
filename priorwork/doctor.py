@@ -90,7 +90,7 @@ def run_checks(root: Path, client: Optional[Any] = None) -> List[Check]:
 
     # 設定
     if not (root / ".env").is_file():
-        out.append((WARN, ".env", t("There is no .env. Set your API keys in the settings (VS Code: Prior Work's Settings; command line: `priorwork settings`)")))
+        out.append((WARN, ".env", t("There is no .env. Set your API keys in the settings (VS Code: Priorwork's Settings; command line: `priorwork settings`)")))
     if os.environ.get("SEMANTIC_SCHOLAR_API_KEY") or os.environ.get("S2_API_KEY"):
         out.append((OK, "Semantic Scholar", t("An API key is set")))
     else:

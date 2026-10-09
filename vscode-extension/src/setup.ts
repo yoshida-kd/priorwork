@@ -105,7 +105,7 @@ export class Setup {
         // requirements.txt が priorwork の版を指していなければ、拡張機能と同じ版を入れる
         const pinned = fs.existsSync(req) && /^\s*priorwork\b/m.test(fs.readFileSync(req, 'utf-8'));
         const spec = pinned ? ['-r', req] : [`priorwork==${this.version}`];
-        const title = vscode.l10n.t('Prior Work: setting up the Python environment (.venv)');
+        const title = vscode.l10n.t('Priorwork: setting up the Python environment (.venv)');
         this.output.appendLine(`\n== ${title}`);
         const code = await vscode.window.withProgress(
             { location: vscode.ProgressLocation.Notification, title, cancellable: true },
@@ -128,7 +128,7 @@ export class Setup {
         }
         const show = vscode.l10n.t('Show the output');
         void vscode.window.showErrorMessage(vscode.l10n.t(
-            'Prior Work: could not set up the Python environment. It needs Python 3.10 or later '
+            'Priorwork: could not set up the Python environment. It needs Python 3.10 or later '
             + '(the setting priorwork.python chooses which one).'), show)
             .then((p) => { if (p === show) { this.output.show(); } });
         return false;
@@ -139,7 +139,7 @@ export class Setup {
         const L = vscode.l10n;
         const go = L.t('Install uv');
         const picked = await vscode.window.showInformationMessage(L.t(
-            'Prior Work needs Python 3.10 or later, which was not found. It can install uv (a small tool from Astral, into your home folder, without administrator rights), which then downloads Python for the workspace.'),
+            'Priorwork needs Python 3.10 or later, which was not found. It can install uv (a small tool from Astral, into your home folder, without administrator rights), which then downloads Python for the workspace.'),
             { modal: true }, go);
         if (picked !== go) {
             return undefined;
@@ -148,7 +148,7 @@ export class Setup {
             ? ['powershell', ['-NoProfile', '-ExecutionPolicy', 'ByPass', '-Command', 'irm https://astral.sh/uv/install.ps1 | iex']]
             : ['sh', ['-c', 'if command -v curl >/dev/null; then curl -LsSf https://astral.sh/uv/install.sh | sh; '
                              + 'else wget -qO- https://astral.sh/uv/install.sh | sh; fi']];
-        const title = L.t('Prior Work: installing uv');
+        const title = L.t('Priorwork: installing uv');
         this.output.appendLine(`\n== ${title}`);
         const code = await vscode.window.withProgress(
             { location: vscode.ProgressLocation.Notification, title, cancellable: true },
@@ -157,7 +157,7 @@ export class Setup {
         if (!uv) {
             const show = L.t('Show the output');
             void vscode.window.showErrorMessage(L.t(
-                'Prior Work: could not install uv. Install Python 3.10 or later (python.org), then try again.'), show)
+                'Priorwork: could not install uv. Install Python 3.10 or later (python.org), then try again.'), show)
                 .then((p) => { if (p === show) { this.output.show(); } });
         }
         return uv;
@@ -209,7 +209,7 @@ export class Setup {
         }
         try {
             const out = await vscode.window.withProgress(
-                { location: vscode.ProgressLocation.Notification, title: vscode.l10n.t('Prior Work: creating the workspace') },
+                { location: vscode.ProgressLocation.Notification, title: vscode.l10n.t('Priorwork: creating the workspace') },
                 () => runText(root, ['init', root, '--lang', lang.lang]));
             this.output.appendLine(out);
         } catch (e) {
@@ -220,7 +220,7 @@ export class Setup {
             onDone();
             const env = vscode.l10n.t('Open the Settings');
             const picked = await vscode.window.showInformationMessage(vscode.l10n.t(
-                'Prior Work: the workspace is ready. Set your API keys in the settings, then start a survey.'), env);
+                'Priorwork: the workspace is ready. Set your API keys in the settings, then start a survey.'), env);
             if (picked === env) {
                 void vscode.commands.executeCommand('priorwork.openSettings');
             }
@@ -228,7 +228,7 @@ export class Setup {
         }
         const openIt = vscode.l10n.t('Open the folder');
         const picked = await vscode.window.showInformationMessage(
-            vscode.l10n.t('Prior Work: the workspace is ready in {0}.', root), openIt);
+            vscode.l10n.t('Priorwork: the workspace is ready in {0}.', root), openIt);
         if (picked === openIt) {
             void vscode.commands.executeCommand('vscode.openFolder', folder);
         }
@@ -240,7 +240,7 @@ export class Setup {
         if (!have) {
             const setUp = vscode.l10n.t('Set up .venv');
             const picked = await vscode.window.showWarningMessage(vscode.l10n.t(
-                'Prior Work: the priorwork command was not found for this workspace.'), setUp);
+                'Priorwork: the priorwork command was not found for this workspace.'), setUp);
             if (picked === setUp && await this.createVenv(root)) {
                 onReady();
             }
@@ -249,7 +249,7 @@ export class Setup {
         if (compareVersions(have, this.version) < 0) {
             const update = vscode.l10n.t('Update the engine');
             const picked = await vscode.window.showInformationMessage(vscode.l10n.t(
-                'Prior Work: this workspace uses priorwork {0}; the extension is {1}.', have, this.version), update);
+                'Priorwork: this workspace uses priorwork {0}; the extension is {1}.', have, this.version), update);
             if (picked === update) {
                 await vscode.commands.executeCommand('priorwork.upgrade', this.version);
             }

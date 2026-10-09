@@ -36,7 +36,7 @@ export class SettingsPanel implements vscode.Disposable {
 
     async show(): Promise<void> {
         if (!this.panel) {
-            this.panel = vscode.window.createWebviewPanel('priorwork.settings', vscode.l10n.t('Prior Work Settings'),
+            this.panel = vscode.window.createWebviewPanel('priorwork.settings', vscode.l10n.t('Priorwork Settings'),
                 vscode.ViewColumn.Active, {
                     enableScripts: true,
                     localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, 'media')],
@@ -60,7 +60,7 @@ export class SettingsPanel implements vscode.Disposable {
                 return;
             }
             if (m.type === 'save' && Object.keys(m.values).length) {
-                vscode.window.setStatusBarMessage(vscode.l10n.t('Prior Work: saved the settings.'), 4000);
+                vscode.window.setStatusBarMessage(vscode.l10n.t('Priorwork: saved the settings.'), 4000);
             } else if (m.type === 'check') {
                 const r = await this.actions.busy(vscode.l10n.t('checking the connections'),
                     (o) => runJson<DoctorReport>(this.model.root, ['doctor', '--online'], o));
@@ -99,7 +99,7 @@ export class SettingsPanel implements vscode.Disposable {
         }
         const r = await runJson<SettingsReport>(this.model.root, ['settings', '--import-ssci', picked[0].fsPath]);
         this.model.refresh();
-        void vscode.window.showInformationMessage(vscode.l10n.t('Prior Work: imported the SSCI list ({0} journals).',
+        void vscode.window.showInformationMessage(vscode.l10n.t('Priorwork: imported the SSCI list ({0} journals).',
                                                                 r.ssci.journals));
     }
 
@@ -108,7 +108,7 @@ export class SettingsPanel implements vscode.Disposable {
             return;
         }
         if (!this.model.root) {
-            this.panel.webview.html = this.page(`<p>${esc(vscode.l10n.t('Open a Prior Work workspace folder first.'))}</p>`);
+            this.panel.webview.html = this.page(`<p>${esc(vscode.l10n.t('Open a Priorwork workspace folder first.'))}</p>`);
             return;
         }
         try {
@@ -176,7 +176,7 @@ export class SettingsPanel implements vscode.Disposable {
                 `<li class="c-${c.level}">${icon[c.level]} <b>${esc(c.name)}</b>: ${esc(c.message)}</li>`).join('')}</ul>
           </section>` : '';
         return `
-        <h1>${esc(L.t('Prior Work Settings'))}</h1>
+        <h1>${esc(L.t('Priorwork Settings'))}</h1>
         <p class="muted">${esc(L.t('Saved in .env in the workspace, which is kept out of Git. Keys are never shown here.'))}</p>
         ${sections}
         <section class="group"><h2>${esc(L.t('SSCI journal list'))}</h2>

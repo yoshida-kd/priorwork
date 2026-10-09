@@ -66,8 +66,37 @@ export interface SurveyDetail extends SurveySummary {
     scope: Scope;
     unfilled: number[];
     zotero_missing: number[];
+    zotero_collection: ZoteroCollectionLink | null;
     sync: string | null;
     next: NextStep[];
+}
+
+/** サーベイに結び付けた Zotero のコレクション。 */
+export interface ZoteroCollectionLink {
+    key: string;
+    name: string;
+}
+
+/** `priorwork zotero --collections --json` */
+export interface ZoteroCollections {
+    collections: ZoteroCollection[];
+}
+
+export interface ZoteroCollection {
+    key: string;
+    name: string;
+    path: string;
+    items: number;
+}
+
+/** `priorwork zotero SURVEY [--collection X] [--import] --json` */
+export interface ZoteroReport {
+    survey: string;
+    collection: ZoteroCollectionLink | null;
+    missing_dois: string[];
+    to_import: number;
+    imported: AddedPaper[];
+    no_doi: string[];
 }
 
 export interface Ssci {

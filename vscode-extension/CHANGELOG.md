@@ -1,7 +1,41 @@
 # Changelog
 
-Prior Work's command-line tool (`priorwork` on PyPI) and this extension are
+Priorwork's command-line tool (`priorwork` on PyPI) and this extension are
 released together, under one version number.
+
+## 0.1.3
+
+- **Hand the survey to your agent.** The agent now carries a survey through to
+  the exported report without stopping: it sets the scope, searches, screens
+  (recording a reason for every decision, includes too), chases citations,
+  fills in the cards, writes, checks and exports, then reports what it decided.
+  You overturn decisions and correct cards in the sidebar; the agent follows
+  them. To decide each paper yourself, ask it to go through it together with
+  you (or say so in `AGENTS.local.md`).
+- **No skill names to type.** Ask in plain words. The skills are renamed
+  `priorwork` (the entry point) and `priorwork-new`, `priorwork-screen`,
+  `priorwork-snowball`, `priorwork-extract`, `priorwork-check`; `priorwork
+  sync` replaces the old `survey-*` skills.
+- **New Survey → Ask your agent to do it** copies a request for a whole survey;
+  *Ask Your Agent…* gains *Carry on to the end* and *Search more*. After
+  copying, a button opens the chat of Claude Code, Antigravity or Copilot.
+- **Full surveys search more.** `search` and `snowball` take 25 papers by
+  default for a full survey (10 otherwise), and the next steps say *Search
+  more* until a full survey has 6+ queries and 80+ papers. Bulk search turns
+  `AND` / `OR` / `NOT` into `+` / `|` / `-` (written the other way, it found
+  nothing), and a search that finds nothing says how to rephrase it.
+- **View the report anywhere.** Right-click `reports/*.html` → *View the Report
+  in Priorwork*, also on a server over SSH where Live Preview cannot open it.
+  When the agent exports a report, a notification offers to show it.
+- **Zotero collections.** Link a Zotero collection to a survey (*Link a Zotero
+  Collection…*, or `priorwork zotero SURVEY --collection NAME`). "In Zotero"
+  then means in that collection; papers you put in it can be registered as
+  candidates (`--import`); full texts come from its PDFs first. `--dois`
+  prints the DOIs to paste into Zotero's magic wand. Priorwork still never
+  writes to Zotero.
+- The agent no longer opens Priorwork's own files in `.venv`.
+- Renamed from Prior Work to Priorwork (the display name only; the commands,
+  the package and the extension ID are unchanged).
 
 ## 0.1.2
 

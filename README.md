@@ -1,35 +1,36 @@
-# Prior Work
+# Priorwork
 
-**Literature reviews for the social sciences, built with an AI agent — no terminal needed**
+**Hand your literature review to an AI agent, then check it — no terminal needed**
 
 [日本語](README.ja.md) · **[Guide](https://yoshida-kd.github.io/priorwork/guide/)** · [Website](https://yoshida-kd.github.io/priorwork/)
 
-Prior Work is a toolkit for writing topic-based literature reviews in economics, sociology,
-political science, management, psychology and neighbouring fields together with an AI agent
-(Claude Code, Antigravity and others).
+Priorwork (as in *prior work*) is a toolkit for handing topic-based literature reviews in economics,
+sociology, political science, public administration, management, psychology and neighbouring fields
+to an AI agent (Claude Code, Antigravity and others).
 
-**No terminal needed.** In VS Code, everything you do yourself happens in the Prior Work sidebar —
-searching, screening, checking the paper cards, settings, checks, the report for reading — and
-everything you ask of the agent happens in its chat: filling in the cards from the full texts and
-writing the review. The extension never calls an AI service itself, so there is nothing to pay for
-beyond the agent you already use.
+**Ask in plain words; check in the sidebar.** Tell your agent "do a full review of …" (or use **New
+Survey → Ask your agent to do it** in VS Code). It sets the scope, searches, screens, chases
+citations, fills in the paper cards, writes the review, checks it and exports it, without stopping.
+You read the report and overturn or correct anything from the Priorwork sidebar. No terminal, no
+commands or skill names to learn. The extension never calls an AI service itself, so there is
+nothing to pay for beyond the agent you already use.
 
-- **The chat writes; the repository remembers.** Candidates, decisions and the search log live in
-  JSON under `.priorwork/surveys/`, so a survey picks up where it left off in the next
-  conversation.
-- **You decide.** The agent presents numbered candidates with a recommendation and records your
-  answer ("include 2, 5, 7"); or screen them yourself on a page per paper, one key per decision.
-- **You check.** Each included paper gets a card (research question, X, Y, data, identification,
-  findings, limitations). The agent fills it in from the abstract or the full text; you check and
-  correct it next to the abstract, and record how it was checked.
+- **Every decision has a reason.** The agent records a reason for each paper it includes or
+  excludes, and writes the scope it chose into the report. Overturn a decision with one key on the
+  paper's page; the agent follows your changes and never overturns them. Prefer to decide each
+  paper yourself? Ask it to go through it together with you.
+- **The repository remembers.** Candidates, decisions and the search log live in JSON under
+  `.priorwork/surveys/`, so a survey picks up where it left off in the next conversation.
+- **Cards you can check.** Each included paper gets a card (research question, X, Y, data,
+  identification, findings, limitations) written only from the abstract or the full text, with the
+  evidence it was checked against.
 - **Fabrication is caught mechanically.** `priorwork check` finds author–year citations in the
   text that match no registered paper, and DOIs that point to other papers.
 - **People read only the reports.** `priorwork export` writes the version for reading (HTML);
   the state and caches stay out of the way in `.priorwork/`.
 
 ```
-① scope → ② search → ③ screen → ④ chase citations → ⑤ fill in from the text → ⑥ check
-  /survey-new          /survey-screen  /survey-snowball     /survey-extract        /survey-check
+① scope → ② search → ③ screen → ④ chase citations → ⑤ fill in the cards → ⑥ write → ⑦ check and export
 ```
 
 ## How it fits together
@@ -37,7 +38,7 @@ beyond the agent you already use.
 | | The engine (the `priorwork` command and the VS Code extension) | A workspace |
 | :--- | :--- | :--- |
 | Holds | the code and the originals of `AGENTS.md` and the skills | the reports, their state, `.env` |
-| Comes from | PyPI (`pip install priorwork`) and the VS Code Marketplace (Prior Work) | you (a private GitHub repository) |
+| Comes from | PyPI (`pip install priorwork`) and the VS Code Marketplace (Priorwork) | you (a private GitHub repository) |
 | Updated by | releases | `./priorwork upgrade` |
 
 A workspace pins the engine's version in `requirements.txt`, so nothing changes behind your back;
@@ -50,24 +51,25 @@ code, so updates never conflict.
 
 ### From VS Code
 
-1. Install **Prior Work** from the Extensions view. Nothing else is needed to start: the
+1. Install **Priorwork** from the Extensions view. Nothing else is needed to start: the
    extension uses Python 3.10 or later if you have it, and otherwise installs
    [uv](https://docs.astral.sh/uv/), which downloads Python (into your home folder, without
-   administrator rights). For the writing you will want an AI agent that works in VS Code
-   (Claude Code, for example), and **git** to keep the workspace on GitHub.
-2. In the Prior Work activity bar, choose **Create a Workspace**, then an empty folder and the
+   administrator rights). You will also want an AI agent that works in VS Code (Claude Code,
+   Antigravity, …), and **git** to keep the workspace on GitHub.
+2. In the Priorwork activity bar, choose **Create a Workspace**, then an empty folder and the
    language of the reports (English or Japanese). The extension creates a `.venv` in that folder,
    installs `priorwork` from PyPI and sets the workspace up.
 3. Open the **Settings** (the gear in the sidebar): add a free Semantic Scholar API key
    (recommended), and Zotero and the SSCI list if you have them. **Save and Check the Connections**
    tells you whether they work.
-4. **Publish it to GitHub** from the row in the sidebar, as a **private** repository. Later
-   changes are committed from VS Code's Source Control view (the agent also offers to commit at the
-   end of each step).
-5. **New Survey** → **Search** → **Screen Candidates** (or ask the agent to recommend decisions).
-6. **Ask Your Agent…** on the survey copies a request — fill in the cards, write the text, check
-   and fix — to paste into the agent's chat. Check the cards it wrote on each paper's page.
-7. **Check the Survey**, then **Export and View the Report**.
+4. **Publish it to GitHub** from the row in the sidebar, as a **private** repository. The agent
+   commits at each natural break; it pushes only when you agree.
+5. **New Survey** → **Ask your agent to do it**: give the topic and paste the copied request into
+   the agent's chat (or just ask in the chat). The agent works through to the exported report.
+6. Read the report (**Export and View the Report**, or right-click `reports/*.html` → **View the
+   Report in Priorwork**; this works over SSH too), then check decisions and cards on each paper's
+   page and correct what you disagree with.
+7. Ask for more with **Ask Your Agent…** on the survey, or in the chat ("search more", "carry on").
 
 What the extension does:
 
@@ -204,31 +206,35 @@ major journals.
 
 ### With your agent
 
-Open the workspace in Claude Code (or another agent) and say, for example, "I want to start a
-review on the employment effects of minimum wages." The agent follows `AGENTS.md` and uses the
-skills for each step (`.agent/skills/`); you can also call a skill directly, like `/survey-new`.
-In VS Code, **Ask Your Agent…** on a survey copies a ready-made request to paste into the chat.
+Open the workspace with your agent and ask in plain words, for example "do a full review of the
+employment effects of minimum wages". The agent follows `AGENTS.md` and the skills
+(`.agent/skills/`, also under `.claude/skills/`): the entry point `priorwork` looks at the state and
+takes the next step, through to the exported report. You never need to type a skill name (typing
+`/priorwork` works too). In VS Code, **New Survey → Ask your agent to do it** and **Ask Your Agent…**
+on a survey copy ready-made requests.
 
-| Skill | What it does | What you decide |
-| :--- | :--- | :--- |
-| `/survey-new` | creates the survey and runs the first searches | research question, period, criteria, depth |
-| `/survey-screen` | presents candidates 5–10 at a time with a recommendation (or screen them yourself in VS Code) | include / exclude (with a reason) / maybe |
-| `/survey-snowball` | chases the references and citations of the included papers | decisions on the new candidates |
-| `/survey-extract` | gets the full texts and fills in the paper cards (RQ, identification, …) | where the PDFs are; whether abstracts are enough |
-| `/survey-check` | checks the survey and fixes what it finds | findings that cannot be resolved |
+| Skill | What it does |
+| :--- | :--- |
+| `priorwork` | the entry point: looks at the state and runs the whole survey, step by step |
+| `priorwork-new` | sets the scope, creates the survey and runs enough searches for the depth |
+| `priorwork-screen` | decides each candidate against the criteria, with a reason (in consultation mode, recommends and waits) |
+| `priorwork-snowball` | chases the references and citations of the included papers |
+| `priorwork-extract` | gets the full texts and fills in the paper cards (RQ, identification, …) |
+| `priorwork-check` | checks the survey, fixes what it finds and exports the report |
 
-When you come back, say "let's continue"; the agent looks at `./priorwork status` for progress and
-the next steps.
+The agent decides on its own by default. To decide the scope and each paper yourself, ask it to go
+through it together with you, or write that in `AGENTS.local.md`. When you come back, say "let's
+continue"; the agent looks at `./priorwork status` for progress and the next steps.
 
 ### Depth (quick / full)
 
-A survey has a depth, agreed in `/survey-new` and changeable later with
+A survey has a depth, taken from the request (or chosen by the agent) and changeable later with
 `./priorwork scope SURVEY --depth full`.
 
 | | quick | full |
 | :--- | :--- | :--- |
 | Suits | a narrow topic, or just an overview | a broad topic with subtopics, or when coverage matters |
-| Searches | one or two queries | several queries per subtopic |
+| Searches | 2–3 queries (10 results each) | 2–4 queries per subtopic (25 results each), 100+ candidates |
 | Citation chasing | optional | yes |
 | Cards | abstracts are fine | core papers checked in the full text |
 
@@ -282,6 +288,7 @@ The numbers are guides, not limits. The rules and `priorwork check` are the same
 ./priorwork export SURVEY [--format html|docx|md] [-o PATH] [--with-abstracts]
 ./priorwork fulltext SURVEY <number> [--pdf <path>]
 ./priorwork zotero [SURVEY] [--refresh]
+./priorwork zotero --collections | SURVEY --collection NAME | SURVEY --import | SURVEY --dois
 
 # Finding literature
 ./priorwork search "<English query>" [--into SURVEY] [--bulk] [--sort citations|relevance|recent|cpy] [--year 2010-2024] [--ssci-only] [--limit N]

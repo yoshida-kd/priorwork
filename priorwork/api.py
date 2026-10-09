@@ -86,6 +86,23 @@ def _error_detail(resp: requests.Response) -> str:
     return re.sub(r"\s+", " ", text)[:200].strip()
 
 
+_BOOL_WORDS = {"AND": "+", "OR": "|", "NOT": "-"}
+
+
+def bulk_query(query: str) -> str:
+    """bulk 検索のクエリの AND / OR / NOT（大文字の語）を + / | / - に直す。
+
+    S2 の bulk 検索はこれらの語を演算子と見ず、ただの語として探すので、0 件になる（エージェントがよく書く）。
+    引用符の中は変えない。
+    """
+    parts = re.split(r'("[^"]*")', query)
+    for i in range(0, len(parts), 2):
+        parts[i] = re.sub(r"\bAND\s+NOT\s+", "NOT ", parts[i])
+        parts[i] = re.sub(r"\b(AND|OR)\b", lambda m: f" {_BOOL_WORDS[m.group(1)]} ", parts[i])
+        parts[i] = re.sub(r"\bNOT\s+", "-", parts[i])
+    return re.sub(r"\s+", " ", "".join(parts)).strip()
+
+
 class ApiError(RuntimeError):
     def __init__(self, service: str, message: str, status: Optional[int] = None):
         super().__init__(f"[{service}] {message}")
@@ -342,7 +359,7 @@ class LiteratureClient:
     def _search_s2(self, query: str, limit: int, year: Optional[str], bulk: bool) -> List[Dict[str, Any]]:
         if bulk:
             # bulk 検索: AND(+) / OR(|) / 除外(-) / "フレーズ" が使え、被引用数順に最大 1000 件返る
-            data = self._s2("/paper/search/bulk", {"query": query, "fields": S2_BULK_FIELDS, "year": year,
+            data = self._s2("/paper/search/bulk", {"query": bulk_query(query), "fields": S2_BULK_FIELDS, "year": year,
                                                     "sort": "citationCount:desc"})
         else:
             data = self._s2("/paper/search", {"query": query, "limit": min(limit, 100), "fields": S2_PAPER_FIELDS,

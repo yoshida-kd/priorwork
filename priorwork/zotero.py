@@ -7,6 +7,10 @@ Zotero 連携（読み取り専用）。
 
 Zotero にも WebDAV にも書き込みは一切しない（GET のみ）。
 
+サーベイに Zotero のコレクションを結び付けると（`priorwork zotero SURVEY --collection 名前`）、
+「Zotero にあるか」はそのコレクションに入っているかで見る。コレクションに入れた論文は候補として取り込め（`--import`）、
+本文もそのコレクションの PDF を優先する。コレクションを作る・論文を入れるのはユーザー（Zotero に書き込まない）。
+
 設定（.env）:
   ZOTERO_API_KEY, ZOTERO_USER_ID               … 必須（キーは「Allow library access」のみの読み取り専用を推奨）
   ZOTERO_WEBDAV_URL, ZOTERO_WEBDAV_USER, ZOTERO_WEBDAV_PASSWORD … WebDAV 同期のとき
@@ -53,6 +57,8 @@ class ZoteroClient:
         self.webdav_auth = (webdav_user, webdav_password) if webdav_user else None
         self.index_path = index_path or INDEX_PATH
         self._index: Optional[Dict[str, Any]] = None
+        # サーベイに結び付けたコレクション（キー）。同じ論文が複数あれば、こちらの中のものを優先する
+        self.prefer_collection = ""
 
     @classmethod
     def from_env(cls) -> Optional["ZoteroClient"]:
@@ -142,6 +148,8 @@ class ZoteroClient:
             if not batch or start >= total:
                 break
 
+        if new_version != since or "collections" not in index:
+            index["collections"] = self._fetch_collections()
         if since and new_version != since:
             resp = self._get(f"{self.prefix}/deleted", {"since": since})
             if resp.ok:
@@ -152,6 +160,60 @@ class ZoteroClient:
         self._save_index(index)
         self._index = index
         return index
+
+    def _fetch_collections(self) -> Dict[str, Dict[str, str]]:
+        collections: Dict[str, Dict[str, str]] = {}
+        start = 0
+        while True:
+            resp = self._get(f"{self.prefix}/collections", {"format": "json", "limit": 100, "start": start})
+            if not resp.ok:
+                raise ZoteroError("[Zotero] " + t("Cannot read the collections (HTTP {status})", status=resp.status_code))
+            batch = resp.json()
+            for c in batch:
+                data = c.get("data") or {}
+                collections[c["key"]] = {"key": c["key"], "name": data.get("name", ""),
+                                         "parent": data.get("parentCollection") or ""}
+            start += len(batch)
+            if not batch or start >= int(resp.headers.get("Total-Results", len(batch))):
+                return collections
+
+    def collections(self) -> List[Dict[str, Any]]:
+        """コレクションの一覧（親の名前つきのパス "親 / 子" と、中の論文の数）。"""
+        cols = self.index.get("collections") or {}
+
+        def path(key: str, depth: int = 0) -> str:
+            c = cols.get(key)
+            if not c or depth > 20:
+                return ""
+            parent = path(c["parent"], depth + 1) if c["parent"] else ""
+            return f"{parent} / {c['name']}" if parent else c["name"]
+
+        counts: Dict[str, int] = {}
+        for i in self._parents():
+            for k in i["collections"]:
+                counts[k] = counts.get(k, 0) + 1
+        return sorted(({"key": k, "name": c["name"], "path": path(k), "items": counts.get(k, 0)}
+                       for k, c in cols.items()), key=lambda c: c["path"].lower())
+
+    def find_collection(self, name_or_key: str) -> Dict[str, Any]:
+        """名前・パス・キーでコレクションを探す。見つからない / 複数あればエラー。"""
+        q = name_or_key.strip()
+        cols = self.collections()
+        hits = ([c for c in cols if c["key"] == q] or [c for c in cols if c["path"] == q]
+                or [c for c in cols if c["name"].lower() == q.lower()])
+        if len(hits) == 1:
+            return hits[0]
+        if not hits:
+            raise ZoteroError(t("No Zotero collection named \"{name}\". The collections: {names}", name=q,
+                                names=", ".join(c["path"] for c in cols) or t("(none)")))
+        raise ZoteroError(t("More than one Zotero collection is named \"{name}\"; give the path or the key: {names}",
+                            name=q, names=", ".join(f"{c['path']} ({c['key']})" for c in hits)))
+
+    def collection_items(self, key: str) -> List[Dict[str, Any]]:
+        return [i for i in self._parents() if key in i["collections"]]
+
+    def _parents(self) -> List[Dict[str, Any]]:
+        return [i for i in self.index["items"].values() if not i["parentItem"] and i["itemType"] != "attachment"]
 
     def _load_index(self) -> Dict[str, Any]:
         try:
@@ -175,7 +237,7 @@ class ZoteroClient:
 
     def find_item(self, record: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """DOI（無ければタイトル）で、論文に対応する Zotero の親アイテムを探す。"""
-        items = [i for i in self.index["items"].values() if not i["parentItem"] and i["itemType"] != "attachment"]
+        items = sorted(self._parents(), key=lambda i: self.prefer_collection not in i.get("collections", []))
         doi = normalize_doi(record.get("doi", ""))
         if doi:
             for i in items:
@@ -192,11 +254,13 @@ class ZoteroClient:
         return [i for i in self.index["items"].values()
                 if i["parentItem"] == parent_key and i["contentType"] == "application/pdf"]
 
-    def status(self, record: Dict[str, Any]) -> Dict[str, Any]:
+    def status(self, record: Dict[str, Any], collection: str = "") -> Dict[str, Any]:
+        """Zotero にあるか。collection を渡すと、そのコレクションに入っているか（in_collection）も見る。"""
         item = self.find_item(record)
         if not item:
-            return {"registered": False, "key": "", "pdfs": 0}
-        return {"registered": True, "key": item["key"], "pdfs": len(self.pdf_attachments(item["key"]))}
+            return {"registered": False, "key": "", "pdfs": 0, "in_collection": False}
+        return {"registered": True, "key": item["key"], "pdfs": len(self.pdf_attachments(item["key"])),
+                "in_collection": bool(collection) and collection in item.get("collections", [])}
 
     # ---- Content ----
 

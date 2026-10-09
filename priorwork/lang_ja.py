@@ -281,8 +281,8 @@ MESSAGES = {
         "リモートがありません。GitHub に非公開リポジトリとして公開してください（VS Code ではサイドバーの「GitHub に公開」、または `gh repo create <名前> --private --source=. --push`）",
     "The remote is not GitHub: {urls}": "リモートが GitHub ではありません: {urls}",
     "Remote: {urls}": "リモート: {urls}",
-    "There is no .env. Set your API keys in the settings (VS Code: Prior Work's Settings; command line: `priorwork settings`)":
-        ".env がありません。設定で API キーを入れてください（VS Code では Prior Work の設定、コマンドラインでは `priorwork settings`）",
+    "There is no .env. Set your API keys in the settings (VS Code: Priorwork's Settings; command line: `priorwork settings`)":
+        ".env がありません。設定で API キーを入れてください（VS Code では Priorwork の設定、コマンドラインでは `priorwork settings`）",
     "An API key is set": "API キーが設定されています",
     "No API key. Requests share a public pool, so searches often fail with HTTP 429":
         "API キー未設定。共有枠のため HTTP 429 で検索が失敗しやすくなります",
@@ -525,4 +525,50 @@ MESSAGES = {
     "recent: S2's order (roughly newest first) / cited: by citations (OpenAlex)":
         "recent: S2 の返却順（概ね新しい順）/ cited: 被引用数順 (OpenAlex)",
     "the SSCI status of a journal name or ISSN": "誌名 / ISSN の SSCI 判定",
+    # 検索の件数・Zotero のコレクション
+    "number of papers (default: 25 for a full survey, else 10)": "件数（既定: full のサーベイは 25、それ以外は 10）",
+    "No hits. Bulk search takes + (AND), | (OR), - (NOT) and \"phrases\"; try fewer terms or synonyms":
+        "0 件でした。bulk 検索では + (AND)・| (OR)・- (NOT)・\"フレーズ\" を使います。語を減らすか、同義語で試してください",
+    "No hits. Try fewer terms, synonyms or --bulk": "0 件でした。語を減らすか、同義語か --bulk で試してください",
+    "Search more: a full survey usually needs {min_q}+ queries and {min_n}+ papers "
+    "(now {queries|# query|# queries}, {n|# paper|# papers})":
+        "検索を足す: full のサーベイでは、{min_q} クエリ・{min_n} 本以上が目安（いまは {queries} クエリ・{n} 本）",
+    "Register {n|# paper|# papers} from the Zotero collection \"{name}\" as candidates":
+        "Zotero のコレクション「{name}」の {n} 本を候補に登録する",
+    "  zotero SURVEY --collection NAME   link a Zotero collection (--import registers its papers, --dois lists the DOIs to add)":
+        "  zotero SURVEY --collection 名前   Zotero のコレクションを結び付ける（--import で中の論文を登録、--dois で追加する DOI の一覧）",
+    "Cannot read the collections (HTTP {status})": "コレクションを読めません（HTTP {status}）",
+    "No Zotero collection named \"{name}\". The collections: {names}":
+        "「{name}」という Zotero のコレクションはありません。コレクション: {names}",
+    "More than one Zotero collection is named \"{name}\"; give the path or the key: {names}":
+        "「{name}」という Zotero のコレクションが複数あります。パスかキーで指定してください: {names}",
+    "(none)": "（なし）",
+    "No collections in the Zotero library": "Zotero のライブラリにコレクションはありません",
+    "{n|# item|# items}": "{n} 件",
+    "Linked the Zotero collection \"{name}\" to {survey}": "Zotero のコレクション「{name}」を {survey} に結び付けました",
+    "Unlinked the Zotero collection from {survey}": "{survey} と Zotero のコレクションの結び付きを外しました",
+    "No Zotero collection is linked to {survey}. Link one with "
+    "`priorwork zotero {survey} --collection \"<name>\"`":
+        "{survey} に Zotero のコレクションが結び付いていません。"
+        "`priorwork zotero {survey} --collection \"<名前>\"` で結び付けてください",
+    "Imported from the Zotero collection: {n|# paper|# papers} ({new} new)":
+        "Zotero のコレクションから取り込みました: {n} 本（新規 {new}）",
+    "not imported (no DOI, or not found): {title}": "取り込めなかったもの（DOI が無い / 見つからない）: {title}",
+    "collection: {name}": "コレクション: {name}",
+    "in Zotero, not in the collection": "Zotero にあるがコレクションに無い",
+    "To add them at once: copy the DOIs from `priorwork zotero {name} --dois` and paste them into Zotero's "
+    "\"Add Item by Identifier\" (the magic wand){where}":
+        "まとめて足すには: `priorwork zotero {name} --dois` の DOI をコピーし、{where}Zotero の"
+        "「識別子でアイテムを追加」（魔法の杖）に貼ります",
+    " with the collection \"{name}\" selected": "コレクション「{name}」を選んだ状態で",
+    "{n|# paper is|# papers are} in the collection but not in the survey yet: "
+    "`priorwork zotero {name} --import` registers them as candidates":
+        "コレクションにあってサーベイにまだ無い論文が {n} 本あります: "
+        "`priorwork zotero {name} --import` で候補に登録します",
+    "list the collections of the Zotero library": "Zotero のライブラリのコレクションを一覧する",
+    "link a Zotero collection (name, path or key) to the survey; \"\" unlinks it":
+        "Zotero のコレクション（名前・パス・キー）をサーベイに結び付ける（\"\" で外す）",
+    "register the papers of the linked collection as candidates": "結び付けたコレクションの論文を候補に登録する",
+    "print only the DOIs of the papers not in Zotero (for the magic wand)":
+        "Zotero に無い論文の DOI だけを出す（魔法の杖に貼る用）",
 }

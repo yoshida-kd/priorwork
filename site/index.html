@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Prior Work</title>
-<meta name="description" content="Prior Work: literature reviews for the social sciences, built with an AI agent from the VS Code sidebar — search, screening, paper cards and checks, with no terminal needed.">
+<title>Priorwork</title>
+<meta name="description" content="Priorwork: hand a literature review for the social sciences to your AI agent — it searches, screens, fills in paper cards and writes; you check and correct from the VS Code sidebar. No terminal needed.">
 <link rel="alternate" hreflang="ja" href="ja/">
 <link rel="alternate" hreflang="en" href="">
 <link rel="alternate" hreflang="x-default" href="">
@@ -32,7 +32,7 @@
   <div class="wrap">
     <a class="brand" href="./">
       <svg viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="5" fill="#1f3a5f"/><rect x="5" y="6" width="10.5" height="13" rx="1.2" fill="#fff"/><path d="M7.2 9.5h6M7.2 12h6M7.2 14.5h4" stroke="#1f3a5f" stroke-width="1.1" stroke-linecap="round" opacity=".6"/><circle cx="16.5" cy="16.5" r="4.2" fill="#2e9e6a" stroke="#1f3a5f" stroke-width="1"/><path d="M14.8 16.6l1.2 1.2 2.3-2.5" fill="none" stroke="#fff" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      Prior Work
+      Priorwork
     </a>
     <nav>
       <a href="#install">Install</a>
@@ -46,9 +46,9 @@
 <main>
 <div class="hero">
   <div class="wrap">
-    <h1>Prior Work</h1>
-    <p class="tagline">Literature reviews for the social sciences, built with an AI agent</p>
-    <p class="lead">Search Semantic Scholar and OpenAlex, screen the candidates, check the paper cards your agent fills in, and catch citations that match no paper — all from the VS Code sidebar, with no terminal. What you ask of the agent goes through its chat; what you decide stays yours.</p>
+    <h1>Priorwork</h1>
+    <p class="tagline">Hand your review of the prior work to an AI agent — then check it</p>
+    <p class="lead">Tell your agent (Claude Code, Antigravity, …) the topic. It sets the scope, searches Semantic Scholar and OpenAlex, screens with a reason for every decision, chases citations, fills in a card for each paper, writes the review and checks every citation. You read the result and overturn or correct anything from the VS Code sidebar — no terminal, no commands to learn.</p>
     <div class="actions">
       <a class="button primary" href="https://marketplace.visualstudio.com/items?itemName=yoshida-kd.priorwork">Get the VS Code extension</a>
       <a class="button secondary" href="guide/">Read the guide</a>
@@ -58,14 +58,14 @@
 
 <section class="alt">
   <div class="wrap">
-    <h2>How a survey goes</h2>
+    <h2>What the agent does, without stopping</h2>
     <ol class="chapters">
       <li><b>Scope</b> <span>— research question, period, criteria, depth</span></li>
       <li><b>Search</b> <span>— Semantic Scholar + OpenAlex</span></li>
-      <li><b>Screen</b> <span>— a page per paper, one key per decision</span></li>
+      <li><b>Screen</b> <span>— against your criteria, a reason for each</span></li>
       <li><b>Chase citations</b> <span>— references and citing papers</span></li>
-      <li><b>Cards</b> <span>— the agent fills them in; you check</span></li>
-      <li><b>Write</b> <span>— the agent writes from the cards</span></li>
+      <li><b>Cards</b> <span>— from the abstracts and full texts</span></li>
+      <li><b>Write</b> <span>— background, debates and gaps, from the cards</span></li>
       <li><b>Check and export</b> <span>— citations, DOIs, unchecked cards; HTML</span></li>
     </ol>
   </div>
@@ -76,8 +76,8 @@
     <h2>What it does</h2>
     <div class="features">
       <div class="feature">
-        <h3>Screen with one key</h3>
-        <p>A page per candidate with the abstract, the SSCI status, warnings and your criteria. <b>I</b> include, <b>M</b> maybe, <b>X</b> exclude with a reason — and on to the next.</p>
+        <h3>Just ask in plain words</h3>
+        <p>"Do a full review of …" in your agent's chat, or <i>New Survey → Ask your agent to do it</i> in the sidebar. No commands or skill names; the agent carries on to the end and reports what it decided.</p>
       </div>
       <div class="feature">
         <h3>Paper cards you can check</h3>
@@ -92,12 +92,12 @@
         <p>Every author–year citation in the text must match a registered paper, and no DOI may point to another title. Until then, the export says <i>Draft</i>.</p>
       </div>
       <div class="feature">
-        <h3>Your agent writes, you decide</h3>
-        <p><i>Ask Your Agent…</i> copies a ready-made request — fill in the cards, write the text, check and fix — for the chat of Claude Code or another agent. The extension never calls an AI service itself.</p>
+        <h3>Overturn anything with one key</h3>
+        <p>A page per paper with the abstract, the SSCI status, warnings, your criteria and the agent's reason. <b>I</b> include, <b>M</b> maybe, <b>X</b> exclude; correct a card and save. The agent follows your changes.</p>
       </div>
       <div class="feature">
-        <h3>No terminal, no setup</h3>
-        <p>Install the extension and create a workspace: it sets up Python (through uv if you have none), your keys go on a settings page, and the workspace goes to a private GitHub repository from the sidebar.</p>
+        <h3>Reports, Zotero, servers</h3>
+        <p>The report opens inside VS Code, on a server over SSH too. Link a Zotero collection to a survey: the DOIs to add are one copy away, and the PDFs there are read first. The extension never calls an AI service itself.</p>
       </div>
     </div>
   </div>
@@ -107,8 +107,8 @@
   <div class="wrap two">
     <div>
       <h2>Install</h2>
-      <p>Install the <a href="https://marketplace.visualstudio.com/items?itemName=yoshida-kd.priorwork">Prior Work extension</a> in VS Code and press <strong>Create a Workspace</strong> in its sidebar. Nothing else is needed to start: it uses Python 3.10 or later if you have it, and otherwise installs uv, which downloads Python (into your home folder, without administrator rights).</p>
-      <p>Linux and macOS; on Windows, inside WSL. For the writing, an AI agent that works in VS Code (Claude Code, for example).</p>
+      <p>Install the <a href="https://marketplace.visualstudio.com/items?itemName=yoshida-kd.priorwork">Priorwork extension</a> in VS Code and press <strong>Create a Workspace</strong> in its sidebar. Nothing else is needed to start: it uses Python 3.10 or later if you have it, and otherwise installs uv, which downloads Python (into your home folder, without administrator rights).</p>
+      <p>Linux and macOS; on Windows, inside WSL. And an AI agent that works in VS Code (Claude Code, Antigravity, …).</p>
     </div>
     <div>
       <h2>From a terminal</h2>
@@ -130,15 +130,16 @@
       <li><a href="guide/#1-introduction">Introduction</a> <span>— what it does, what you need</span></li>
       <li><a href="guide/#2-install">Install</a> <span>— VS Code, WSL, servers over SSH</span></li>
       <li><a href="guide/#3-create-a-workspace">Create a workspace</a> <span>— settings, GitHub, another machine</span></li>
-      <li><a href="guide/#4-a-survey-step-by-step">A survey, step by step</a> <span>— from the scope to the export</span></li>
-      <li><a href="guide/#5-paper-cards">Paper cards</a> <span>— fields, evidence levels, full texts</span></li>
-      <li><a href="guide/#6-checks">Checks</a></li>
-      <li><a href="guide/#7-settings">Settings</a> <span>— API keys, Zotero, the SSCI list</span></li>
-      <li><a href="guide/#8-working-with-the-agent">Working with the agent</a></li>
-      <li><a href="guide/#9-inside-a-workspace">Inside a workspace</a></li>
-      <li><a href="guide/#10-updating-the-engine">Updating the engine</a></li>
-      <li><a href="guide/#11-on-the-command-line">On the command line</a></li>
-      <li><a href="guide/#12-troubleshooting">Troubleshooting</a></li>
+      <li><a href="guide/#4-hand-it-to-the-agent">Hand it to the agent</a> <span>— ask, view the report, check and correct, Zotero</span></li>
+      <li><a href="guide/#5-doing-it-yourself">Doing it yourself</a> <span>— search and screen from the sidebar</span></li>
+      <li><a href="guide/#6-paper-cards">Paper cards</a> <span>— fields, evidence levels, full texts</span></li>
+      <li><a href="guide/#7-checks">Checks</a></li>
+      <li><a href="guide/#8-settings">Settings</a> <span>— API keys, Zotero, the SSCI list</span></li>
+      <li><a href="guide/#9-instructions-for-the-agent">Instructions for the agent</a></li>
+      <li><a href="guide/#10-inside-a-workspace">Inside a workspace</a></li>
+      <li><a href="guide/#11-updating-the-engine">Updating the engine</a></li>
+      <li><a href="guide/#12-on-the-command-line">On the command line</a></li>
+      <li><a href="guide/#13-troubleshooting">Troubleshooting</a></li>
     </ol>
   </div>
 </section>
@@ -146,7 +147,7 @@
 
 <footer>
   <div class="wrap">
-    <span>Prior Work · MIT License · by <a href="https://github.com/yoshida-kd">yoshida-kd</a></span>
+    <span>Priorwork · MIT License · by <a href="https://github.com/yoshida-kd">yoshida-kd</a></span>
     <span><a href="https://github.com/yoshida-kd/priorwork">Source</a> ·
     <a href="https://pypi.org/project/priorwork/">PyPI</a> ·
     <a href="https://github.com/yoshida-kd/priorwork/issues">Issues</a></span>

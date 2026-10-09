@@ -27,9 +27,9 @@ page() {  # page <原稿> <出力> <言語> <題> <説明> <目次の見出し> 
     -V root="$7" -V home="$8" -V slug="$9" -o "$2"
 }
 
-page "$repo/docs/guide.md" "$out/guide/index.html" en "Prior Work guide" \
-  "The full manual for Prior Work: literature reviews for the social sciences with an AI agent, from the VS Code sidebar." \
+page "$repo/docs/guide.md" "$out/guide/index.html" en "Priorwork guide" \
+  "The full manual for Priorwork: hand literature reviews for the social sciences to your AI agent, then check them from the VS Code sidebar." \
   "Contents" "../" "../" guide
-page "$repo/docs/guide.ja.md" "$out/ja/guide/index.html" ja "Prior Work 手引き" \
-  "Prior Work の手引き。AI エージェントと作る社会科学の先行研究サーベイを、VS Code のサイドバーから。" \
+page "$repo/docs/guide.ja.md" "$out/ja/guide/index.html" ja "Priorwork 手引き" \
+  "Priorwork の手引き。社会科学の先行研究サーベイを AI エージェントに任せ、VS Code のサイドバーで確かめる。" \
   "目次" "../../" "../" guide

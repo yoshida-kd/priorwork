@@ -97,4 +97,4 @@ jobs:
           V: ${{ needs.check.outputs.version }}
         run: |
           awk -v v="## $V" '$0 == v {on=1; next} /^## / {on=0} on' vscode-extension/CHANGELOG.md > notes.md
-          gh release create "$GITHUB_REF_NAME" out/* --repo "$GITHUB_REPOSITORY" --title "Prior Work $V" --notes-file notes.md
+          gh release create "$GITHUB_REF_NAME" out/* --repo "$GITHUB_REPOSITORY" --title "Priorwork $V" --notes-file notes.md

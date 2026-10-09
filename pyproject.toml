@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "priorwork"
-version = "0.1.2"
+version = "0.1.3"
 description = "Build literature reviews for the social sciences in conversation with an AI agent (Semantic Scholar + OpenAlex + SSCI)"
 readme = "README.md"
 license = "MIT"
