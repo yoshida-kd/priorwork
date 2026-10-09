@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-for (const f of ['paper.js']) {
+for (const f of ['paper.js', 'settings.js']) {
   execFileSync(process.execPath, ['--check', join(root, 'media', f)], { stdio: 'inherit' });
   console.log('checked', f);
 }

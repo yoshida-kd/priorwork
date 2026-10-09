@@ -34,7 +34,7 @@ _NON_AUTHOR_WORDS = {
     "agency", "institute", "department", "government", "union", "nations", "census", "survey", "table", "figure",
     "fig", "section", "appendix", "chapter", "wave", "round", "model", "column", "panel", "equation", "act",
 }  # May・Law など姓にもなる語は入れない（架空の引用を見逃すため）
-_IGNORE_RE = re.compile(r"<!--\s*(?:priorwork|lit):ignore-citation\s+(.+?)\s*\(?\s*(\d{4})[a-z]?\s*\)?\s*-->")
+_IGNORE_RE = re.compile(r"<!--\s*priorwork:ignore-citation\s+(.+?)\s*\(?\s*(\d{4})[a-z]?\s*\)?\s*-->")
 
 
 class Citation(NamedTuple):
@@ -88,7 +88,7 @@ def find_citations(text: str) -> List[Citation]:
 
 
 def ignored_citations(md: str) -> Set[Tuple[str, int]]:
-    """`<!-- priorwork:ignore-citation World Bank (2010) -->` で検査から外した引用（旧名 lit: も読む）。"""
+    """`<!-- priorwork:ignore-citation World Bank (2010) -->` で検査から外した引用。"""
     return {(surname(m.group(1)), int(m.group(2))) for m in _IGNORE_RE.finditer(_fold(md))}
 
 

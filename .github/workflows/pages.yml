@@ -1,0 +1,54 @@
+name: pages
+
+# 公開用リポジトリ（yoshida-kd/priorwork）の main が変わったら、site/ と手引き
+# （docs/guide*.md を site/build.sh で HTML にしたもの。/guide/ と /ja/guide/）を
+# https://yoshida-kd.github.io/priorwork/ に出す（Octavo の pages.yml と同じ形）。main は
+# tools/release.py のコミットでしか変わらないので、ページが変わるのもリリースのときだけ。
+#
+# 開発用の priorwork-dev でも同じファイルが動くが、repository の条件で何もしない。
+#
+# 前もって要るもの（公開側のリポジトリで一度だけ）:
+#   Settings > Pages > Source を「GitHub Actions」にする
+#   （gh api -X POST repos/yoshida-kd/priorwork/pages -f build_type=workflow）
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: github.repository == 'yoshida-kd/priorwork'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+      # 手引き（docs/guide*.md）を HTML にするのに pandoc を使う（gfm_auto_identifiers があればよいので apt のもので足りる）
+      - name: Install pandoc
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q pandoc
+          pandoc --version | head -1
+      - name: Assemble the site
+        run: |
+          mkdir _site
+          cp -R site/. _site/
+          rm _site/guide.html _site/build.sh
+          sh site/build.sh _site
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v5

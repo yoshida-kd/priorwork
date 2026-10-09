@@ -34,7 +34,7 @@ button {
   cursor: pointer;
 }
 button:hover { background: var(--vscode-button-secondaryHoverBackground); }
-button:focus-visible, input:focus-visible { outline: 1px solid var(--vscode-focusBorder); }
+button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 1px solid var(--vscode-focusBorder); }
 button.include { color: var(--vscode-button-foreground); background: var(--vscode-button-background); }
 button.include:hover { background: var(--vscode-button-hoverBackground); }
 button.current { border-color: var(--vscode-focusBorder); }
@@ -85,3 +85,42 @@ button.chip { font-size: .85em; padding: .1rem .5rem; border-radius: 1rem; }
 .muted { color: var(--vscode-descriptionForeground); }
 .abstract { white-space: pre-wrap; }
 .keys { font-size: .85em; margin-top: 2rem; }
+.card {
+  margin: 1.5rem 0;
+  padding: .8rem;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 4px;
+}
+.card.dirty { border-color: var(--vscode-focusBorder); }
+.card h2 { font-size: 1.1rem; margin: 0 0 .3rem; }
+.card .unsaved { display: none; font-size: .8rem; font-weight: normal; color: var(--vscode-editorWarning-foreground); }
+.card.dirty .unsaved { display: inline; }
+.field { display: block; margin: .6rem 0; }
+.field > span { display: block; font-weight: 600; margin-bottom: .15rem; }
+textarea, select {
+  box-sizing: border-box;
+  font: inherit;
+  color: var(--vscode-input-foreground);
+  background: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 3px;
+  padding: .3rem .5rem;
+}
+textarea { width: 100%; resize: vertical; line-height: 1.5; }
+select { min-width: 12rem; }
+.card-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .8rem; }
+.card-actions .spacer { flex: 1; }
+/* 設定のページ */
+.settings h1 { font-size: 1.4rem; margin: 1rem 0 .3rem; }
+.group { margin: 1.2rem 0; padding: .8rem; border: 1px solid var(--vscode-panel-border); border-radius: 4px; }
+.group h2 { font-size: 1.1rem; margin: 0 0 .3rem; }
+.settings .field input { box-sizing: border-box; width: 100%; }
+.settings .field code { font-weight: normal; font-size: .8em; opacity: .7; margin-left: .3rem; }
+.secret { display: flex; gap: .3rem; }
+.settings .actions { position: sticky; bottom: 0; display: flex; gap: .5rem; align-items: center; padding: .6rem 0;
+  background: var(--vscode-editor-background); border-top: 1px solid var(--vscode-panel-border); }
+.settings .unsaved { display: none; color: var(--vscode-editorWarning-foreground); }
+.settings.dirty .unsaved { display: inline; }
+.checks { list-style: none; padding: 0; margin: 0; }
+.checks li { margin: .2rem 0; }
+.c-ng { color: var(--vscode-errorForeground); }

@@ -4,8 +4,7 @@
 reports/YYYYMMDD_<slug>.md              … 人（とエージェント）が読み書きするレポート本体
 .priorwork/surveys/YYYYMMDD_<slug>.json … 論文候補・採否・検索履歴などの状態（CLI が管理）
 
-Markdown のうち `<!-- BEGIN priorwork:NAME -->` 〜 `<!-- END priorwork:NAME -->` の範囲は CLI が再生成する
-（旧名 lit の `<!-- BEGIN lit:NAME -->` も読み、再生成のときに priorwork: に書き換える）。
+Markdown のうち `<!-- BEGIN priorwork:NAME -->` 〜 `<!-- END priorwork:NAME -->` の範囲は CLI が再生成する。
 ただし「各論文の詳細」カード（papers）は、見出しと書誌行だけを再生成し、
 RQ・識別戦略などの記入内容はそのまま残す。比較マトリクスはカードの記入内容から作る。
 
@@ -37,7 +36,6 @@ DEPTHS = {"quick": "Quick (a narrow topic; get an overview fast)",
 DEFAULT_DEPTH = "full"
 BLOCKS = ("scope", "matrix", "papers", "references", "log")
 MARKER = "priorwork"
-LEGACY_MARKER = "lit"
 
 # カードの記入欄: (キー, ラベル)。ラベルは英語が原文で、レポートにはサーベイの言語で書く。
 # 読むときはどちらの言語のラベルも受け付ける（括弧の前までの先頭一致）
@@ -397,6 +395,43 @@ class Survey:
         return [e for e in self.by_status(INCLUDED)
                 if evidence_key(fields.get(e["key"], {}).get("evidence", "")) == EVIDENCE_UNCHECKED]
 
+    def card(self, number: int) -> Dict[str, str]:
+        """採用論文のカードの記入欄（フォーム用。1行目が行内の値、2行目以降が直下の箇条書き）。"""
+        key = self._card_key(number)
+        self.render()   # 採用したばかりでカードがまだ無ければ作る
+        cards = parse_cards(extract_blocks(self.md_path.read_text(encoding="utf-8"))["papers"])
+        return card_values(cards.get(key, ""))
+
+    def set_card(self, number: int, values: Dict[str, str]) -> bool:
+        """カードの記入欄を書き換え、マトリクスなどを再生成する。確認レベルはキー（unchecked など）で渡す。変更があれば True。"""
+        key = self._card_key(number)
+        unknown = sorted(set(values) - {k for k, _ in CARD_FIELDS})
+        if unknown:
+            raise SurveyError(t("Unknown card fields: {names} (use {known})", names=", ".join(unknown),
+                                known=", ".join(k for k, _ in CARD_FIELDS)))
+        values = dict(values)
+        if "evidence" in values:
+            if values["evidence"] not in EVIDENCE_KEYS:
+                raise SurveyError(t("The evidence level is one of: {keys}", keys=", ".join(EVIDENCE_KEYS)))
+            values["evidence"] = evidence_label(values["evidence"], self.lang)
+        self.render()
+        md = self.md_path.read_text(encoding="utf-8")
+        cards = parse_cards(extract_blocks(md)["papers"])
+        cards[key] = set_card_fields(cards.get(key, ""), values, self.lang)
+        papers = "\n\n".join(f"<!-- paper: {k} -->\n{body}" for k, body in cards.items())
+        new_md = self.rendered_markdown(replace_blocks(md, {"papers": papers}))
+        if new_md == md:
+            return False
+        self.md_path.write_text(new_md, encoding="utf-8")
+        self.save()
+        return True
+
+    def _card_key(self, number: int) -> str:
+        e = self.get(number)
+        if e["status"] != INCLUDED:
+            raise SurveyError(t("#{number} is not included, so it has no card", number=number))
+        return e["key"]
+
     # ---- rendering ----
 
     def render(self) -> bool:
@@ -483,17 +518,16 @@ def year_labels(included: List[Dict[str, Any]]) -> Dict[str, str]:
 
 # ---------------- Markdown blocks ----------------
 
-# 旧名 lit の印も読む（BEGIN と END は同じ名前どうし）
-_BLOCK_RE = re.compile(rf"<!-- BEGIN ({MARKER}|{LEGACY_MARKER}):(\w+) -->\n?(.*?)\n?<!-- END \1:\2 -->", re.S)
+_BLOCK_RE = re.compile(rf"<!-- BEGIN {MARKER}:(\w+) -->\n?(.*?)\n?<!-- END {MARKER}:\1 -->", re.S)
 
 
 def extract_blocks(md: str) -> Dict[str, str]:
-    return {m.group(2): m.group(3) for m in _BLOCK_RE.finditer(md)}
+    return {m.group(1): m.group(2) for m in _BLOCK_RE.finditer(md)}
 
 
 def replace_blocks(md: str, rendered: Dict[str, str]) -> str:
     def sub(m):
-        name = m.group(2)
+        name = m.group(1)
         if name not in rendered:
             return m.group(0)
         return f"<!-- BEGIN {MARKER}:{name} -->\n{rendered[name]}\n<!-- END {MARKER}:{name} -->"
@@ -556,6 +590,53 @@ def parse_card_fields(body: str) -> Dict[str, str]:
         elif not line.startswith(" "):
             current = None
     return values
+
+
+_FIELD_LINE = re.compile(r"^- \*\*(.+?)\*\*[:：]\s*(.*)$")
+
+
+def _field_spans(lines: List[str]) -> Dict[str, Tuple[int, int, str]]:
+    """記入欄ごとの (先頭の行, 直下の箇条書きの終わりの次の行, 書かれているラベル)。parse_card_fields と同じ読み方。"""
+    spans: Dict[str, Tuple[int, int, str]] = {}
+    stems = _field_stems()
+    for i, line in enumerate(lines):
+        m = _FIELD_LINE.match(line)
+        key = m and next((k for stem, k in stems if m.group(1).startswith(stem)), None)
+        if key and key not in spans:
+            j = i + 1
+            while j < len(lines) and lines[j].startswith((" ", "\t")) and lines[j].strip():
+                j += 1
+            spans[key] = (i, j, m.group(1))
+    return spans
+
+
+def card_values(body: str) -> Dict[str, str]:
+    """記入欄ごとの値（フォーム用）。1行目が行内の値、2行目以降が直下の箇条書き（印を外したもの）。"""
+    lines = body.splitlines()
+    values = {}
+    for key, (i, j, _) in _field_spans(lines).items():
+        inline = _FIELD_LINE.match(lines[i]).group(2).strip()
+        subs = [re.sub(r"^[-*]\s+", "", ln.strip()) for ln in lines[i + 1:j]]
+        values[key] = "\n".join([inline, *subs]).rstrip()
+    return values
+
+
+def set_card_fields(body: str, values: Dict[str, str], lang: str) -> str:
+    """記入欄を書き換えたカード本文（card_values の逆）。ほかの行はそのまま。消されていた欄は最後の欄の後ろに足す。"""
+    lines = body.splitlines()
+    labels = dict(CARD_FIELDS)
+    for key, value in values.items():
+        spans = _field_spans(lines)
+        parts = value.replace("\r\n", "\n").split("\n")
+        inline = parts[0].strip()
+        subs = [re.sub(r"^[-*]\s+", "", p.strip()) for p in parts[1:] if p.strip()]
+        if key in spans:
+            i, j, label = spans[key]
+        else:
+            i = j = max((s[1] for s in spans.values()), default=0)
+            label = tl(lang, labels[key])
+        lines[i:j] = [f"- **{label}**: {inline}".rstrip(), *(f"  - {s}" for s in subs)]
+    return "\n".join(lines)
 
 
 def new_card_body(record: Dict[str, Any], lang: str) -> str:

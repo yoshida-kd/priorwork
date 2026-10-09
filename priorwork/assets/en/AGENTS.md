@@ -24,7 +24,7 @@ When you report to the user, say what changed in the report, not in the internal
 - **The user decides.** For the scope and for each paper, give a recommendation and wait for the user's decision. Never include or exclude on your own.
 - **The workspace is a Git repository pushed to GitHub (a private repository).** At the end of each step, offer to commit the changes to `reports/*.md`, `.priorwork/surveys/` and so on. Push only when the user agrees. Never commit `.env` (API keys).
 - **When a conversation resumes, look at the state first.** `./priorwork status` (the list) → `./priorwork status <survey>` (progress and next steps).
-- **The user also works from the Priorwork sidebar in VS Code** (searching, recording decisions, exporting). When the user says "I screened them" or "I included those", reload with `./priorwork list <survey>` instead of relying on what you remember.
+- **The user also works from the Prior Work sidebar in VS Code** (searching, recording decisions, filling in paper cards, exporting). When the user says "I screened them" or "I included those", reload with `./priorwork list <survey>` instead of relying on what you remember. Before rewriting a card, read the report again (the user may have corrected it in the sidebar).
 
 ## Steps and skills
 

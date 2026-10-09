@@ -201,3 +201,36 @@ def test_log_block_shows_the_screening_flow(s, s2_record):
     assert "検索 1 回・引用をたどる 1 回（延べ 15 件ヒット）" in log
     assert "重複を除いて 2 件（検索で見つけた 1 / 引用から 1 / 手動登録 0）" in log
     assert "採用 1・保留 0・除外 0・未選別 1" in log
+
+
+def test_card_round_trip_keeps_the_rest_of_the_card(s, s2_record):
+    s.upsert(s2_record(), "search", status=INCLUDED)
+    s.render()
+    md = s.md_path.read_text()
+    s.md_path.write_text(md.replace("- **メモ**:", "- **メモ**: 手書き\n  - 深い\n    - さらに深い"))
+    assert s.card(1)["evidence"] == "未確認" and s.card(1)["memo"] == "手書き\n深い\nさらに深い"
+
+    assert s.set_card(1, {"rq": "雇用は減るか\n- 短期\n長期", "evidence": "abstract"})
+    card = s.card(1)
+    assert card["rq"] == "雇用は減るか\n短期\n長期" and card["evidence"] == "要旨のみ"
+    md = s.md_path.read_text()
+    assert "- **RQ**: 雇用は減るか\n  - 短期\n  - 長期\n" in md
+    assert "    - さらに深い" in md and "<details>" in md      # 書き換えていない欄・要旨はそのまま
+    assert "雇用は減るか" in extract_blocks(md)["matrix"]    # マトリクスも作り直す
+    assert s.unfilled() == []
+    assert not s.set_card(1, {"rq": "雇用は減るか\n短期\n長期"})
+
+
+def test_card_restores_a_deleted_field_and_rejects_bad_input(s, s2_record):
+    s.upsert(s2_record(), "search", status=INCLUDED)
+    s.render()
+    s.md_path.write_text(s.md_path.read_text().replace("- **限界**:\n", ""))
+    s.set_card(1, {"limits": "標本が小さい"})
+    assert s.card(1)["limits"] == "標本が小さい"
+    with pytest.raises(SurveyError):
+        s.set_card(1, {"evidence": "maybe"})
+    with pytest.raises(SurveyError):
+        s.set_card(1, {"title": "x"})
+    s.upsert(s2_record(doi="10.1/other", title="Other"), "search")
+    with pytest.raises(SurveyError):
+        s.card(2)

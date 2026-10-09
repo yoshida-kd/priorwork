@@ -7,7 +7,7 @@
 埋め込みは `{name}` の名前つき。順番は変えてよいが、**名前は原文と同じもの**を使うこと。
 英語の単数・複数（`{n|paper|papers}`）は日本語では使わず、`{n}` と書く。
 
-レポートの文言（見出し・記入欄の名前・確認レベル・採否の名前）は、旧名 lit が書いていた日本語と同じにしてある。
+レポートの文言（見出し・記入欄の名前・確認レベル・採否の名前）は、
 既存のレポートを再生成しても文言が変わらないように、ここを変えるときは注意する（記入欄の名前はレポートから読み返す）。
 """
 
@@ -118,6 +118,25 @@ MESSAGES = {
     "The state file is missing: {path}": "状態ファイルがありません: {path}",
     "The report is missing: {path}": "レポートがありません: {path}",
     "#{number} is not in this survey": "#{number} はこのサーベイにありません",
+    "(not created yet)": "（まだありません）",
+    "A value cannot contain both a quote (') and spaces or #: {value}": "値に ' と空白・# を同時に含めることはできません: {value}",
+    "A value must be on one line: {key}": "値は1行で指定してください: {key}",
+    "Could not read {file}: {error}": "{file} を読めませんでした: {error}",
+    "File not found: {path}": "ファイルが見つかりません: {path}",
+    "Give the settings as a JSON object on stdin: {error}": "設定は標準入力に JSON のオブジェクトで渡してください: {error}",
+    "Imported the SSCI list: {file} ({n|# journal|# journals})": "SSCI リストを取り込みました: {file}（{n} 誌）",
+    "Unknown settings: {names}": "扱えない設定です: {names}",
+    "Updated: {names}": "更新しました: {names}",
+    "import the SSCI list downloaded from the Master Journal List": "Master Journal List からダウンロードした SSCI リストを取り込む",
+    "not set": "未設定",
+    "read the values to write as a JSON object from stdin (an empty string removes one)": "書き込む値を標準入力から JSON のオブジェクトで読む（空文字で削除）",
+    "set": "設定済み",
+    "show or change the settings in .env (API keys, Zotero) and the SSCI list": ".env の設定（API キー・Zotero）と SSCI リストを表示・変更",
+    "{file} has no journal title or ISSN column. Download the SSCI list as CSV from the Master Journal List": "{file} に誌名・ISSN の列がありません。Master Journal List から SSCI のリストを CSV でダウンロードしてください",
+    "#{number} is not included, so it has no card": "#{number} は採用論文ではないため、カードがありません",
+    "Unknown card fields: {names} (use {known})": "カードに無い欄です: {names}（使える欄: {known}）",
+    "The evidence level is one of: {keys}": "確認レベルは次のいずれかです: {keys}",
+    "Give each field as KEY=VALUE: {item}": "欄は 欄=値 の形で指定してください: {item}",
     "Managed blocks are missing: {names} (restore `<!-- BEGIN priorwork:{first} -->` … `<!-- END priorwork:{first} -->`)":
         "管理ブロックが見つかりません: {names}（`<!-- BEGIN priorwork:{first} -->` 〜 `<!-- END priorwork:{first} -->` を復元してください）",
 
@@ -236,18 +255,9 @@ MESSAGES = {
     "Give the version as X.Y.Z: {version}": "版は X.Y.Z の形で指定してください: {version}",
     "pip install failed (requirements.txt was restored): {error}":
         "pip install に失敗しました（requirements.txt は元に戻しました）: {error}",
-    "The destination already exists: {path}": "移行先が既に存在します: {path}",
-    "Both {old} and {new} exist. Keep one of them and run it again": "{old} と {new} の両方があります。どちらかにしてから、もう一度実行してください",
-    "The engine running now is inside the workspace, so it cannot be deleted. "
-    "Run it with the engine installed by pip (.venv/bin/priorwork)":
-        "ワークスペース内のエンジンで実行中のため削除できません。`pip install` したエンジン（.venv/bin/priorwork）で実行してください",
 
     # -- 診断（doctor.py） ------------------------------------------------------------
     "Layout": "構成",
-    "This is a workspace of lit, priorwork's former name. Move it with `priorwork migrate`":
-        "旧名 lit のワークスペースです。`priorwork migrate` で移行してください",
-    "Old layout (surveys/ holds both md and json). Move it with `priorwork migrate`":
-        "旧構成（surveys/ に md と json が同居）です。`priorwork migrate` で移行してください",
     "Missing directories: {dirs} (create them with `priorwork init`)": "ディレクトリがありません: {dirs}（`priorwork init` で作成）",
     "reports/ and .priorwork/ are there ({root})": "reports/ と .priorwork/ があります（{root}）",
     "Workspace language": "ワークスペースの言語",
@@ -267,14 +277,12 @@ MESSAGES = {
         ".env が Git に登録されています。`git rm --cached .env` で外し、API キーを再発行してください",
     ".env is not in .gitignore. Fix .gitignore with `./priorwork sync`":
         ".env が .gitignore に入っていません。`./priorwork sync` で .gitignore を直してください",
-    "No remote. Create a private repository on GitHub and push (e.g. `gh repo create <name> --private --source=. --push`)":
-        "リモートがありません。GitHub に非公開リポジトリを作って push してください（例: `gh repo create <名前> --private --source=. --push`）",
+    "No remote. Publish it as a private repository on GitHub (VS Code: the sidebar's Publish to GitHub; or `gh repo create <name> --private --source=. --push`)":
+        "リモートがありません。GitHub に非公開リポジトリとして公開してください（VS Code ではサイドバーの「GitHub に公開」、または `gh repo create <名前> --private --source=. --push`）",
     "The remote is not GitHub: {urls}": "リモートが GitHub ではありません: {urls}",
     "Remote: {urls}": "リモート: {urls}",
-    "There is no .env. Copy `.env.example` to `.env` and set your API keys":
-        ".env がありません。`.env.example` をコピーして API キーを設定してください",
-    "Settings under lit's old names: {names}. Rename them to PRIORWORK_…":
-        "旧名 lit の設定が残っています: {names}。PRIORWORK_… に名前を変えてください",
+    "There is no .env. Set your API keys in the settings (VS Code: Prior Work's Settings; command line: `priorwork settings`)":
+        ".env がありません。設定で API キーを入れてください（VS Code では Prior Work の設定、コマンドラインでは `priorwork settings`）",
     "An API key is set": "API キーが設定されています",
     "No API key. Requests share a public pool, so searches often fail with HTTP 429":
         "API キー未設定。共有枠のため HTTP 429 で検索が失敗しやすくなります",
@@ -282,8 +290,8 @@ MESSAGES = {
     "No key or e-mail (it works, with a daily usage cap)": "キー・メール未設定（使えますが、1 日の利用量に上限があります）",
     "SSCI journal list": "SSCI 収録リスト",
     "{file} ({n|# ISSN|# ISSNs})": "{file}（{n} 件の ISSN）",
-    "Not set, so the SSCI status is guessed from the journal name (🟡). Put Clarivate's CSV in {dir}":
-        "未設定。誌名による推定（🟡）になります。Clarivate の CSV を {dir} に置いてください",
+    "Not set, so the SSCI status is guessed from the journal name (🟡). Import Clarivate's CSV in the settings (`priorwork settings --import-ssci CSV`)":
+        "未設定。誌名による推定（🟡）になります。設定で Clarivate の CSV を取り込んでください（`priorwork settings --import-ssci CSV`）",
     "Not set (optional; with it, priorwork can see what is in Zotero and fetch full texts)":
         "未設定（任意。設定すると登録状況の確認と本文取得ができます）",
     "Found (`priorwork export --format docx` works)": "あります（`priorwork export --format docx` が使えます）",
@@ -321,19 +329,6 @@ MESSAGES = {
     " (check the connections with `priorwork doctor --online`)": "（接続の確認は `priorwork doctor --online`）",
     "Updated the engine to {version}. Review the changes with `git diff requirements.txt AGENTS.md .agent` and commit them.":
         "エンジンを {version} に更新しました。`git diff requirements.txt AGENTS.md .agent` で変更を確認してコミットします。",
-    "Found nothing to move. Running `priorwork sync` only.": "旧構成のデータは見つかりませんでした。`priorwork sync` だけ実行します。",
-    "moved: {what}": "移動: {what}",
-    "regenerated: {path}": "再生成: {path}",
-    "skipped: {path}": "スキップ: {path}",
-    "could not read, left as it is: {what}": "読めないため、そのままにしました: {what}",
-    "old files that were overwritten are kept in: {path}/": "上書きした旧ファイルの退避先: {path}/",
-    "Engine files that are no longer needed (the engine is the one installed with pip):":
-        "不要になったエンジンのファイル（エンジンは pip でインストールしたものを使います）:",
-    "Delete them with `priorwork migrate --clean`": "削除するなら `priorwork migrate --clean`",
-    "README.md still describes the old template (and the old layout). Delete it if you do not need it, or rewrite it.":
-        "README.md は旧テンプレートの説明のままです（旧構成の説明を含みます）。不要なら削除するか、書き換えてください。",
-    "Moved. Check with `./priorwork status`, review the changes with `git status` and commit them.":
-        "移行しました。`./priorwork status` で確認してください。`git status` で変更を確認してコミットします。",
     "Set the scope": "調査範囲を決める",
     "Search": "検索する",
     "Screen {n|# candidate|# candidates}": "候補 {n} 件を選別する",
@@ -406,9 +401,6 @@ MESSAGES = {
     "Papers citing {id}: {n} ({order})": "{id} を引用している論文: {n} 件（{order}）",
     "References of {id}: {n} ({order})": "{id} の参考文献: {n} 件（{order}）",
     "Basis: {basis}": "判定根拠: {basis}",
-    "a workspace of lit, priorwork's former name": "旧名 lit のワークスペース",
-    "a workspace in the old layout (surveys/ holds both md and json)": "旧構成（surveys/ に md と json が同居）のワークスペース",
-    "This is {what}. Move it with `priorwork migrate`": "{what}です。`priorwork migrate` で新しい構成に移してください",
 
     # -- --help（cli.py の USAGE_LINES と argparse の help） ---------------------------------
     "priorwork — build literature reviews for the social sciences, in conversation with an AI agent":
@@ -422,8 +414,6 @@ MESSAGES = {
         "  doctor [--online]          設定（API キー・SSCI リスト・エンジンの版など）を診断",
     "  upgrade [--to X.Y.Z]       update the engine to the latest (or given) version, then sync":
         "  upgrade [--to X.Y.Z]       エンジンを最新（または指定）の版に更新して sync",
-    "  migrate [--clean]          move a workspace from lit (the former name) or from the old layout":
-        "  migrate [--clean]          旧名 lit のワークスペースや旧構成から移行",
     "Surveys": "サーベイの管理",
     "  status [SURVEY]            list the surveys / progress and next steps":
         "  status [SURVEY]            サーベイ一覧 / 進捗と次にやること",
@@ -437,6 +427,10 @@ MESSAGES = {
         "  include / exclude / maybe  採否を記録（例: priorwork include SURVEY 2 5 7）",
     "  add SURVEY DOI...          register papers by DOI (included by default)":
         "  add SURVEY DOI...          DOI を指定して登録（既定で採用）",
+    "  card SURVEY N [--set ...]  show or fill in the card of an included paper":
+        "  card SURVEY N [--set ...]  採用論文のカードを表示・記入",
+    "  settings                   show or change the API keys, Zotero and the SSCI list":
+        "  settings                   API キー・Zotero・SSCI リストの設定を表示・変更",
     "  render SURVEY              regenerate the managed blocks of the Markdown":
         "  render SURVEY              Markdown の管理ブロックを再生成",
     "  export SURVEY              write the report for reading (HTML / Word / Markdown)":
@@ -473,8 +467,6 @@ MESSAGES = {
     "also check the connections to Semantic Scholar, OpenAlex and Zotero": "Semantic Scholar・OpenAlex・Zotero への接続も確認する",
     "update the engine, then sync": "エンジンを更新して sync",
     "the version to update to (default: the latest)": "更新先の版（既定: 最新）",
-    "move a workspace from lit or from the old layout": "旧名 lit や旧構成から移行",
-    "delete engine files left over from a copy of the old template": "旧テンプレートのコピーに残ったエンジンのファイルを削除",
     "list the surveys / progress and next steps": "サーベイ一覧 / 進捗と次にやること",
     "the research question": "リサーチクエスチョン",
     "the period (e.g. 2000-2024)": "対象期間（例: 2000-2024）",
@@ -498,6 +490,11 @@ MESSAGES = {
     "the reason": "理由",
     "register papers by DOI or ID (included by default)": "DOI / ID を指定して登録（既定で採用）",
     "register as a candidate, not as included": "採用ではなく候補として登録",
+    "show or fill in the card of an included paper": "採用論文のカードを表示・記入",
+    "fields to write (evidence=unchecked|abstract|fulltext, rq, x, y, data, method, findings, limits, memo); "
+    "a new line starts the bullet points below":
+        "書き込む欄（evidence=unchecked|abstract|fulltext、rq、x、y、data、method、findings、limits、memo）。"
+        "改行の後ろは直下の箇条書きになる",
     "regenerate the managed blocks of the Markdown": "Markdown の管理ブロックを再生成",
     "check the survey": "サーベイを検査",
     "do not re-check the DOIs with OpenAlex": "OpenAlex での DOI 再確認をしない",

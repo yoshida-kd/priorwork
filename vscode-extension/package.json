@@ -2,7 +2,7 @@
   "name": "priorwork",
   "displayName": "Prior Work",
   "description": "%extension.description%",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "yoshida-kd",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -34,8 +34,7 @@
   ],
   "activationEvents": [
     "workspaceContains:.priorwork/config.json",
-    "workspaceContains:.priorwork/surveys",
-    "workspaceContains:.lit/surveys"
+    "workspaceContains:.priorwork/surveys"
   ],
   "main": "./out/extension.js",
   "l10n": "./l10n",
@@ -54,12 +53,7 @@
       {
         "view": "priorwork.surveys",
         "contents": "%welcome.noWorkspace%",
-        "when": "!priorwork.hasWorkspace && !priorwork.legacy"
-      },
-      {
-        "view": "priorwork.surveys",
-        "contents": "%welcome.legacy%",
-        "when": "priorwork.legacy"
+        "when": "!priorwork.hasWorkspace"
       },
       {
         "view": "priorwork.surveys",
@@ -71,8 +65,8 @@
       { "command": "priorwork.refresh", "title": "%command.refresh%", "category": "Prior Work", "icon": "$(refresh)" },
       { "command": "priorwork.initWorkspace", "title": "%command.initWorkspace%", "category": "Prior Work", "icon": "$(new-folder)" },
       { "command": "priorwork.setupEnvironment", "title": "%command.setupEnvironment%", "category": "Prior Work", "icon": "$(package)" },
-      { "command": "priorwork.migrate", "title": "%command.migrate%", "category": "Prior Work" },
       { "command": "priorwork.newSurvey", "title": "%command.newSurvey%", "category": "Prior Work", "icon": "$(add)" },
+      { "command": "priorwork.askAgent", "title": "%command.askAgent%", "category": "Prior Work", "icon": "$(comment-discussion)" },
       { "command": "priorwork.editScope", "title": "%command.editScope%", "category": "Prior Work", "icon": "$(settings)" },
       { "command": "priorwork.search", "title": "%command.search%", "category": "Prior Work", "icon": "$(search)" },
       { "command": "priorwork.snowball", "title": "%command.snowball%", "category": "Prior Work", "icon": "$(references)" },
@@ -91,6 +85,8 @@
       { "command": "priorwork.doctor", "title": "%command.doctor%", "category": "Prior Work", "icon": "$(pulse)" },
       { "command": "priorwork.sync", "title": "%command.sync%", "category": "Prior Work" },
       { "command": "priorwork.upgrade", "title": "%command.upgrade%", "category": "Prior Work" },
+      { "command": "priorwork.publish", "title": "%command.publish%", "category": "Prior Work", "icon": "$(github)" },
+      { "command": "priorwork.openSettings", "title": "%command.openSettings%", "category": "Prior Work", "icon": "$(gear)" },
       { "command": "priorwork.openEnv", "title": "%command.openEnv%", "category": "Prior Work", "icon": "$(key)" },
       { "command": "priorwork.showOutput", "title": "%command.showOutput%", "category": "Prior Work" },
       { "command": "priorwork.runStep", "title": "%command.runStep%", "category": "Prior Work" }
@@ -99,7 +95,8 @@
       "view/title": [
         { "command": "priorwork.newSurvey", "when": "view == priorwork.surveys && priorwork.hasWorkspace", "group": "navigation@1" },
         { "command": "priorwork.refresh", "when": "view == priorwork.surveys", "group": "navigation@2" },
-        { "command": "priorwork.openEnv", "when": "view == priorwork.surveys && priorwork.hasWorkspace", "group": "1_setup@1" },
+        { "command": "priorwork.openSettings", "when": "view == priorwork.surveys && priorwork.hasWorkspace", "group": "navigation@3" },
+        { "command": "priorwork.openSettings", "when": "view == priorwork.surveys && priorwork.hasWorkspace", "group": "1_setup@1" },
         { "command": "priorwork.doctor", "when": "view == priorwork.surveys", "group": "1_setup@2" },
         { "command": "priorwork.setupEnvironment", "when": "view == priorwork.surveys && priorwork.hasWorkspace", "group": "1_setup@3" },
         { "command": "priorwork.sync", "when": "view == priorwork.surveys && priorwork.hasWorkspace", "group": "2_engine@1" },
@@ -116,6 +113,7 @@
         { "command": "priorwork.editScope", "when": "view == priorwork.surveys && viewItem == priorwork.survey", "group": "2_screen@2" },
         { "command": "priorwork.openReport", "when": "view == priorwork.surveys && viewItem == priorwork.survey", "group": "3_report@1" },
         { "command": "priorwork.check", "when": "view == priorwork.surveys && viewItem == priorwork.survey", "group": "3_report@2" },
+        { "command": "priorwork.askAgent", "when": "view == priorwork.surveys && viewItem == priorwork.survey", "group": "4_agent@1" },
         { "command": "priorwork.exportReport", "when": "view == priorwork.surveys && viewItem == priorwork.survey", "group": "3_report@3" },
 
         { "command": "priorwork.include", "when": "view == priorwork.surveys && viewItem =~ /^priorwork\\.paper\\.(candidate|maybe|excluded)$/", "group": "inline@1" },
@@ -137,8 +135,8 @@
         { "command": "priorwork.reset", "when": "false" },
         { "command": "priorwork.openDoi", "when": "false" },
         { "command": "priorwork.fulltext", "when": "false" },
-        { "command": "priorwork.migrate", "when": "priorwork.legacy" },
         { "command": "priorwork.newSurvey", "when": "priorwork.hasWorkspace" },
+        { "command": "priorwork.askAgent", "when": "priorwork.hasSurveys" },
         { "command": "priorwork.editScope", "when": "priorwork.hasSurveys" },
         { "command": "priorwork.search", "when": "priorwork.hasSurveys" },
         { "command": "priorwork.snowball", "when": "priorwork.hasSurveys" },
@@ -149,6 +147,8 @@
         { "command": "priorwork.check", "when": "priorwork.hasSurveys" },
         { "command": "priorwork.sync", "when": "priorwork.hasWorkspace" },
         { "command": "priorwork.upgrade", "when": "priorwork.hasWorkspace" },
+        { "command": "priorwork.openSettings", "when": "priorwork.hasWorkspace" },
+        { "command": "priorwork.publish", "when": "priorwork.hasWorkspace" },
         { "command": "priorwork.openEnv", "when": "priorwork.hasWorkspace" },
         { "command": "priorwork.setupEnvironment", "when": "priorwork.hasWorkspace" }
       ]
@@ -191,7 +191,7 @@
             "title": "%walkthrough.keys.title%",
             "description": "%walkthrough.keys.description%",
             "media": { "image": "media/icon.png", "altText": "Prior Work" },
-            "completionEvents": ["onCommand:priorwork.openEnv"]
+            "completionEvents": ["onCommand:priorwork.openSettings"]
           },
           {
             "id": "survey",

@@ -55,4 +55,4 @@ Query ideas: the English terms for the concept, typical identification strategie
 ## 3. Report to the user and stop
 
 - Give the number of candidates registered and point out notable papers (highly cited ones, ones with ⚠️).
-- Ask whether to move on to screening (`/survey-screen`) or to search more. Mention that the user can also screen in the Priorwork sidebar in VS Code.
+- Ask whether to move on to screening (`/survey-screen`) or to search more. Mention that the user can also screen in the Prior Work sidebar in VS Code.

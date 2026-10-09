@@ -4,13 +4,15 @@
 // 候補を上から順に選別できる。採否の記録は CLI（`priorwork include|maybe|exclude|reset`）が行い、
 // ここは結果を読み直して描き直すだけ。
 import * as vscode from 'vscode';
-import { Entry, Scope, Status } from './cli';
+import { CardReport, Entry, runJson, Scope, Status } from './cli';
 import { Model } from './model';
 import { authorYear, groupLabel } from './tree';
 
 export interface PaperActions {
     decide(survey: string, numbers: number[], status: Status, reason: string): Promise<boolean>;
     fulltext(survey: string, number: number): Promise<void>;
+    saveCard(survey: string, number: number, values: Record<string, string>): Promise<boolean>;
+    askAgent(survey: string, number: number): Thenable<unknown>;
     openReport(survey: string): Promise<void>;
 }
 
@@ -19,6 +21,8 @@ type Msg =
     | { type: 'nav'; to: 'prev' | 'next' | 'nextUnscreened' }
     | { type: 'openDoi' }
     | { type: 'fulltext' }
+    | { type: 'saveCard'; values: Record<string, string> }
+    | { type: 'askAgent' }
     | { type: 'openReport' };
 
 function esc(s: unknown): string {
@@ -147,6 +151,18 @@ export class PaperPanel implements vscode.Disposable {
             case 'fulltext':
                 await this.actions.fulltext(survey, entry.number);
                 return;
+            case 'askAgent':
+                await this.actions.askAgent(survey, entry.number);
+                return;
+            case 'saveCard':
+                this.busy = true;
+                try {
+                    await this.actions.saveCard(survey, entry.number, m.values);
+                } finally {
+                    this.busy = false;
+                }
+                await this.render();
+                return;
             case 'openReport':
                 await this.actions.openReport(survey);
                 return;
@@ -160,9 +176,15 @@ export class PaperPanel implements vscode.Disposable {
         let papers: Entry[];
         let entry: Entry | undefined;
         let scope: Scope | undefined;
+        let card: CardReport | string | undefined;
         try {
             ({ papers, entry } = await this.current());
             scope = (await this.model.detail(this.survey)).scope;
+            if (entry?.status === 'included') {
+                // カードが読めなくても（レポートの管理ブロックが壊れているなど）、選別はできるようにする
+                card = await runJson<CardReport>(this.model.root, ['card', this.survey, String(entry.number)])
+                    .catch((e: unknown) => (e instanceof Error ? e.message : String(e)));
+            }
         } catch (e) {
             this.panel.webview.html = this.page(`<p class="error">${esc(e instanceof Error ? e.message : e)}</p>`);
             return;
@@ -173,10 +195,11 @@ export class PaperPanel implements vscode.Disposable {
         }
         this.panel.title = `#${entry.number} ${authorYear(entry)}`;
         const open = papers.filter((e) => e.status === 'candidate' || e.status === 'maybe').length;
-        this.panel.webview.html = this.page(this.body(entry, papers, scope, open));
+        this.panel.webview.html = this.page(this.body(entry, papers, scope, open, card));
     }
 
-    private body(e: Entry, papers: Entry[], scope: Scope | undefined, open: number): string {
+    private body(e: Entry, papers: Entry[], scope: Scope | undefined, open: number,
+                 card: CardReport | string | undefined): string {
         const r = e.record;
         const L = vscode.l10n;
         const i = papers.findIndex((p) => p.number === e.number);
@@ -237,7 +260,39 @@ export class PaperPanel implements vscode.Disposable {
             ${e.fulltext ? ` · ${esc(L.t('Full text'))}: ${esc(e.fulltext.path)}` : ''}</p>
           ${status === 'included' && !e.fulltext ? `<button data-open="fulltext">${esc(L.t('Get the full text'))}</button>` : ''}
         </section>
-        <p class="keys muted">${esc(L.t('Keys: I include · M maybe · X exclude (type the reason first) · U back to candidate · N next unscreened · J/K next/previous · O open DOI'))}</p>`;
+        ${card === undefined ? '' : this.cardForm(e, card)}
+        <p class="keys muted">${esc(L.t('Keys: I include · M maybe · X exclude (type the reason first) · U back to candidate · N next unscreened · J/K next/previous · O open DOI · Ctrl+S save the card'))}</p>`;
+    }
+
+    /** 採用論文のカードの記入欄。書きかけは paper.js が論文ごとに webview の状態へ退避する。 */
+    private cardForm(e: Entry, card: CardReport | string): string {
+        const L = vscode.l10n;
+        if (typeof card === 'string') {
+            return `<section class="card"><h2>${esc(L.t('Paper card'))}</h2><p class="error">${esc(card)}</p></section>`;
+        }
+        const evidence = card.evidence ?? '';
+        const options = card.evidence_options.map((o) =>
+            `<option value="${esc(o.key)}"${o.key === evidence ? ' selected' : ''}>${esc(o.label)}</option>`).join('');
+        const fields = card.fields.map((f) => `
+          <label class="field"><span>${esc(f.label)}</span>
+            <textarea data-field="${esc(f.key)}" data-original="${esc(f.value)}"
+                      rows="${Math.max(2, f.value.split('\n').length + 1)}">${esc(f.value)}</textarea></label>`).join('');
+        return `
+        <section class="card" data-survey="${esc(this.survey)}" data-number="${e.number}">
+          <h2>${esc(L.t('Paper card'))} <span class="unsaved">● ${esc(L.t('Unsaved changes'))}</span></h2>
+          <p class="muted">${esc(L.t('Write only what the abstract or the full text says. The first line of each field goes into the comparison matrix; the lines below it become bullet points.'))}</p>
+          <label class="field"><span>${esc(L.t('Evidence'))}</span>
+            <select data-field="evidence" data-original="${esc(evidence)}">
+              ${evidence ? '' : `<option value="" selected>${esc(L.t('(unreadable — choose one)'))}</option>`}${options}
+            </select></label>
+          ${fields}
+          <div class="card-actions">
+            <button class="include" data-card="save">${esc(L.t('Save the card'))} <kbd>Ctrl+S</kbd></button>
+            <button data-card="revert">${esc(L.t('Discard the changes'))}</button>
+            <span class="spacer"></span>
+            <button data-card="agent" title="${esc(L.t('Copies a request to paste into your agent\'s chat'))}">${esc(L.t('Ask the agent to fill it in'))}</button>
+          </div>
+        </section>`;
     }
 
     private page(body: string): string {

@@ -88,10 +88,11 @@ export class SurveyTree implements vscode.TreeDataProvider<Node>, vscode.Disposa
                       command: { command: 'priorwork.showOutput', title: '' } },
                 ];
             }
-            if (ws.legacy) {
-                return [];                             // viewsWelcome の「移行する」が出る
-            }
             const rows: Node[] = [];
+            if (ws.git && !ws.git.remote) {   // 古い CLI は git を返さない
+                rows.push({ kind: 'message', label: vscode.l10n.t('Not on GitHub yet — publish it as a private repository'),
+                            icon: 'github', command: { command: 'priorwork.publish', title: '' } });
+            }
             if (ws.sync) {
                 rows.push({ kind: 'message', label: vscode.l10n.t('AGENTS.md and the skills are out of date — update them'),
                             icon: 'warning', command: { command: 'priorwork.sync', title: '' } });

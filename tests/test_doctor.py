@@ -17,21 +17,11 @@ def test_fresh_workspace_is_healthy_apart_from_missing_keys(tmp_path, monkeypatc
     assert not any(level == NG for level, _ in checks.values())
 
 
-def test_legacy_layout_and_version_drift_are_reported(tmp_path):
-    (tmp_path / "surveys").mkdir()
-    (tmp_path / "surveys" / "20260101_x.json").write_text("{}")
+def test_missing_directories_and_version_drift_are_reported(tmp_path):
     (tmp_path / "requirements.txt").write_text("priorwork==0.0.1\n")
     checks = by_name(run_checks(tmp_path))
-    assert checks["構成"][0] == NG
+    assert checks["構成"][0] == WARN and "priorwork init" in checks["構成"][1]
     assert checks["エンジンの版"][0] == WARN and "0.0.1" in checks["エンジンの版"][1]
-
-
-def test_a_lit_workspace_is_reported(tmp_path, monkeypatch):
-    (tmp_path / ".lit" / "surveys").mkdir(parents=True)
-    monkeypatch.setenv("LIT_MAX_RETRIES", "3")
-    checks = run_checks(tmp_path)
-    assert by_name(checks)["構成"][0] == NG and "lit" in by_name(checks)["構成"][1]
-    assert any(name == ".env" and "LIT_MAX_RETRIES" in msg for _, name, msg in checks)
 
 
 def test_online_failures_are_reported_not_raised(tmp_path):

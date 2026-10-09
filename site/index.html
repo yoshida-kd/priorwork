@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prior Work</title>
+<meta name="description" content="Prior Work: literature reviews for the social sciences, built with an AI agent from the VS Code sidebar — search, screening, paper cards and checks, with no terminal needed.">
+<link rel="alternate" hreflang="ja" href="ja/">
+<link rel="alternate" hreflang="en" href="">
+<link rel="alternate" hreflang="x-default" href="">
+<script>
+/* 日本語のブラウザで英語版を開いたときだけ日本語版へ移す。外へは何も送らない。
+   言語のリンクを押した人は、その選択を覚えて、そちらに従う。 */
+(function () {
+  try {
+    document.addEventListener('click', function (e) {
+      var a = e.target.closest && e.target.closest('a[data-lang]');
+      if (a) localStorage.setItem('priorwork-lang', a.getAttribute('data-lang'));
+    });
+    var chosen = localStorage.getItem('priorwork-lang');
+    var l = chosen || (navigator.languages && navigator.languages[0]) || navigator.language || '';
+    if (/^ja\b/i.test(l)) location.replace('ja/' + location.hash);
+  } catch (e) {}
+})();
+</script>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="./">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="5" fill="#1f3a5f"/><rect x="5" y="6" width="10.5" height="13" rx="1.2" fill="#fff"/><path d="M7.2 9.5h6M7.2 12h6M7.2 14.5h4" stroke="#1f3a5f" stroke-width="1.1" stroke-linecap="round" opacity=".6"/><circle cx="16.5" cy="16.5" r="4.2" fill="#2e9e6a" stroke="#1f3a5f" stroke-width="1"/><path d="M14.8 16.6l1.2 1.2 2.3-2.5" fill="none" stroke="#fff" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Prior Work
+    </a>
+    <nav>
+      <a href="#install">Install</a>
+      <a href="guide/">Guide</a>
+      <a href="https://github.com/yoshida-kd/priorwork">GitHub</a>
+      <a href="ja/" hreflang="ja" lang="ja" data-lang="ja">日本語</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<div class="hero">
+  <div class="wrap">
+    <h1>Prior Work</h1>
+    <p class="tagline">Literature reviews for the social sciences, built with an AI agent</p>
+    <p class="lead">Search Semantic Scholar and OpenAlex, screen the candidates, check the paper cards your agent fills in, and catch citations that match no paper — all from the VS Code sidebar, with no terminal. What you ask of the agent goes through its chat; what you decide stays yours.</p>
+    <div class="actions">
+      <a class="button primary" href="https://marketplace.visualstudio.com/items?itemName=yoshida-kd.priorwork">Get the VS Code extension</a>
+      <a class="button secondary" href="guide/">Read the guide</a>
+    </div>
+  </div>
+</div>
+
+<section class="alt">
+  <div class="wrap">
+    <h2>How a survey goes</h2>
+    <ol class="chapters">
+      <li><b>Scope</b> <span>— research question, period, criteria, depth</span></li>
+      <li><b>Search</b> <span>— Semantic Scholar + OpenAlex</span></li>
+      <li><b>Screen</b> <span>— a page per paper, one key per decision</span></li>
+      <li><b>Chase citations</b> <span>— references and citing papers</span></li>
+      <li><b>Cards</b> <span>— the agent fills them in; you check</span></li>
+      <li><b>Write</b> <span>— the agent writes from the cards</span></li>
+      <li><b>Check and export</b> <span>— citations, DOIs, unchecked cards; HTML</span></li>
+    </ol>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>What it does</h2>
+    <div class="features">
+      <div class="feature">
+        <h3>Screen with one key</h3>
+        <p>A page per candidate with the abstract, the SSCI status, warnings and your criteria. <b>I</b> include, <b>M</b> maybe, <b>X</b> exclude with a reason — and on to the next.</p>
+      </div>
+      <div class="feature">
+        <h3>Paper cards you can check</h3>
+        <p>Research question, X, Y, data, identification, findings and limitations for each included paper, with how it was checked. The comparison matrix is built from them.</p>
+      </div>
+      <div class="feature">
+        <h3>Search that finds the classics</h3>
+        <p>Semantic Scholar by relevance or boolean bulk search, DOIs and journals verified against OpenAlex, and citation chasing from the included papers.</p>
+      </div>
+      <div class="feature">
+        <h3>Fabrication caught mechanically</h3>
+        <p>Every author–year citation in the text must match a registered paper, and no DOI may point to another title. Until then, the export says <i>Draft</i>.</p>
+      </div>
+      <div class="feature">
+        <h3>Your agent writes, you decide</h3>
+        <p><i>Ask Your Agent…</i> copies a ready-made request — fill in the cards, write the text, check and fix — for the chat of Claude Code or another agent. The extension never calls an AI service itself.</p>
+      </div>
+      <div class="feature">
+        <h3>No terminal, no setup</h3>
+        <p>Install the extension and create a workspace: it sets up Python (through uv if you have none), your keys go on a settings page, and the workspace goes to a private GitHub repository from the sidebar.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="install" class="alt">
+  <div class="wrap two">
+    <div>
+      <h2>Install</h2>
+      <p>Install the <a href="https://marketplace.visualstudio.com/items?itemName=yoshida-kd.priorwork">Prior Work extension</a> in VS Code and press <strong>Create a Workspace</strong> in its sidebar. Nothing else is needed to start: it uses Python 3.10 or later if you have it, and otherwise installs uv, which downloads Python (into your home folder, without administrator rights).</p>
+      <p>Linux and macOS; on Windows, inside WSL. For the writing, an AI agent that works in VS Code (Claude Code, for example).</p>
+    </div>
+    <div>
+      <h2>From a terminal</h2>
+      <p>The same engine is a command, for agents and scripts:</p>
+<pre><code>python3 -m venv .venv
+.venv/bin/pip install priorwork
+.venv/bin/priorwork init --lang en
+./priorwork settings
+./priorwork new "minimum wages and employment" --slug minimum_wage</code></pre>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Documentation</h2>
+    <p><a href="guide/">The guide</a> covers everything.</p>
+    <ol class="chapters">
+      <li><a href="guide/#1-introduction">Introduction</a> <span>— what it does, what you need</span></li>
+      <li><a href="guide/#2-install">Install</a> <span>— VS Code, WSL, servers over SSH</span></li>
+      <li><a href="guide/#3-create-a-workspace">Create a workspace</a> <span>— settings, GitHub, another machine</span></li>
+      <li><a href="guide/#4-a-survey-step-by-step">A survey, step by step</a> <span>— from the scope to the export</span></li>
+      <li><a href="guide/#5-paper-cards">Paper cards</a> <span>— fields, evidence levels, full texts</span></li>
+      <li><a href="guide/#6-checks">Checks</a></li>
+      <li><a href="guide/#7-settings">Settings</a> <span>— API keys, Zotero, the SSCI list</span></li>
+      <li><a href="guide/#8-working-with-the-agent">Working with the agent</a></li>
+      <li><a href="guide/#9-inside-a-workspace">Inside a workspace</a></li>
+      <li><a href="guide/#10-updating-the-engine">Updating the engine</a></li>
+      <li><a href="guide/#11-on-the-command-line">On the command line</a></li>
+      <li><a href="guide/#12-troubleshooting">Troubleshooting</a></li>
+    </ol>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Prior Work · MIT License · by <a href="https://github.com/yoshida-kd">yoshida-kd</a></span>
+    <span><a href="https://github.com/yoshida-kd/priorwork">Source</a> ·
+    <a href="https://pypi.org/project/priorwork/">PyPI</a> ·
+    <a href="https://github.com/yoshida-kd/priorwork/issues">Issues</a></span>
+  </div>
+</footer>
+
+</body>
+</html>

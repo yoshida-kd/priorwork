@@ -43,7 +43,7 @@ def ws(tmp_path, monkeypatch, capsys):
 
 def test_status_list_and_decisions(ws):
     top = ws("status", "--json")
-    assert top["workspace"] and top["legacy"] is None and top["surveys"] == [] and top["lang"] == "ja"
+    assert top["workspace"] and top["git"] == {"repo": True, "remote": False} and top["surveys"] == [] and top["lang"] == "ja"
 
     made = ws("new", "最低賃金", "--slug", "mw", "--json")
     assert made["name"].endswith("_mw") and made["report"].endswith(".md") and made["lang"] == "ja"
@@ -74,10 +74,27 @@ def test_check_export_and_doctor(ws):
     assert doctor["version"] and {"level", "name", "message"} <= set(doctor["checks"][0])
 
 
-def test_status_json_works_in_a_lit_workspace(ws, tmp_path):
-    import shutil
-    shutil.move(str(tmp_path / ".priorwork"), str(tmp_path / ".lit"))
-    assert ws("status", "--json")["legacy"] == "lit"
+def test_card_reads_and_writes(ws):
+    ws("new", "t", "--slug", "mw", "--json")
+    ws("search", "minimum wage", "--into", "mw", "--limit", "1", "--json")
+    ws("include", "mw", "1", "--json")
+    card = ws("card", "mw", "1", "--json")
+    assert card["number"] == 1 and card["evidence"] == "unchecked"
+    assert [o["key"] for o in card["evidence_options"]] == ["unchecked", "abstract", "fulltext"]
+    assert {"key", "label", "value"} <= set(card["fields"][0]) and "evidence" not in [f["key"] for f in card["fields"]]
+    card = ws("card", "mw", "1", "--set", "rq=Does employment fall?\nIn the short run", "evidence=fulltext", "--json")
+    assert card["evidence"] == "fulltext"
+    assert next(f["value"] for f in card["fields"] if f["key"] == "rq") == "Does employment fall?\nIn the short run"
+
+
+def test_settings_reads_and_writes_through_stdin(ws, tmp_path, monkeypatch):
+    import io
+    monkeypatch.setattr("sys.stdin", io.StringIO('{"SEMANTIC_SCHOLAR_API_KEY": "abc", "ZOTERO_USER_ID": "42"}'))
+    st = ws("settings", "--stdin", "--json")
+    items = {i["key"]: i for i in st["items"]}
+    assert items["SEMANTIC_SCHOLAR_API_KEY"]["set"] and items["SEMANTIC_SCHOLAR_API_KEY"]["value"] == ""
+    assert items["ZOTERO_USER_ID"]["value"] == "42" and st["exists"] and st["ssci"]["file"] is None
+    assert "abc" not in json.dumps(st)
 
 
 def test_the_extension_reads_only_keys_the_cli_writes():
@@ -89,7 +106,8 @@ def test_the_extension_reads_only_keys_the_cli_writes():
     for name, body in re.findall(r"export interface (\w+)(?: extends [\w, ]+)? \{(.*?)\n\}", text, re.S):
         declared[name] = set(re.findall(r"^\s+(\w+)\??:", body, re.M))
     expected = {
-        "WorkspaceStatus": {"version", "root", "workspace", "legacy", "lang", "sync", "surveys"},
+        "WorkspaceStatus": {"version", "root", "workspace", "lang", "git", "sync", "surveys"},
+        "GitInfo": {"repo", "remote"},
         "SurveySummary": {"name", "topic", "created", "depth", "lang", "report", "counts", "searches"},
         "SurveyDetail": {"scope", "unfilled", "zotero_missing", "sync", "next"},
         "NextStep": {"id", "text", "args"},
@@ -108,6 +126,12 @@ def test_the_extension_reads_only_keys_the_cli_writes():
         "Finding": {"level", "message"},
         "DoctorCheck": {"level", "name", "message"},
         "AddedPaper": {"number", "new", "status", "title"},
+        "CardReport": {"number", "evidence", "evidence_options", "fields"},
+        "CardField": {"key", "label", "value"},
+        "EvidenceOption": {"key", "label"},
+        "SettingsReport": {"env", "exists", "items", "ssci"},
+        "SettingItem": {"key", "secret", "set", "value"},
+        "SsciListInfo": {"file", "journals"},
     }
     for name, keys in expected.items():
         assert name in declared, name

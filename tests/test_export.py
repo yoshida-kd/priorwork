@@ -10,7 +10,7 @@ title: "T"
 # T
 
 > [!NOTE]
-> `<!-- BEGIN lit:… -->` は再生成されます。
+> `<!-- BEGIN priorwork:… -->` は再生成されます。
 
 ## 1. 背景
 - **学術的背景**:
@@ -21,7 +21,7 @@ title: "T"
 記入のルール:
 - 書かれていることだけを書く
 
-<!-- BEGIN lit:papers -->
+<!-- BEGIN priorwork:papers -->
 <!-- paper: doi:10.1/a -->
 ### #1 A (2000): T
 - **書誌**: x
@@ -40,7 +40,7 @@ title: "T"
 - **確認レベル**: 要旨のみ
 - **RQ**: 何か
 
-<!-- END lit:papers -->
+<!-- END priorwork:papers -->
 """
     text, title, empty = clean_markdown(md)
     assert title == "T"

@@ -142,7 +142,6 @@ def clean_markdown(md: str, with_abstracts: bool = False, lang: str = "ja") -> T
     text = re.sub(r"<!--.*?-->[ \t]*\n?", "", "\n".join(lines), flags=re.DOTALL)
     for la in i18n.LANGS:
         text = text.replace(tl(la, _UNSET), tl(la, "(not set)"))
-    text = text.replace("（未設定 — `lit scope` で設定）", "（未設定）")   # 旧名 lit で書かれたまま
     if not with_abstracts:
         text = re.sub(r"<details>.*?</details>[ \t]*\n?", "", text, flags=re.DOTALL)
     lines = _drop_empty_items(text.splitlines())

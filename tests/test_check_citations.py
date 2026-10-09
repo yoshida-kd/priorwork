@@ -56,7 +56,7 @@ def test_fabricated_citation_in_a_group_is_an_error(s):
 
 
 def test_organizations_are_info_and_ignore_comment_silences(s):
-    write_prose(s, "World Bank (2010) と Smith (2015)\n<!-- lit:ignore-citation Smith (2015) -->")
+    write_prose(s, "World Bank (2010) と Smith (2015)\n<!-- priorwork:ignore-citation Smith (2015) -->")
     assert not any("Smith" in m or "Bank" in m for m in messages(s, ERROR))
     assert any("Bank (2010)" in m for m in messages(s, INFO))
 

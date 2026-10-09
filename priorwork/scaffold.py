@@ -1,12 +1,8 @@
-"""ワークスペースの初期化・エンジン由来ファイルの同期・更新・旧構成からの移行。
+"""ワークスペースの初期化・エンジン由来ファイルの同期・更新。
 
 エンジン（priorwork パッケージ）は AGENTS.md・スキル・`./priorwork` ラッパーを同梱している（言語ごとに
 `assets/<lang>/`）。`priorwork sync` はワークスペースの言語のものを書き出し、エンジンを更新したときに最新へ揃える。
 書き出したファイルは `.priorwork/sync.json` に記録し、記録にないファイルを黙って上書きしない。
-
-旧構成からの移行（`priorwork migrate`）は2種類:
-  - 旧名 lit のワークスペース（`.lit/`、`./lit`、`litsurvey @ git+…/lit.git`）
-  - さらに古い構成（`surveys/` に md と json が同居、`data/*.csv`）
 """
 
 import difflib
@@ -24,10 +20,9 @@ from typing import Dict, List, Optional
 
 from . import __version__, i18n
 from .i18n import t
-from .survey import Survey, SurveyError
 from .workspace import (
-    ASSETS_DIR, ENGINE_DIR, LEGACY_META, assets_dir, cache_dir, config_path, data_dir, load_config, meta_dir,
-    reports_dir, save_config, state_dir, workspace_lang,
+    ASSETS_DIR, ENGINE_DIR, assets_dir, cache_dir, data_dir, load_config, meta_dir, reports_dir, save_config,
+    state_dir, workspace_lang,
 )
 
 DIST = "priorwork"                                   # PyPI の配布名
@@ -61,10 +56,6 @@ GITIGNORE_BEGIN = "# BEGIN priorwork (managed by `priorwork sync`)"
 GITIGNORE_END = "# END priorwork"
 GITIGNORE_LINES = [".env", ".venv/", "__pycache__/", ".priorwork/cache/", ".priorwork/data/",
                    "reports/*.html", "reports/*.docx", "reports/*.clean.md"]  # priorwork export の出力（再生成できる）
-# 旧名 lit が管理していたブロック（移行のときに消す）
-LEGACY_GITIGNORE_BLOCKS = (("# BEGIN lit (managed by `lit sync`)", "# END lit"),)
-# さらに古い構成の除外設定。`.lit/` 全体を除外すると状態ファイルが Git に載らない
-LEGACY_GITIGNORE_LINES = {".lit/", ".priorwork/", "data/*.csv"}
 
 
 class ScaffoldError(Exception):
@@ -184,7 +175,7 @@ def sync(root: Path, force: bool = False) -> SyncResult:
             dest.chmod(0o755)
         kept[rel] = _sha(content)
 
-    for rel in sorted(managed - set(files)):  # エンジンから無くなったスキル、旧名の ./lit など
+    for rel in sorted(managed - set(files)):  # エンジンから無くなったスキルなど
         stale = root / rel
         if stale.is_file():
             stale.unlink()
@@ -232,9 +223,7 @@ def _drop_block(lines: List[str], begin: str, end: str) -> List[str]:
 def ensure_gitignore(root: Path) -> bool:
     path = root / ".gitignore"
     lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
-    for begin, end in ((GITIGNORE_BEGIN, GITIGNORE_END), *LEGACY_GITIGNORE_BLOCKS):
-        lines = _drop_block(lines, begin, end)
-    lines = [ln for ln in lines if ln.strip() not in LEGACY_GITIGNORE_LINES]
+    lines = _drop_block(lines, GITIGNORE_BEGIN, GITIGNORE_END)
     while lines and not lines[-1].strip():
         lines.pop()
     text = "\n".join(lines + ([""] if lines else []) + [GITIGNORE_BEGIN, *GITIGNORE_LINES, GITIGNORE_END]) + "\n"
@@ -248,6 +237,13 @@ def in_git_repo(root: Path) -> bool:
     try:
         return subprocess.run(["git", "rev-parse", "--is-inside-work-tree"], cwd=root,
                               capture_output=True, text=True).stdout.strip() == "true"
+    except OSError:
+        return False
+
+
+def has_remote(root: Path) -> bool:
+    try:
+        return bool(subprocess.run(["git", "remote"], cwd=root, capture_output=True, text=True).stdout.strip())
     except OSError:
         return False
 
@@ -303,12 +299,12 @@ def latest_version() -> str:
 
 
 def pin_requirements(root: Path, version: str) -> str:
-    """requirements.txt のエンジンの行を、指定の版に固定する（旧名 litsurvey の行も置き換える）。書き換え後の行を返す。"""
+    """requirements.txt のエンジンの行を、指定の版に固定する。書き換え後の行を返す。"""
     line = requirement_line(version)
     path = root / "requirements.txt"
     lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
     for i, cur in enumerate(lines):
-        if re.match(rf"\s*(?:{DIST}|litsurvey)\b", cur):
+        if re.match(rf"\s*{DIST}\b", cur):
             lines[i] = line
             break
     else:
@@ -338,126 +334,3 @@ def upgrade(root: Path, version: Optional[str] = None) -> str:
         subprocess.run([sys.executable, "-m", "priorwork", "sync"], cwd=tmp, check=True,
                        env={**os.environ, "PRIORWORK_WORKSPACE": str(root)})
     return version
-
-
-# ---------------- 旧構成からの移行 ----------------
-
-def is_lit_workspace(root: Path) -> bool:
-    """旧名 lit のワークスペース（`.lit/` があり、`.priorwork/` がまだ無い）。"""
-    return (root / LEGACY_META).is_dir() and not meta_dir(root).is_dir()
-
-
-def is_old_layout(root: Path) -> bool:
-    """さらに古い構成（surveys/ に md と json が同居）のまま、新しい構成にはまだ状態ファイルが無い。"""
-    old = root / "surveys"
-    return (old.is_dir() and any(old.glob("*.json")) and not any(state_dir(root).glob("*.json"))
-            and not any((root / LEGACY_META / "surveys").glob("*.json")))
-
-
-def is_legacy(root: Path) -> bool:
-    return is_lit_workspace(root) or is_old_layout(root)
-
-
-def leftover_engine_files(root: Path) -> List[Path]:
-    """旧テンプレートのコピーに残っている、いまは不要なエンジンのファイル。"""
-    if not (root / "litsurvey" / "__init__.py").exists() or not (root / "templates" / "literature_review.md").exists():
-        return []
-    names = ["litsurvey", "tests", "templates", "pyproject.toml", "litsurvey.egg-info", ".pytest_cache"]
-    return [root / n for n in names if (root / n).exists()]
-
-
-def _move(src: Path, dst: Path, moved: List[str], root: Path):
-    if dst.exists():
-        raise ScaffoldError(t("The destination already exists: {path}", path=dst.relative_to(root)))
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    shutil.move(str(src), str(dst))
-    moved.append(f"{src.relative_to(root)} → {dst.relative_to(root)}")
-
-
-def migrate(root: Path, clean: bool = False) -> Dict:
-    """旧構成を新しい構成に移す。戻り値: {moved, removed, leftover, skipped, backup, stale_readme, rendered, unreadable}"""
-    _refuse_engine_repo(root)
-    moved: List[str] = []
-    removed: List[str] = []
-
-    # 1. 旧名 lit: .lit/ をまるごと .priorwork/ に（状態・キャッシュ・sync.json）。中身は日本語
-    if (root / LEGACY_META).is_dir():
-        if meta_dir(root).exists():
-            raise ScaffoldError(t("Both {old} and {new} exist. Keep one of them and run it again",
-                                  old=f"{LEGACY_META}/", new=f"{meta_dir(root).name}/"))
-        _move(root / LEGACY_META, meta_dir(root), moved, root)
-        if not config_path(root).exists():
-            save_config(root, {"lang": "ja"})
-        if (root / "requirements.txt").exists():
-            before = (root / "requirements.txt").read_text(encoding="utf-8")
-            pin_requirements(root, __version__)
-            if (root / "requirements.txt").read_text(encoding="utf-8") != before:
-                moved.append(f"requirements.txt → {requirement_line()}")
-
-    # 2. さらに古い構成: 先に移行先の衝突を調べ、途中で止まって半端な状態にならないようにする
-    old_surveys, old_data = root / "surveys", root / "data"
-    plan = []
-    if old_surveys.is_dir():
-        plan += [(p, (reports_dir(root) if p.suffix == ".md" else state_dir(root)) / p.name)
-                 for p in sorted(old_surveys.iterdir()) if p.suffix in (".md", ".json")]
-    for name in ("fulltext", "zotero"):
-        if (meta_dir(root) / name).is_dir():
-            plan.append((meta_dir(root) / name, cache_dir(root) / name))
-    if old_data.is_dir():
-        plan += [(p, data_dir(root) / p.name) for p in sorted(old_data.glob("*.csv"))]
-    clashes = [dst for _, dst in plan if dst.exists()]
-    if clashes:
-        raise ScaffoldError(t("The destination already exists: {path}",
-                              path=", ".join(str(c.relative_to(root)) for c in clashes)))
-    if plan and not config_path(root).exists():
-        save_config(root, {"lang": "ja"})
-
-    for src, dst in plan:
-        _move(src, dst, moved, root)
-    for d in (old_surveys, old_data):
-        keep = d / ".gitkeep"
-        if keep.exists() and [p for p in d.iterdir() if p != keep] == []:
-            keep.unlink()
-        if d.is_dir() and not any(d.iterdir()):
-            d.rmdir()
-            removed.append(f"{d.relative_to(root)}/")
-
-    # 上書きされる旧ファイルは退避しておく
-    backup = cache_dir(root) / "migrate-backup"
-    lang = workspace_lang(root)
-    managed = _load_manifest(root).get("files", [])
-    for rel, content in engine_files(lang).items():
-        cur = root / rel
-        if cur.is_file() and cur.read_bytes() != content and rel not in managed:
-            (backup / rel).parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(cur, backup / rel)
-
-    result = init(root, force=True)
-
-    # レポートの管理ブロックの印を priorwork: に書き換える（再生成）
-    rendered, unreadable = [], []
-    for path in sorted(state_dir(root).glob("*.json")):
-        try:
-            s = Survey.load(path.name, reports_dir(root), state_dir(root))
-            if s.render():
-                rendered.append(str(s.md_path.relative_to(root)))
-            else:
-                s.save()   # 状態ファイルの形式だけ新しくする
-        except (SurveyError, ValueError, KeyError) as e:
-            unreadable.append(f"{path.relative_to(root)}: {e}")
-
-    leftover = leftover_engine_files(root)
-    if clean and leftover:
-        if any(p.resolve() == ENGINE_DIR for p in leftover):
-            raise ScaffoldError(t("The engine running now is inside the workspace, so it cannot be deleted. "
-                                  "Run it with the engine installed by pip (.venv/bin/priorwork)"))
-        for p in leftover:
-            shutil.rmtree(p) if p.is_dir() else p.unlink()
-            removed.append(str(p.relative_to(root)) + ("/" if p.is_dir() else ""))
-        leftover = []
-    readme = root / "README.md"
-    stale_readme = readme.is_file() and "対話しながら作る社会科学の文献サーベイ" in readme.read_text(encoding="utf-8")
-    return {"stale_readme": stale_readme, "moved": moved, "removed": removed + result.removed,
-            "leftover": [str(p.relative_to(root)) for p in leftover], "skipped": result.skipped,
-            "backup": [str(backup.relative_to(root))] if backup.exists() else [], "rendered": rendered,
-            "unreadable": unreadable}

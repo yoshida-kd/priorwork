@@ -36,7 +36,7 @@ Follow the rules in [AGENTS.md](../../../AGENTS.md). **The user decides.** The a
 
 4. Repeat 2 and 3 until no candidates are left or the user stops.
 
-The user may also screen in the Priorwork sidebar in VS Code. When the user says so, reload the list with step 1 before continuing.
+The user may also screen in the Prior Work sidebar in VS Code. When the user says so, reload the list with step 1 before continuing.
 
 ## Including a paper whose DOI needs checking (⚠️)
 

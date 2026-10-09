@@ -12,17 +12,17 @@ from datetime import date
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from . import __version__, i18n, scaffold, ssci
+from . import __version__, i18n, scaffold, settings, ssci
 from .api import ApiError, LiteratureClient
 from .check import ERROR, INFO, WARN, check_survey
 from .doctor import NG, OK, run_checks
 from .export import FORMATS, export
 from .fulltext import FulltextError, fetch_fulltext
-from .i18n import t
+from .i18n import t, tl
 from .snowball import snowball
 from .survey import (
-    CANDIDATE, DEFAULT_DEPTH, DEPTHS, EXCLUDED, INCLUDED, MAYBE, STATUSES, Survey, SurveyError, author_short,
-    status_label, status_trail,
+    CANDIDATE, CARD_FIELDS, DEFAULT_DEPTH, DEPTHS, EVIDENCE_KEYS, EXCLUDED, INCLUDED, MAYBE, STATUSES, Survey,
+    SurveyError, author_short, evidence_key, evidence_label, status_label, status_trail,
 )
 from .workspace import ROOT, meta_dir, workspace_lang
 from .zotero import ZoteroClient, ZoteroError
@@ -42,7 +42,7 @@ USAGE_LINES = [
     "  sync [--force|--diff]      update AGENTS.md, the skills and ./priorwork to the engine's version",
     "  doctor [--online]          diagnose the setup (API keys, SSCI list, engine version, …)",
     "  upgrade [--to X.Y.Z]       update the engine to the latest (or given) version, then sync",
-    "  migrate [--clean]          move a workspace from lit (the former name) or from the old layout",
+    "  settings                   show or change the API keys, Zotero and the SSCI list",
     "",
     "Surveys",
     "  status [SURVEY]            list the surveys / progress and next steps",
@@ -51,6 +51,7 @@ USAGE_LINES = [
     "  list SURVEY                list the papers (numbers, decisions, SSCI)",
     "  include / exclude / maybe  record decisions (e.g. priorwork include SURVEY 2 5 7)",
     "  add SURVEY DOI...          register papers by DOI (included by default)",
+    "  card SURVEY N [--set ...]  show or fill in the card of an included paper",
     "  render SURVEY              regenerate the managed blocks of the Markdown",
     "  export SURVEY              write the report for reading (HTML / Word / Markdown)",
     "  check SURVEY               find empty fields, unregistered citations and DOI mismatches",
@@ -201,37 +202,40 @@ def cmd_doctor(args, client):
         sys.exit(1)
 
 
+def cmd_settings(args, client):
+    if args.import_ssci:
+        got = settings.import_ssci(ROOT, Path(args.import_ssci))
+        if not args.json:
+            print(t("Imported the SSCI list: {file} ({n|# journal|# journals})", file=got["file"], n=got["journals"]))
+    if args.stdin:
+        try:
+            values = json.loads(sys.stdin.read() or "{}")
+        except ValueError as e:
+            raise settings.SettingsError(t("Give the settings as a JSON object on stdin: {error}", error=e)) from e
+        if not isinstance(values, dict) or not all(v is None or isinstance(v, str) for v in values.values()):
+            raise settings.SettingsError(t("Give the settings as a JSON object on stdin: {error}",
+                                           error='{"KEY": "value"}'))
+        changed = settings.update(ROOT, values)
+        if not args.json:
+            print(t("Updated: {names}", names=", ".join(changed)) if changed else t("no changes"))
+    if args.json:
+        return dump_json(settings.status(ROOT))
+    if not (args.stdin or args.import_ssci):
+        st = settings.status(ROOT)
+        print(st["env"] + ("" if st["exists"] else " " + t("(not created yet)")))
+        for item in st["items"]:
+            shown = t("set") if item["set"] else t("not set")
+            if item["value"]:
+                shown += f" ({item['value']})"
+            print(f"  {item['key']}: {shown}")
+        print(t("SSCI journal list") + ": " + (f"{st['ssci']['file']} ({st['ssci']['journals']})" if st["ssci"]["file"]
+                                               else t("not set")))
+
+
 def cmd_upgrade(args, client):
     version = scaffold.upgrade(ROOT, args.to)
     print(t("Updated the engine to {version}. Review the changes with `git diff requirements.txt AGENTS.md .agent` "
             "and commit them.", version=version))
-
-
-def cmd_migrate(args, client):
-    if not scaffold.is_legacy(ROOT) and not scaffold.leftover_engine_files(ROOT):
-        print(t("Found nothing to move. Running `priorwork sync` only."))
-    out = scaffold.migrate(ROOT, clean=args.clean)
-    for line in out["moved"]:
-        print("  " + t("moved: {what}", what=line))
-    for line in out["removed"]:
-        print("  " + t("removed: {path}", path=line))
-    for rel in out["rendered"]:
-        print("  " + t("regenerated: {path}", path=rel))
-    for rel in out["skipped"]:
-        print("  " + t("skipped: {path}", path=rel))
-    for line in out["unreadable"]:
-        print("  ⚠️ " + t("could not read, left as it is: {what}", what=line))
-    if out["backup"]:
-        print("  " + t("old files that were overwritten are kept in: {path}/", path=out["backup"][0]))
-    if out["leftover"]:
-        print("\n" + t("Engine files that are no longer needed (the engine is the one installed with pip):"))
-        for rel in out["leftover"]:
-            print(f"  {rel}")
-        print(t("Delete them with `priorwork migrate --clean`"))
-    if out["stale_readme"]:
-        print("\n" + t("README.md still describes the old template (and the old layout). Delete it if you do not need it, "
-                       "or rewrite it."))
-    print("\n" + t("Moved. Check with `./priorwork status`, review the changes with `git status` and commit them."))
 
 
 # ---------------- Survey commands ----------------
@@ -277,9 +281,10 @@ def cmd_status(args, client):
     if not args.survey:
         surveys = Survey.list_all()
         if args.json:
-            legacy = "lit" if scaffold.is_lit_workspace(ROOT) else ("layout" if scaffold.is_old_layout(ROOT) else None)
             return dump_json({"version": __version__, "root": str(ROOT), "workspace": meta_dir(ROOT).is_dir(),
-                              "legacy": legacy, "lang": workspace_lang(ROOT), "sync": scaffold.sync_status(ROOT),
+                              "lang": workspace_lang(ROOT),
+                              "git": {"repo": (repo := scaffold.in_git_repo(ROOT)),
+                                      "remote": repo and scaffold.has_remote(ROOT)}, "sync": scaffold.sync_status(ROOT),
                               "surveys": [survey_summary(s) for s in surveys]})
         if not surveys:
             print(t("No surveys yet. Create one with `priorwork new \"<topic>\" --slug <english_slug>`."))
@@ -406,6 +411,40 @@ def cmd_add(args, client):
     render_and_report(s)
     if args.json:
         dump_json({"added": added_json(added)})
+
+
+def card_json(s: Survey, number: int) -> Dict[str, Any]:
+    values = s.card(number)
+    lang = s.lang
+    return {"number": number, "evidence": evidence_key(values.get("evidence", "")),
+            "evidence_options": [{"key": k, "label": evidence_label(k, lang)} for k in EVIDENCE_KEYS],
+            "fields": [{"key": k, "label": tl(lang, label), "value": values.get(k, "")}
+                       for k, label in CARD_FIELDS if k != "evidence"]}
+
+
+def cmd_card(args, client):
+    s = Survey.load(args.survey)
+    if args.set:
+        values = {}
+        for item in args.set:
+            key, sep, value = item.partition("=")
+            if not sep:
+                sys.exit(t("Error: {message}", message=t("Give each field as KEY=VALUE: {item}", item=item)))
+            values[key.strip()] = value
+        changed = s.set_card(args.number, values)
+        if not args.json:
+            print(f"{s.md_path}: " + (t("updated") if changed else t("no changes")))
+    if args.json:
+        return dump_json(card_json(s, args.number))
+    if not args.set:
+        card = card_json(s, args.number)
+        names = {o["key"]: o["label"] for o in card["evidence_options"]}
+        print(f"#{args.number} " + t("Evidence") + f": {names.get(card['evidence'], '?')}")
+        for f in card["fields"]:
+            lines = f["value"].split("\n") if f["value"] else [""]
+            print(f"  {f['key']} ({f['label']}): {lines[0]}")
+            for line in lines[1:]:
+                print(f"      - {line}")
 
 
 def cmd_render(args, client):
@@ -651,11 +690,14 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("doctor", parents=[common, as_json], help=t("diagnose the setup"))
     p.add_argument("--online", action="store_true", help=t("also check the connections to Semantic Scholar, OpenAlex and Zotero"))
 
+    p = sub.add_parser("settings", parents=[common, as_json],
+                       help=t("show or change the settings in .env (API keys, Zotero) and the SSCI list"))
+    p.add_argument("--stdin", action="store_true",
+                   help=t("read the values to write as a JSON object from stdin (an empty string removes one)"))
+    p.add_argument("--import-ssci", metavar="CSV", help=t("import the SSCI list downloaded from the Master Journal List"))
+
     p = sub.add_parser("upgrade", parents=[common], help=t("update the engine, then sync"))
     p.add_argument("--to", metavar="X.Y.Z", help=t("the version to update to (default: the latest)"))
-
-    p = sub.add_parser("migrate", parents=[common], help=t("move a workspace from lit or from the old layout"))
-    p.add_argument("--clean", action="store_true", help=t("delete engine files left over from a copy of the old template"))
 
     p = sub.add_parser("status", parents=[common, as_json], help=t("list the surveys / progress and next steps"))
     p.add_argument("survey", nargs="?")
@@ -692,6 +734,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("survey")
     p.add_argument("paper_ids", nargs="+", help="DOI / DOI URL / Semantic Scholar ID / OpenAlex ID")
     p.add_argument("--candidate", action="store_true", help=t("register as a candidate, not as included"))
+
+    p = sub.add_parser("card", parents=[common, as_json], help=t("show or fill in the card of an included paper"))
+    p.add_argument("survey")
+    p.add_argument("number", type=int, help=t("the paper number"))
+    p.add_argument("--set", nargs="+", metavar="KEY=VALUE",
+                   help=t("fields to write (evidence=unchecked|abstract|fulltext, rq, x, y, data, method, findings, "
+                          "limits, memo); a new line starts the bullet points below"))
 
     p = sub.add_parser("render", parents=[common], help=t("regenerate the managed blocks of the Markdown"))
     p.add_argument("survey")
@@ -749,28 +798,21 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 HANDLERS = {
-    "init": cmd_init, "sync": cmd_sync, "upgrade": cmd_upgrade, "doctor": cmd_doctor, "migrate": cmd_migrate,
+    "init": cmd_init, "sync": cmd_sync, "upgrade": cmd_upgrade, "doctor": cmd_doctor, "settings": cmd_settings,
     "status": cmd_status, "new": cmd_new, "scope": cmd_scope, "list": cmd_list,
     "include": cmd_set_status, "exclude": cmd_set_status, "maybe": cmd_set_status, "reset": cmd_set_status,
-    "add": cmd_add, "render": cmd_render, "check": cmd_check, "export": cmd_export, "fulltext": cmd_fulltext, "zotero": cmd_zotero,
+    "add": cmd_add, "card": cmd_card, "render": cmd_render, "check": cmd_check, "export": cmd_export, "fulltext": cmd_fulltext, "zotero": cmd_zotero,
     "search": cmd_search, "snowball": cmd_snowball, "get": cmd_get,
     "citations": cmd_linked, "references": cmd_linked, "journal": cmd_journal,
 }
-# 旧構成のワークスペースでも動かすコマンド（移行・診断と、GUI が状況を知るための status --json）
-WORKS_ON_LEGACY = ("init", "sync", "upgrade", "migrate", "doctor")
 
 
 def main(argv: Optional[List[str]] = None):
     args = build_parser().parse_args(argv)
-    legacy_ok = args.command in WORKS_ON_LEGACY or (args.command == "status" and args.json and not args.survey)
-    if not legacy_ok and scaffold.is_legacy(ROOT):
-        what = (t("a workspace of lit, priorwork's former name") if scaffold.is_lit_workspace(ROOT)
-                else t("a workspace in the old layout (surveys/ holds both md and json)"))
-        sys.exit(t("Error: {message}", message=t("This is {what}. Move it with `priorwork migrate`", what=what)))
     client = LiteratureClient(use_cache=not args.no_cache)
     try:
         HANDLERS[args.command](args, client)
-    except (ApiError, SurveyError, FulltextError, ZoteroError, scaffold.ScaffoldError) as e:
+    except (ApiError, SurveyError, FulltextError, ZoteroError, scaffold.ScaffoldError, settings.SettingsError) as e:
         sys.exit(t("Error: {message}", message=e))
     except KeyboardInterrupt:
         sys.exit(130)

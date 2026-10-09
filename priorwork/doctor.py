@@ -12,14 +12,11 @@ from typing import Any, List, Optional, Tuple
 
 from . import __version__, i18n, scaffold, ssci
 from .i18n import t
-from .workspace import data_dir, meta_dir, reports_dir, state_dir, workspace_lang
+from .workspace import meta_dir, reports_dir, state_dir, workspace_lang
 from .zotero import ZoteroClient, ZoteroError
 
 OK, WARN, NG = "ok", "warn", "ng"
 Check = Tuple[str, str, str]  # (レベル, 項目, 説明)
-
-# 旧名 lit のときの環境変数（.env に残っていたら新しい名前を案内する）
-LEGACY_ENV = ("LIT_MAX_RETRIES", "LIT_CACHE_TTL_DAYS", "LIT_NO_CACHE", "LIT_WORKSPACE")
 
 
 def _pinned_version(root: Path) -> Optional[str]:
@@ -53,8 +50,8 @@ def git_checks(root: Path) -> List[Check]:
     remotes = (_git(root, "remote", "-v") or subprocess.CompletedProcess([], 0, "")).stdout.split()
     urls = sorted({u for u in remotes[1::3]})
     if not urls:
-        out.append((WARN, name, t("No remote. Create a private repository on GitHub and push "
-                                  "(e.g. `gh repo create <name> --private --source=. --push`)")))
+        out.append((WARN, name, t("No remote. Publish it as a private repository on GitHub (VS Code: the sidebar's "
+                                  "Publish to GitHub; or `gh repo create <name> --private --source=. --push`)")))
     elif not any("github.com" in u for u in urls):
         out.append((WARN, name, t("The remote is not GitHub: {urls}", urls=", ".join(urls))))
     else:
@@ -69,11 +66,7 @@ def run_checks(root: Path, client: Optional[Any] = None) -> List[Check]:
     # ワークスペース
     layout = t("Layout")
     missing = [d.relative_to(root) for d in (reports_dir(root), state_dir(root), meta_dir(root)) if not d.is_dir()]
-    if scaffold.is_lit_workspace(root):
-        out.append((NG, layout, t("This is a workspace of lit, priorwork's former name. Move it with `priorwork migrate`")))
-    elif scaffold.is_old_layout(root):
-        out.append((NG, layout, t("Old layout (surveys/ holds both md and json). Move it with `priorwork migrate`")))
-    elif missing:
+    if missing:
         out.append((WARN, layout, t("Missing directories: {dirs} (create them with `priorwork init`)",
                                     dirs=", ".join(map(str, missing)))))
     else:
@@ -97,11 +90,7 @@ def run_checks(root: Path, client: Optional[Any] = None) -> List[Check]:
 
     # 設定
     if not (root / ".env").is_file():
-        out.append((WARN, ".env", t("There is no .env. Copy `.env.example` to `.env` and set your API keys")))
-    legacy = [v for v in LEGACY_ENV if os.environ.get(v)]
-    if legacy:
-        out.append((WARN, ".env", t("Settings under lit's old names: {names}. Rename them to PRIORWORK_…",
-                                    names=", ".join(legacy))))
+        out.append((WARN, ".env", t("There is no .env. Set your API keys in the settings (VS Code: Prior Work's Settings; command line: `priorwork settings`)")))
     if os.environ.get("SEMANTIC_SCHOLAR_API_KEY") or os.environ.get("S2_API_KEY"):
         out.append((OK, "Semantic Scholar", t("An API key is set")))
     else:
@@ -117,7 +106,7 @@ def run_checks(root: Path, client: Optional[Any] = None) -> List[Check]:
         out.append((OK, ssci_name, t("{file} ({n|# ISSN|# ISSNs})", file=ssci_list.path.name, n=len(ssci_list.issns))))
     else:
         out.append((WARN, ssci_name, t("Not set, so the SSCI status is guessed from the journal name (🟡). "
-                                       "Put Clarivate's CSV in {dir}", dir=data_dir(root))))
+                                       "Import Clarivate's CSV in the settings (`priorwork settings --import-ssci CSV`)")))
 
     zotero = ZoteroClient.from_env()
     out.append((OK, "Zotero", t("Set")) if zotero

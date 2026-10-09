@@ -33,12 +33,17 @@ export interface SurveySummary {
     searches: number;
 }
 
+export interface GitInfo {
+    repo: boolean;
+    remote: boolean;
+}
+
 export interface WorkspaceStatus {
     version: string;
     root: string;
     workspace: boolean;
-    legacy: 'lit' | 'layout' | null;
     lang: string;
+    git: GitInfo;
     sync: string | null;
     surveys: SurveySummary[];
 }
@@ -148,6 +153,49 @@ export interface AddedPaper {
     title: string;
 }
 
+export type Evidence = 'unchecked' | 'abstract' | 'fulltext';
+
+export interface EvidenceOption {
+    key: Evidence;
+    label: string;
+}
+
+export interface CardField {
+    key: string;
+    label: string;
+    /** 1行目が行内の値（比較マトリクスに載る）、2行目以降が直下の箇条書き */
+    value: string;
+}
+
+/** `priorwork card SURVEY N --json`（採用論文のカード） */
+export interface CardReport {
+    number: number;
+    evidence: Evidence | null;
+    evidence_options: EvidenceOption[];
+    fields: CardField[];
+}
+
+export interface SettingItem {
+    key: string;
+    secret: boolean;
+    set: boolean;
+    /** 秘密の値（API キー・パスワード）は空。設定済みかは set で見る */
+    value: string;
+}
+
+export interface SsciListInfo {
+    file: string | null;
+    journals: number;
+}
+
+/** `priorwork settings --json` */
+export interface SettingsReport {
+    env: string;
+    exists: boolean;
+    items: SettingItem[];
+    ssci: SsciListInfo;
+}
+
 export interface SearchReport {
     query: string;
     hits: number;
@@ -206,6 +254,8 @@ export interface RunOptions {
     token?: vscode.CancellationToken;
     onOutput?: (text: string) => void;
     timeoutMs?: number;
+    /** 標準入力に渡す文字列（API キーなどを引数に載せないため） */
+    input?: string;
 }
 
 export interface RunResult {
@@ -226,6 +276,9 @@ export function run(root: string | undefined, args: string[], opts: RunOptions =
         } catch (e) {
             resolve({ code: null, stdout: '', stderr: String(e) });
             return;
+        }
+        if (opts.input !== undefined) {
+            child.stdin?.end(opts.input);
         }
         const timer = opts.timeoutMs ? setTimeout(() => child.kill(), opts.timeoutMs) : undefined;
         child.stdout?.on('data', (b: Buffer) => { stdout += b.toString(); });
@@ -273,7 +326,7 @@ export async function runJson<T>(root: string | undefined, args: string[], opts:
                        r.stderr + r.stdout);
 }
 
-/** JSON を出さないコマンド（render・sync・migrate・upgrade）。失敗したら CliError。 */
+/** JSON を出さないコマンド（render・sync・upgrade）。失敗したら CliError。 */
 export async function runText(root: string | undefined, args: string[], opts: RunOptions = {}): Promise<string> {
     const r = await run(root, args, opts);
     if (r.code !== 0) {

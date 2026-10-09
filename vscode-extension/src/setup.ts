@@ -3,18 +3,54 @@
 // 拡張機能を入れただけで始められるように、priorwork コマンドが無ければワークスペースの .venv を作り、
 // PyPI から拡張機能と同じ版の priorwork を入れる（ワークスペースの requirements.txt もその版を指す）。
 // 入れたあとは cli.ts がその .venv の priorwork を見つける。
+//
+// .venv を作る Python: 3.10 以上が見つかればそれ。無ければ uv（Astral）に Python ごと取ってこさせる
+// （uv も無ければ、確かめてから公式のインストーラーでホームの下に入れる。管理者権限は要らない）。
 import * as cp from 'child_process';
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { cliVersion, compareVersions, displayLang, runText } from './cli';
 
-function python(): { command: string; args: string[] } {
+interface Cmd {
+    command: string;
+    args: string[];
+}
+
+/** 走らせて、出力（stdout）を返す。動かなければ undefined。 */
+function probe(c: Cmd, args: string[]): Promise<string | undefined> {
+    return new Promise((resolve) => {
+        cp.execFile(c.command, [...c.args, ...args], { timeout: 15000 }, (err, stdout) =>
+            resolve(err ? undefined : String(stdout).trim()));
+    });
+}
+
+/** 3.10 以上の Python。設定 priorwork.python があればそれだけを見る。 */
+async function findPython(): Promise<Cmd | undefined> {
     const explicit = (vscode.workspace.getConfiguration('priorwork').get<string>('python', '') || '').trim();
-    if (explicit) {
-        return { command: explicit, args: [] };
+    const candidates: Cmd[] = explicit ? [{ command: explicit, args: [] }]
+        : process.platform === 'win32' ? [{ command: 'py', args: ['-3'] }, { command: 'python', args: [] }]
+            : ['python3', 'python3.14', 'python3.13', 'python3.12', 'python3.11', 'python3.10']
+                .map((command) => ({ command, args: [] }));
+    for (const c of candidates) {
+        if (await probe(c, ['-c', 'import sys; print(sys.version_info >= (3, 10))']) === 'True') {
+            return c;
+        }
     }
-    return process.platform === 'win32' ? { command: 'py', args: ['-3'] } : { command: 'python3', args: [] };
+    return undefined;
+}
+
+/** uv の場所（PATH か、公式のインストーラーが入れる ~/.local/bin）。 */
+async function findUv(): Promise<string | undefined> {
+    const exe = process.platform === 'win32' ? 'uv.exe' : 'uv';
+    const places = ['uv', path.join(os.homedir(), '.local', 'bin', exe), path.join(os.homedir(), '.cargo', 'bin', exe)];
+    for (const p of places) {
+        if (await probe({ command: p, args: [] }, ['--version'])) {
+            return p;
+        }
+    }
+    return undefined;
 }
 
 function venvPython(root: string): string {
@@ -57,10 +93,16 @@ export class Setup {
      * 無ければ拡張機能と同じ版。成功したら true。
      */
     async createVenv(root: string): Promise<boolean> {
-        const py = python();
+        const py = fs.existsSync(venvPython(root)) ? undefined : await findPython();
+        let uv: string | undefined;
+        if (!py && !fs.existsSync(venvPython(root))) {
+            uv = await findUv() ?? await this.installUv();
+            if (!uv) {
+                return false;
+            }
+        }
         const req = path.join(root, 'requirements.txt');
-        // 旧名 lit のワークスペースの requirements.txt は lit を指している。移行（priorwork migrate）
-        // の前なので、拡張機能と同じ版の priorwork を入れる（移行が requirements.txt を書き換える）
+        // requirements.txt が priorwork の版を指していなければ、拡張機能と同じ版を入れる
         const pinned = fs.existsSync(req) && /^\s*priorwork\b/m.test(fs.readFileSync(req, 'utf-8'));
         const spec = pinned ? ['-r', req] : [`priorwork==${this.version}`];
         const title = vscode.l10n.t('Prior Work: setting up the Python environment (.venv)');
@@ -69,7 +111,11 @@ export class Setup {
             { location: vscode.ProgressLocation.Notification, title, cancellable: true },
             async (progress, token) => {
                 if (!fs.existsSync(venvPython(root))) {
-                    const made = await stream(py.command, [...py.args, '-m', 'venv', '.venv'], root, this.output, token, progress);
+                    // uv は Python が無ければ取ってくる。--seed で pip も入れる（priorwork upgrade が使う）
+                    const made = py
+                        ? await stream(py.command, [...py.args, '-m', 'venv', '.venv'], root, this.output, token, progress)
+                        : await stream(uv as string, ['venv', '--seed', '--python', '>=3.10', '.venv'], root, this.output,
+                                       token, progress);
                     if (made !== 0) {
                         return made;
                     }
@@ -86,6 +132,35 @@ export class Setup {
             + '(the setting priorwork.python chooses which one).'), show)
             .then((p) => { if (p === show) { this.output.show(); } });
         return false;
+    }
+
+    /** Python が無いとき: 確かめてから uv を公式のインストーラーで入れる。入れた uv の場所を返す。 */
+    private async installUv(): Promise<string | undefined> {
+        const L = vscode.l10n;
+        const go = L.t('Install uv');
+        const picked = await vscode.window.showInformationMessage(L.t(
+            'Prior Work needs Python 3.10 or later, which was not found. It can install uv (a small tool from Astral, into your home folder, without administrator rights), which then downloads Python for the workspace.'),
+            { modal: true }, go);
+        if (picked !== go) {
+            return undefined;
+        }
+        const [command, args] = process.platform === 'win32'
+            ? ['powershell', ['-NoProfile', '-ExecutionPolicy', 'ByPass', '-Command', 'irm https://astral.sh/uv/install.ps1 | iex']]
+            : ['sh', ['-c', 'if command -v curl >/dev/null; then curl -LsSf https://astral.sh/uv/install.sh | sh; '
+                             + 'else wget -qO- https://astral.sh/uv/install.sh | sh; fi']];
+        const title = L.t('Prior Work: installing uv');
+        this.output.appendLine(`\n== ${title}`);
+        const code = await vscode.window.withProgress(
+            { location: vscode.ProgressLocation.Notification, title, cancellable: true },
+            (progress, token) => stream(command, args, os.homedir(), this.output, token, progress));
+        const uv = code === 0 ? await findUv() : undefined;
+        if (!uv) {
+            const show = L.t('Show the output');
+            void vscode.window.showErrorMessage(L.t(
+                'Prior Work: could not install uv. Install Python 3.10 or later (python.org), then try again.'), show)
+                .then((p) => { if (p === show) { this.output.show(); } });
+        }
+        return uv;
     }
 
     /** 「ワークスペースを作る」: フォルダ・言語を選び、必要なら .venv を用意して `priorwork init`。 */
@@ -143,11 +218,11 @@ export class Setup {
         }
         if (open && open.fsPath === root) {
             onDone();
-            const env = vscode.l10n.t('Open .env');
+            const env = vscode.l10n.t('Open the Settings');
             const picked = await vscode.window.showInformationMessage(vscode.l10n.t(
-                'Prior Work: the workspace is ready. Set your API keys in .env, then start a survey.'), env);
+                'Prior Work: the workspace is ready. Set your API keys in the settings, then start a survey.'), env);
             if (picked === env) {
-                void vscode.commands.executeCommand('priorwork.openEnv');
+                void vscode.commands.executeCommand('priorwork.openSettings');
             }
             return;
         }

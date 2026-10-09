@@ -1,13 +1,16 @@
 # Prior Work
 
-**AI エージェントと対話しながら作る、社会科学の先行研究サーベイ**
+**AI エージェントと作る、社会科学の先行研究サーベイ — ターミナルは不要**
 
-[English](README.md)
+[English](README.md) · **[手引き](https://yoshida-kd.github.io/priorwork/ja/guide/)** · [ウェブページ](https://yoshida-kd.github.io/priorwork/ja/)
 
-社会科学（経済学・社会学・政治学・経営学・心理学など）のテーマ別文献サーベイを、AI エージェント（Claude Code・Antigravity など）と対話しながら作るためのツールです。VS Code の拡張機能を使うと、候補の選別や検索・検査をサイドバーから操作できます。
+社会科学（経済学・社会学・政治学・経営学・心理学など）のテーマ別文献サーベイを、AI エージェント（Claude Code・Antigravity など）と作るためのツールです。
 
-- **チャットが画面、リポジトリが記憶。** 論文の候補・採否・検索履歴は `.priorwork/surveys/` の JSON に残るので、会話をまたいで続きから作業できます
-- **採否はユーザーが決める。** エージェントは候補を番号つきで示して推薦し、「2, 5, 7 を採用」のような指示を記録します。VS Code では論文ごとのページでキー 1 つで決められます
+**ターミナルは使いません。** VS Code では、自分で行う操作（検索・選別・論文カードの確認・設定・検査・読むための版の表示）はすべて Prior Work のサイドバーで、エージェントに頼む作業（本文からのカードの記入・サーベイの文章）はエージェントのチャットで行います。拡張機能が自分で AI のサービスを呼ぶことはないので、いま使っているエージェントのほかに費用はかかりません。
+
+- **書くのはチャット、覚えるのはリポジトリ。** 論文の候補・採否・検索履歴は `.priorwork/surveys/` の JSON に残るので、会話をまたいで続きから作業できます
+- **採否はユーザーが決める。** エージェントは候補を番号つきで示して推薦し、「2, 5, 7 を採用」のような指示を記録します。論文ごとのページで、キー 1 つで自分で決めることもできます
+- **確かめるのもユーザー。** 採用論文ごとに論文カード（RQ・X・Y・データ・識別戦略・結果・限界）を作ります。エージェントが要旨や本文から記入し、ユーザーが要旨と見比べて確かめ・直し、確認レベルを記録します
 - **でっち上げを機械的に検出する。** 本文中の「著者 (年)」が登録済みの論文に対応しているか、DOI が別の論文を指していないかを `priorwork check` で検査します
 - **人が読むのは `reports/` のレポートだけ。** `priorwork export` が読むための版（HTML）を作ります。状態ファイルやキャッシュは `.priorwork/` に隠れています
 
@@ -32,17 +35,22 @@
 
 ### VS Code から始める
 
-1. VS Code の拡張機能で **Prior Work** を入れます（**Python 3.10 以上**と **git** が必要）
-2. アクティビティバーの Prior Work から **ワークスペースを作る** を選び、空のフォルダとレポートの言語（日本語・英語）を選びます。拡張機能がそのフォルダに `.venv` を作り、PyPI から `priorwork` を入れて `priorwork init` します
-3. **.env を開く** で API キーを設定します（下の「API キー」）
-4. **新しいサーベイ** → **検索** → **候補を選別する**。その先の記入や文章はエージェントに頼みます
+1. VS Code の拡張機能で **Prior Work** を入れます。始めるのにほかに入れるものはありません。Python 3.10 以上があればそれを使い、無ければ [uv](https://docs.astral.sh/uv/) を入れて Python を取ってきます（ホームフォルダーに入り、管理者権限は要りません）。文章を書くには VS Code で動く AI エージェント（Claude Code など）を、ワークスペースを GitHub に置くには **git** を用意してください
+2. アクティビティバーの Prior Work から **ワークスペースを作る** を選び、空のフォルダとレポートの言語（日本語・英語）を選びます。拡張機能がそのフォルダに `.venv` を作り、PyPI から `priorwork` を入れてワークスペースを用意します
+3. サイドバーの歯車の **設定** を開き、Semantic Scholar の無料 API キー（推奨）と、あれば Zotero・SSCI リストを設定します。**保存して接続を確かめる** で動くかを確かめられます
+4. サイドバーに出る行から、**GitHub の非公開リポジトリ**として公開します。以後の変更は VS Code のソース管理画面からコミットします（各工程の終わりにエージェントもコミットを提案します）
+5. **新しいサーベイ** → **検索** → **候補を選別する**（エージェントに採否の推薦を頼んでもかまいません）
+6. サーベイの **エージェントに頼む…** で、カードの記入・文章の執筆・検査と修正などの依頼文をコピーし、エージェントのチャットに貼ります。エージェントが書いたカードは、論文ごとのページで確かめます
+7. **サーベイを検査** し、**レポートを書き出して見る**
 
 拡張機能でできること:
 
 - サイドバーに、サーベイごとの「次にやること」と、未選別・保留・採用・除外の論文。論文の上で採用・保留・除外（複数選択も可）
-- 論文ごとのページ: 要旨・SSCI の判定・警告・調査範囲の採否基準を見ながら、**I** 採用・**M** 保留・**X** 除外（理由つき）。決めると次の未選別の論文に進みます
-- 検索（関連度順・bulk 検索・SSCI 収録誌のみ）、引用をたどる、DOI で追加、本文の取得、検査（問題パネル）、読むための版の表示、設定の診断、`sync`・`upgrade`、lit からの移行
-- エージェントがターミナルで状態を変えると、サイドバーが追随します
+- 論文ごとのページ: 要旨・SSCI の判定・警告・調査範囲の採否基準を見ながら、**I** 採用・**M** 保留・**X** 除外（理由つき）。決めると次の未選別の論文に進みます。採用論文のページでは論文カードも表示・編集でき、エージェントが書いた内容を確かめて直せます（**Ctrl+S** で保存）
+- 検索（関連度順・bulk 検索・SSCI 収録誌のみ）、引用をたどる、DOI で追加、本文の取得、Zotero、検査（問題パネル）、読むための版の表示、設定、診断、エンジンの更新
+- エージェントへの依頼文のコピー。エージェントが状態やレポートを変えると、サイドバーと論文のページが追随します
+
+別のマシンで続けるときは、VS Code でリポジトリを clone し、サイドバーのメニューの **Python の環境（.venv）を用意する** を実行して、**設定** でキーを入れ直します（`.env` は Git に載らないため）。
 
 ### コマンドラインで始める
 
@@ -57,7 +65,7 @@ git add -A && git commit -m "Initialize priorwork workspace"
 gh repo create my-surveys --private --source=. --push   # GitHub に作って push（Web で作って git remote add しても可）
 ```
 
-ワークスペースは GitHub の**非公開**リポジトリで管理する前提です（レポートと状態 JSON には論文の要旨などが入るため）。別のマシンで続けるときは、clone して `python3 -m venv .venv && .venv/bin/pip install -r requirements.txt` し、`.env` を作り直します。
+ワークスペースは GitHub の**非公開**リポジトリで管理する前提です（レポートと状態 JSON には論文の要旨などが入るため）。別のマシンで続けるときは、clone して `python3 -m venv .venv && .venv/bin/pip install -r requirements.txt` し、`.env` を作り直します（`priorwork settings` で設定済みの項目が分かります）。
 
 `--lang` はワークスペースの言語です（レポートの見出し・AGENTS.md・スキル。後から変えられません）。CLI の表示の言語はこれとは別で、`PRIORWORK_LANG=ja` かロケールで決まります（VS Code の拡張機能は VS Code の表示言語に合わせます）。
 
@@ -98,26 +106,9 @@ my-surveys/
 
 `./priorwork status` は、AGENTS.md・スキルがエンジンの版と合っていないと警告します。`priorwork sync` が上書きするのは、`priorwork sync` 自身が書き出したファイルだけです。由来の分からないファイルは、`--force` を付けない限り上書きしません。
 
-### lit（旧名）のワークスペースを移行する
-
-Prior Work は `lit` という名前で開発していました。lit で作ったワークスペース（`.lit/`、`./lit`）は、次の手順で移行します。VS Code の拡張機能で開くと、サイドバーに **Prior Work に移行する** が出ます（`.venv` に priorwork が無ければ入れるところから案内します）。
-
-```bash
-.venv/bin/pip install priorwork
-.venv/bin/priorwork migrate
-git status                                      # 移動の内容を確認してコミット
-```
-
-- `.lit/` を `.priorwork/` に移します（状態・キャッシュ・同期の記録）。ワークスペースの言語は日本語になります
-- `./lit` を消して `./priorwork` を書き出し、`requirements.txt` の `litsurvey @ git+…` を `priorwork==X.Y.Z` に、`.gitignore` の lit のブロックを priorwork のものに置き換えます
-- レポートの管理ブロックの印（`<!-- BEGIN lit:… -->`）を `<!-- BEGIN priorwork:… -->` に書き換えます（手で書いた文章・カードはそのまま）。`<!-- lit:ignore-citation … -->` はそのまま使えます
-- `.env` の `LIT_MAX_RETRIES` などは `PRIORWORK_…` に名前を変えてください（`doctor` が知らせます）
-
-さらに古いテンプレート（`surveys/` に md と json が同居し、`litsurvey/` のコードごとコピーされている構成）も `priorwork migrate [--clean]` で移せます。`--clean` はコピーされていたエンジンのコードを削除します。上書きした旧 AGENTS.md などは `.priorwork/cache/migrate-backup/` に退避します。
-
 ### API キー
 
-ワークスペースの `.env` に書きます。
+ワークスペースの `.env`（Git 管理外）に保存します。VS Code では **設定** のページで入れます。コマンドラインでは `.env` を直接書くか、`priorwork settings --stdin` に JSON を渡します。
 
 | 変数 | 用途 |
 | :--- | :--- |
@@ -143,7 +134,7 @@ https://example.com/nextcloud/remote.php/dav/files/<ユーザー名>/zotero/
 
 ### SSCI 収録リスト（推奨）
 
-SSCI に収録されているかは、Clarivate の [Master Journal List](https://mjl.clarivate.com/) でしか確定できません。SSCI の収録誌リストを CSV でダウンロードし、`.priorwork/data/` に置いてください（ダウンロードしたときのファイル名のままで構いません。Git 管理外）。
+SSCI に収録されているかは、Clarivate の [Master Journal List](https://mjl.clarivate.com/) でしか確定できません。SSCI の収録誌リストを CSV でダウンロードし、VS Code の **設定** のページか `./priorwork settings --import-ssci <CSV>` で取り込んでください（`.priorwork/data/` にコピーされます。Git 管理外）。
 
 リストが無い場合は、主要誌約 100 誌の内蔵リストによる**推定**になります。
 
@@ -161,7 +152,7 @@ SSCI に収録されているかは、Clarivate の [Master Journal List](https:
 ### エージェントと進める
 
 Claude Code（または Antigravity など）でワークスペースを開き、たとえば「最低賃金の雇用効果についてサーベイを始めたい」と話しかけます。
-エージェントは AGENTS.md のルールに従い、工程ごとのスキル（`.agent/skills/`）を使って進めます。スキルは `/survey-new` のように直接呼び出すこともできます。
+エージェントは AGENTS.md のルールに従い、工程ごとのスキル（`.agent/skills/`）を使って進めます。スキルは `/survey-new` のように直接呼び出すこともできます。VS Code では、サーベイの **エージェントに頼む…** で、チャットに貼る依頼文をコピーできます。
 
 | スキル | やること | ユーザーが決めること |
 | :--- | :--- | :--- |
@@ -207,7 +198,7 @@ Claude Code（または Antigravity など）でワークスペースを開き�
 ./priorwork sync [--force|--diff]                              # AGENTS.md・スキル・./priorwork をエンジンの版に更新
 ./priorwork upgrade [--to X.Y.Z]                               # エンジンを更新して sync
 ./priorwork doctor [--online]                                  # 設定（API キー・SSCI リスト・エンジンの版）を診断
-./priorwork migrate [--clean]                                  # lit のワークスペースや旧構成から移行
+./priorwork settings [--stdin] [--import-ssci CSV]             # API キー・Zotero・SSCI リストの設定
 
 # サーベイの管理
 ./priorwork status [SURVEY]                                    # 一覧 / 進捗と次にやること
@@ -218,6 +209,7 @@ Claude Code（または Antigravity など）でワークスペースを開き�
 ./priorwork exclude SURVEY 3 --reason "理論モデルのみ"          # 除外には理由が必須
 ./priorwork maybe SURVEY 9          ./priorwork reset SURVEY 9 # 保留 / 候補に戻す
 ./priorwork add SURVEY <DOI>... [--candidate]                  # DOI を指定して登録（既定で採用）
+./priorwork card SURVEY 3 [--set rq="..." evidence=abstract]   # 論文カードを表示・記入
 ./priorwork render SURVEY
 ./priorwork check SURVEY [--offline]
 ./priorwork export SURVEY [--format html|docx|md] [-o PATH] [--with-abstracts]   # 読むための版を書き出す
@@ -329,7 +321,7 @@ bin/priorwork --help                # このチェックアウトのコードで
 │   ├── cli.py                  # コマンド（--json の出力を含む）
 │   ├── i18n.py / lang_ja.py    # 表示の言語（英語が原文、日本語は対訳表）
 │   ├── workspace.py            # ワークスペースのパスと言語
-│   ├── scaffold.py             # init / sync / upgrade / migrate
+│   ├── scaffold.py             # init / sync / upgrade
 │   ├── survey.py               # 状態ファイルと Markdown 生成
 │   ├── api.py                  # Semantic Scholar / OpenAlex
 │   ├── ssci.py                 # SSCI 判定
@@ -346,3 +338,5 @@ bin/priorwork --help                # このチェックアウトのコードで
 ```
 
 AGENTS.md・スキルを直すときは、`priorwork/assets/en/` と `priorwork/assets/ja/` の両方を編集します。ワークスペースには `priorwork sync` で配られます。
+
+不具合の報告や要望は [Issues](https://github.com/yoshida-kd/priorwork/issues) へどうぞ。

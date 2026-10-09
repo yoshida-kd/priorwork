@@ -3,7 +3,8 @@
 //   cli.ts    priorwork コマンドの呼び出しと --json の型
 //   model.ts  ワークスペースの状態（CLI から読む）。状態ファイルを見張って読み直す
 //   tree.ts   サイドバーの「サーベイ」
-//   paper.ts  論文のページ（選別）
+//   paper.ts  論文のページ（選別・カードの記入）
+//   settings.ts  設定のページ（API キー・Zotero・SSCI リスト）
 //   setup.ts  ワークスペース・.venv を作る、エンジンの版を確かめる
 //
 // 書き換えはすべて CLI が行う。ここはコマンドを組み立てて走らせ、終わったら model.refresh() するだけ。
@@ -15,8 +16,12 @@ import {
 } from './cli';
 import { Model } from './model';
 import { doiUrl, PaperPanel } from './paper';
+import { SettingsPanel } from './settings';
 import { Setup } from './setup';
 import { Node, SurveyTree } from './tree';
+
+/** エージェントに頼める仕事（文面は askAgent）。 */
+type AgentTask = 'fill' | 'screen' | 'snowball' | 'write' | 'check';
 
 export function activate(context: vscode.ExtensionContext): void {
     const output = vscode.window.createOutputChannel('Prior Work');
@@ -31,9 +36,13 @@ export function activate(context: vscode.ExtensionContext): void {
     const paper = new PaperPanel(context, model, {
         decide: (survey, numbers, status, reason) => decide(survey, numbers, status, reason),
         fulltext: (survey, number) => fulltext(survey, number),
+        saveCard: (survey, number, values) => saveCard(survey, number, values),
+        askAgent: (survey, number) => vscode.commands.executeCommand('priorwork.askAgent',
+                                                                     { name: survey, task: 'fill', numbers: [number] }),
         openReport: (survey) => openReport(survey),
     });
-    context.subscriptions.push(output, model, tree, view, paper, problems);
+    const settings = new SettingsPanel(context, model, { busy: (t, task) => busy(t, task), fail: (e) => fail(e) });
+    context.subscriptions.push(output, model, tree, view, paper, settings, problems);
 
     // -- 共通 -----------------------------------------------------------------
     function root(): string | undefined {
@@ -100,6 +109,81 @@ export function activate(context: vscode.ExtensionContext): void {
         } catch (e) {
             fail(e);
             return false;
+        }
+    }
+
+    async function saveCard(survey: string, number: number, values: Record<string, string>): Promise<boolean> {
+        const pairs = Object.entries(values).map(([k, v]) => `${k}=${v}`);
+        try {
+            await runJson(model.root, ['card', survey, String(number), '--set', ...pairs]);
+            model.refresh();
+            vscode.window.setStatusBarMessage(vscode.l10n.t('Prior Work: saved the card of #{0}.', number), 4000);
+            return true;
+        } catch (e) {
+            fail(e);
+            return false;
+        }
+    }
+
+    /**
+     * エージェントに頼む文面をクリップボードに写す。API は呼ばない（利用者が自分のエージェントのチャットに貼る）。
+     * 特定のエージェントに縛られないよう、チャットを開くところまではしない。
+     */
+    async function askAgent(s: SurveySummary, task: AgentTask, numbers: number[] = []): Promise<void> {
+        const L = vscode.l10n;
+        const which = numbers.length ? numbers.map((n) => `#${n}`).join(', ') : L.t('the unfilled ones');
+        const text = {
+            fill: L.t('Using /survey-extract, fill in the paper cards of the survey "{0}" ({1}): {2}. Write only what the abstract or the full text says, and update the evidence level.', s.topic, s.name, which),
+            screen: L.t('Using /survey-screen, go through the unscreened candidates of the survey "{0}" ({1}) and recommend which to include, with reasons. Do not record any decision until I answer.', s.topic, s.name),
+            snowball: L.t('Using /survey-snowball, chase the citations of the included papers of the survey "{0}" ({1}) and present the new candidates.', s.topic, s.name),
+            write: L.t('Write the text of the report of the survey "{0}" ({1}): the background (section 1) and sections 4 to 7, based on the paper cards. Cite only papers registered in the survey, and run ./priorwork check at the end.', s.topic, s.name),
+            check: L.t('Using /survey-check, check the survey "{0}" ({1}) and fix what it finds.', s.topic, s.name),
+        }[task];
+        await vscode.env.clipboard.writeText(text);
+        void vscode.window.showInformationMessage(L.t(
+            'Copied a request for your agent. Paste it into the chat of Claude Code (or another agent that reads AGENTS.md).'));
+    }
+
+    /** Zotero に無い採用論文。DOI をまとめてコピーし（Zotero の「識別子でアイテムを追加」に貼れる）、読み直す。 */
+    async function zoteroMissing(s: SurveySummary): Promise<void> {
+        const L = vscode.l10n;
+        const reload = L.t('Reload from Zotero');
+        const missing = async (): Promise<Entry[]> => {
+            const numbers = new Set((await model.detail(s.name)).zotero_missing);
+            return (await model.papers(s.name)).filter((e) => numbers.has(e.number));
+        };
+        let entries = await missing();
+        for (;;) {
+            if (!entries.length) {
+                void vscode.window.showInformationMessage(L.t('Prior Work: all included papers are in Zotero.'));
+                return;
+            }
+            const dois = entries.filter((e) => e.record.doi).map((e) => e.record.doi as string);
+            const noDoi = entries.filter((e) => !e.record.doi).map((e) => `#${e.number}`);
+            const copy = L.t('Copy the DOIs');
+            const picked = await vscode.window.showInformationMessage(
+                L.t('{0} included papers are not in Zotero: {1}.', entries.length, entries.map((e) => `#${e.number}`).join(', '))
+                + ' ' + L.t('Copy their DOIs, paste them into Zotero\'s "Add Item by Identifier" (the magic wand), then reload.')
+                + (noDoi.length ? ' ' + L.t('Add these by hand (no DOI): {0}.', noDoi.join(', ')) : ''),
+                ...(dois.length ? [copy] : []), reload);
+            if (picked === copy) {
+                await vscode.env.clipboard.writeText(dois.join('\n'));
+                const again = await vscode.window.showInformationMessage(
+                    L.t('Copied {0} DOIs. In Zotero, click the magic wand, paste them and press Enter.', dois.length), reload);
+                if (again !== reload) {
+                    return;
+                }
+            } else if (picked !== reload) {
+                return;
+            }
+            try {
+                await busy(L.t('reloading the Zotero library'), (o) => runText(model.root, ['zotero', s.name, '--refresh'], o));
+            } catch (e) {
+                fail(e);
+                return;
+            }
+            model.refresh();
+            entries = await missing();
         }
     }
 
@@ -176,27 +260,34 @@ export function activate(context: vscode.ExtensionContext): void {
             }
         },
 
-        'priorwork.migrate': async () => {
-            const r = root();
-            if (!r) {
+        'priorwork.askAgent': async (arg?: unknown) => {
+            // 木のサーベイ・サーベイ名、または { name, task, numbers }（論文のページ・次にやることから）
+            const preset = arg && typeof arg === 'object' && 'task' in arg
+                ? arg as { name: string; task: AgentTask; numbers?: number[] } : undefined;
+            const s = await surveyOf(preset ? preset.name : arg);
+            if (!s) {
                 return;
             }
-            const go = vscode.l10n.t('Move');
-            const picked = await vscode.window.showWarningMessage(vscode.l10n.t(
-                'Move this lit workspace to Prior Work? .lit/ becomes .priorwork/, ./lit becomes ./priorwork, and the '
-                + 'reports are regenerated. Commit your work first so that you can review the changes with git.'),
-                { modal: true }, go);
-            if (picked !== go) {
-                return;
+            let task = preset?.task;
+            if (!task) {
+                const L = vscode.l10n;
+                const items: { label: string; description: string; task: AgentTask }[] = [
+                    { label: L.t('Fill in the paper cards'), description: '/survey-extract', task: 'fill' },
+                    { label: L.t('Recommend decisions on the candidates'), description: '/survey-screen', task: 'screen' },
+                    { label: L.t('Chase citations'), description: '/survey-snowball', task: 'snowball' },
+                    { label: L.t('Write the text of the report'), description: L.t('sections 1 and 4–7'), task: 'write' },
+                    { label: L.t('Check and fix'), description: '/survey-check', task: 'check' },
+                ];
+                task = (await vscode.window.showQuickPick(items, { placeHolder: L.t('What should your agent do?') }))?.task;
+                if (!task) {
+                    return;
+                }
             }
-            try {
-                log(await runText(r, ['migrate']));
-                model.refresh();
-                void vscode.window.showInformationMessage(vscode.l10n.t(
-                    'Prior Work: moved. Review the changes with git and commit them.'));
-            } catch (e) {
-                fail(e);
+            let numbers = preset?.numbers ?? [];
+            if (task === 'fill' && !numbers.length) {
+                numbers = (await model.detail(s.name).catch(() => undefined))?.unfilled ?? [];
             }
+            await askAgent(s, task, numbers);
         },
 
         'priorwork.newSurvey': async () => {
@@ -567,6 +658,24 @@ export function activate(context: vscode.ExtensionContext): void {
             }
         },
 
+        'priorwork.openSettings': () => settings.show(),
+
+        'priorwork.publish': async () => {
+            // VS Code の「GitHub に公開」（組み込みの GitHub 拡張機能）。非公開を選ぶよう念を押してから呼ぶ
+            const L = vscode.l10n;
+            const go = L.t('Publish to GitHub');
+            const has = (await vscode.commands.getCommands(true)).includes('github.publish');
+            const picked = await vscode.window.showInformationMessage(
+                L.t('Keep the workspace in a private GitHub repository: the reports contain abstracts. When VS Code asks, choose "Publish to GitHub private repository" and include all the files it suggests (.env is left out by .gitignore).'),
+                { modal: true }, ...(has ? [go] : []), L.t('Open Source Control'));
+            if (picked === go) {
+                await vscode.commands.executeCommand('github.publish');
+                model.refresh();
+            } else if (picked) {
+                await vscode.commands.executeCommand('workbench.view.scm');
+            }
+        },
+
         'priorwork.openEnv': async () => {
             const r = root();
             if (!r) {
@@ -583,7 +692,7 @@ export function activate(context: vscode.ExtensionContext): void {
             await vscode.window.showTextDocument(vscode.Uri.file(env));
         },
 
-        'priorwork.runStep': async (s: SurveySummary, step: { id: string; args: string[] }) => {
+        'priorwork.runStep': async (s: SurveySummary, step: { id: string; text: string; args: string[] }) => {
             switch (step.id) {
                 case 'scope': return vscode.commands.executeCommand('priorwork.editScope', s.name);
                 case 'search': return vscode.commands.executeCommand('priorwork.search', s.name);
@@ -591,23 +700,18 @@ export function activate(context: vscode.ExtensionContext): void {
                 case 'snowball': return vscode.commands.executeCommand('priorwork.snowball', s.name);
                 case 'check': return vscode.commands.executeCommand('priorwork.check', s.name);
                 case 'export': return vscode.commands.executeCommand('priorwork.exportReport', s.name);
-                case 'fill': {
-                    const n = Number(step.args[2]);
-                    const get = vscode.l10n.t('Get the full text of #{0}', n);
-                    const picked = await vscode.window.showInformationMessage(vscode.l10n.t(
-                        'Ask your agent to fill in the paper cards (skill /survey-extract). '
-                        + 'You can get the full texts here first.'), get);
-                    if (picked === get) {
-                        await fulltext(s.name, n);
+                case 'fill':
+                    return vscode.commands.executeCommand('priorwork.askAgent', { name: s.name, task: 'fill' });
+                case 'zotero': return zoteroMissing(s);
+                default:   // 拡張機能がまだ知らない工程（CLI のほうが新しいとき）。ターミナルは開かず、出力パネルに出す
+                    try {
+                        log(await busy(step.text, (o) => runText(model.root, step.args, o)));
+                        output.show(true);
+                        model.refresh();
+                    } catch (e) {
+                        fail(e);
                     }
                     return;
-                }
-                default: {
-                    const term = vscode.window.createTerminal({ name: 'Prior Work', cwd: model.root });
-                    term.show();
-                    term.sendText(['priorwork', ...step.args].map((a) => (/[\s"'<>|&;]/.test(a) ? `"${a}"` : a)).join(' '));
-                    return;
-                }
             }
         },
     };
@@ -615,7 +719,7 @@ export function activate(context: vscode.ExtensionContext): void {
         context.subscriptions.push(vscode.commands.registerCommand(id, fn));
     }
 
-    // 開いたときに一度、エンジンがあるか・版が合っているかを見る（旧名 lit のワークスペースは移行が先）
+    // 開いたときに一度、エンジンがあるか・版が合っているかを見る
     void (async () => {
         const ws = await model.workspace();
         if (model.root && (ws?.workspace || !ws)) {

@@ -8,11 +8,11 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { CliError, Entry, runJson, SurveyDetail, SurveySummary, WorkspaceStatus } from './cli';
 
-/** 開いているフォルダのうち、ワークスペース（.priorwork/ か、旧名 lit の .lit/）のもの。 */
+/** 開いているフォルダのうち、ワークスペース（.priorwork/ があるもの）。 */
 export function findRoot(): string | undefined {
     for (const f of vscode.workspace.workspaceFolders ?? []) {
         const p = f.uri.fsPath;
-        if (['.priorwork', '.lit'].some((d) => fs.existsSync(path.join(p, d)))) {
+        if (fs.existsSync(path.join(p, '.priorwork'))) {
             return p;
         }
     }
@@ -33,10 +33,12 @@ export class Model implements vscode.Disposable {
 
     constructor(private readonly log: (s: string) => void) {
         this.root = findRoot();
-        const watcher = vscode.workspace.createFileSystemWatcher('**/{.priorwork,.lit}/{surveys/*.json,config.json}');
+        const watcher = vscode.workspace.createFileSystemWatcher('**/.priorwork/{surveys/*.json,config.json}');
+        // カードはレポートに書かれるので、エージェントがレポートを直したときも読み直す
+        const reports = vscode.workspace.createFileSystemWatcher('**/reports/*.md', true, false, true);
         const soon = (): void => this.refreshSoon();
         this.subs.push(watcher, watcher.onDidChange(soon), watcher.onDidCreate(soon), watcher.onDidDelete(soon),
-            vscode.workspace.onDidChangeWorkspaceFolders(() => this.refresh()));
+            reports, reports.onDidChange(soon), vscode.workspace.onDidChangeWorkspaceFolders(() => this.refresh()));
     }
 
     dispose(): void {
@@ -67,7 +69,7 @@ export class Model implements vscode.Disposable {
     /** ワークスペースの状態。CLI が無い・壊れているときは undefined（理由は lastError）。 */
     async workspace(): Promise<WorkspaceStatus | undefined> {
         if (!this.root) {
-            await this.setContext(false, false, false);
+            await this.setContext(false, false);
             return undefined;
         }
         if (!this.status && !this.statusError) {
@@ -89,14 +91,12 @@ export class Model implements vscode.Disposable {
             this.log(`[status] ${this.statusError}${e instanceof CliError ? `\n${e.output}` : ''}`);
         }
         const s = this.status;
-        await this.setContext(Boolean(s?.workspace), Boolean(s?.surveys.length), s?.legacy === 'lit'
-            || (!s && fs.existsSync(path.join(this.root ?? '', '.lit'))));
+        await this.setContext(Boolean(s?.workspace), Boolean(s?.surveys.length));
     }
 
-    private async setContext(hasWorkspace: boolean, hasSurveys: boolean, legacy: boolean): Promise<void> {
+    private async setContext(hasWorkspace: boolean, hasSurveys: boolean): Promise<void> {
         await vscode.commands.executeCommand('setContext', 'priorwork.hasWorkspace', hasWorkspace);
         await vscode.commands.executeCommand('setContext', 'priorwork.hasSurveys', hasSurveys);
-        await vscode.commands.executeCommand('setContext', 'priorwork.legacy', legacy);
     }
 
     async surveys(): Promise<SurveySummary[]> {

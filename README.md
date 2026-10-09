@@ -1,19 +1,27 @@
 # Prior Work
 
-**Literature reviews for the social sciences, built in conversation with an AI agent**
+**Literature reviews for the social sciences, built with an AI agent — no terminal needed**
 
-[日本語](README.ja.md)
+[日本語](README.ja.md) · **[Guide](https://yoshida-kd.github.io/priorwork/guide/)** · [Website](https://yoshida-kd.github.io/priorwork/)
 
 Prior Work is a toolkit for writing topic-based literature reviews in economics, sociology,
 political science, management, psychology and neighbouring fields together with an AI agent
-(Claude Code, Antigravity and others). The VS Code extension puts screening, searching and checks
-in the sidebar.
+(Claude Code, Antigravity and others).
 
-- **The chat is the screen; the repository is the memory.** Candidates, decisions and the search
-  log live in JSON under `.priorwork/surveys/`, so a survey picks up where it left off in the next
+**No terminal needed.** In VS Code, everything you do yourself happens in the Prior Work sidebar —
+searching, screening, checking the paper cards, settings, checks, the report for reading — and
+everything you ask of the agent happens in its chat: filling in the cards from the full texts and
+writing the review. The extension never calls an AI service itself, so there is nothing to pay for
+beyond the agent you already use.
+
+- **The chat writes; the repository remembers.** Candidates, decisions and the search log live in
+  JSON under `.priorwork/surveys/`, so a survey picks up where it left off in the next
   conversation.
 - **You decide.** The agent presents numbered candidates with a recommendation and records your
-  answer ("include 2, 5, 7"). In VS Code, a page per paper takes one key per decision.
+  answer ("include 2, 5, 7"); or screen them yourself on a page per paper, one key per decision.
+- **You check.** Each included paper gets a card (research question, X, Y, data, identification,
+  findings, limitations). The agent fills it in from the abstract or the full text; you check and
+  correct it next to the abstract, and record how it was checked.
 - **Fabrication is caught mechanically.** `priorwork check` finds author–year citations in the
   text that match no registered paper, and DOIs that point to other papers.
 - **People read only the reports.** `priorwork export` writes the version for reading (HTML);
@@ -42,13 +50,24 @@ code, so updates never conflict.
 
 ### From VS Code
 
-1. Install **Prior Work** from the Extensions view. You need **Python 3.10 or later** and **git**.
+1. Install **Prior Work** from the Extensions view. Nothing else is needed to start: the
+   extension uses Python 3.10 or later if you have it, and otherwise installs
+   [uv](https://docs.astral.sh/uv/), which downloads Python (into your home folder, without
+   administrator rights). For the writing you will want an AI agent that works in VS Code
+   (Claude Code, for example), and **git** to keep the workspace on GitHub.
 2. In the Prior Work activity bar, choose **Create a Workspace**, then an empty folder and the
    language of the reports (English or Japanese). The extension creates a `.venv` in that folder,
-   installs `priorwork` from PyPI and runs `priorwork init`.
-3. **Open .env** and set your API keys (see *API keys* below).
-4. **New Survey** → **Search** → **Screen Candidates**. Leave filling in the cards and writing to
-   your agent.
+   installs `priorwork` from PyPI and sets the workspace up.
+3. Open the **Settings** (the gear in the sidebar): add a free Semantic Scholar API key
+   (recommended), and Zotero and the SSCI list if you have them. **Save and Check the Connections**
+   tells you whether they work.
+4. **Publish it to GitHub** from the row in the sidebar, as a **private** repository. Later
+   changes are committed from VS Code's Source Control view (the agent also offers to commit at the
+   end of each step).
+5. **New Survey** → **Search** → **Screen Candidates** (or ask the agent to recommend decisions).
+6. **Ask Your Agent…** on the survey copies a request — fill in the cards, write the text, check
+   and fix — to paste into the agent's chat. Check the cards it wrote on each paper's page.
+7. **Check the Survey**, then **Export and View the Report**.
 
 What the extension does:
 
@@ -56,11 +75,17 @@ What the extension does:
   *excluded*, with include / maybe / exclude on each (several at once, too).
 - A page per paper: the abstract, the SSCI status, warnings and the scope's criteria, with **I**
   include, **M** maybe and **X** exclude (with a reason). It then moves on to the next unscreened
-  paper.
+  paper. For included papers, the page also holds the paper card, to check and correct what the
+  agent wrote (**Ctrl+S** saves it).
 - Search (by relevance, boolean bulk search, SSCI journals only), citation chasing, adding by DOI,
-  full texts, checks (in the Problems panel), the report for reading, diagnosis, `sync` and
-  `upgrade`, and moving a lit workspace.
-- When the agent changes the state from the terminal, the sidebar follows.
+  full texts, Zotero, checks (in the Problems panel), the report for reading, settings, diagnosis
+  and updates of the engine.
+- Requests for the agent, copied to paste into its chat. When the agent changes the state or the
+  report, the sidebar and the paper page follow.
+
+To continue on another machine, clone the repository in VS Code, run **Set Up the Python
+Environment** from the sidebar's menu and enter your keys in the **Settings** again (`.env` is not
+in Git).
 
 ### From the command line
 
@@ -77,7 +102,8 @@ gh repo create my-surveys --private --source=. --push   # or create it on the we
 
 Keep the workspace in a **private** GitHub repository: the reports and state files contain
 abstracts. To continue on another machine, clone it, run
-`python3 -m venv .venv && .venv/bin/pip install -r requirements.txt` and recreate `.env`.
+`python3 -m venv .venv && .venv/bin/pip install -r requirements.txt` and recreate `.env`
+(`priorwork settings` shows what is set).
 
 `--lang` is the workspace's language: the headings of the reports, `AGENTS.md` and the skills. It
 is fixed when the workspace is created. The language of the command's messages is separate: it is
@@ -125,33 +151,10 @@ It rewrites `requirements.txt`, runs `pip install` and syncs `AGENTS.md` and the
 `priorwork sync` overwrites only files it wrote itself; anything else is left alone unless you
 pass `--force`.
 
-### Moving a workspace from lit
-
-Prior Work was developed under the name `lit`. A lit workspace (`.lit/`, `./lit`) moves like this;
-opened in VS Code, the sidebar offers **Move to Prior Work** (and installs priorwork into `.venv`
-first if needed).
-
-```bash
-.venv/bin/pip install priorwork
-.venv/bin/priorwork migrate
-git status                                      # review the moves and commit them
-```
-
-- `.lit/` becomes `.priorwork/` (state, caches, the sync record); the workspace's language is Japanese.
-- `./lit` is replaced by `./priorwork`; `litsurvey @ git+…` in `requirements.txt` becomes
-  `priorwork==X.Y.Z`, and lit's block in `.gitignore` is replaced.
-- The markers of the managed blocks in the reports (`<!-- BEGIN lit:… -->`) become
-  `<!-- BEGIN priorwork:… -->`; the text and the cards you wrote stay as they are.
-  `<!-- lit:ignore-citation … -->` still works.
-- Rename `LIT_MAX_RETRIES` and the like in `.env` to `PRIORWORK_…` (`doctor` points them out).
-
-The even older template (`surveys/` holding both md and json, with a copy of the code in
-`litsurvey/`) moves with `priorwork migrate [--clean]`; `--clean` deletes the copied code. Old
-files that are overwritten are kept in `.priorwork/cache/migrate-backup/`.
-
 ### API keys
 
-They go into the workspace's `.env`.
+They go into the workspace's `.env` (kept out of Git). In VS Code, set them on the **Settings** page;
+on the command line, edit `.env` or pipe JSON into `priorwork settings --stdin`.
 
 | Variable | Purpose |
 | :--- | :--- |
@@ -184,8 +187,8 @@ https://example.com/nextcloud/remote.php/dav/files/<user>/zotero/
 ### The SSCI journal list (recommended)
 
 Only Clarivate's [Master Journal List](https://mjl.clarivate.com/) settles whether a journal is in
-the SSCI. Download the SSCI list as CSV and put it in `.priorwork/data/` (keep the downloaded file
-name; it stays out of Git). Without it, the status is **guessed** from a built-in list of about 100
+the SSCI. Download the SSCI list as CSV and import it on the **Settings** page in VS Code, or with
+`./priorwork settings --import-ssci <CSV>` (it is copied to `.priorwork/data/`, which stays out of Git). Without it, the status is **guessed** from a built-in list of about 100
 major journals.
 
 | Shown | Meaning |
@@ -204,6 +207,7 @@ major journals.
 Open the workspace in Claude Code (or another agent) and say, for example, "I want to start a
 review on the employment effects of minimum wages." The agent follows `AGENTS.md` and uses the
 skills for each step (`.agent/skills/`); you can also call a skill directly, like `/survey-new`.
+In VS Code, **Ask Your Agent…** on a survey copies a ready-made request to paste into the chat.
 
 | Skill | What it does | What you decide |
 | :--- | :--- | :--- |
@@ -261,7 +265,7 @@ The numbers are guides, not limits. The rules and `priorwork check` are the same
 ./priorwork sync [--force|--diff]                              # update AGENTS.md, the skills and ./priorwork
 ./priorwork upgrade [--to X.Y.Z]                               # update the engine, then sync
 ./priorwork doctor [--online]                                  # diagnose the setup
-./priorwork migrate [--clean]                                  # move a lit workspace or the old layout
+./priorwork settings [--stdin] [--import-ssci CSV]             # API keys, Zotero, the SSCI list
 
 # Surveys
 ./priorwork status [SURVEY]                                    # the list / progress and next steps
@@ -272,6 +276,7 @@ The numbers are guides, not limits. The rules and `priorwork check` are the same
 ./priorwork exclude SURVEY 3 --reason "theory only"            # an exclusion needs a reason
 ./priorwork maybe SURVEY 9          ./priorwork reset SURVEY 9 # maybe / back to candidate
 ./priorwork add SURVEY <DOI>... [--candidate]                  # register by DOI (included by default)
+./priorwork card SURVEY 3 [--set rq="..." evidence=abstract]   # show or fill in a card
 ./priorwork render SURVEY
 ./priorwork check SURVEY [--offline]
 ./priorwork export SURVEY [--format html|docx|md] [-o PATH] [--with-abstracts]
@@ -343,6 +348,10 @@ extracted text, in `.priorwork/cache/fulltext/` (outside Git):
 Publishers usually refuse automated downloads, so for papers that are not open access, attach the
 PDF in Zotero first.
 
+The list of Zotero items is kept in `.priorwork/cache/zotero/index.json`, and later runs fetch only
+what changed. Papers are matched by DOI (including `DOI: ...` in the Extra field), and by title only
+when there is no DOI.
+
 ### Checks
 
 | Check | Level |
@@ -395,7 +404,7 @@ bin/priorwork --help                # run the code of this checkout
 │   ├── cli.py                  # the commands (including --json output)
 │   ├── i18n.py / lang_ja.py    # messages: English source, Japanese catalogue
 │   ├── workspace.py            # a workspace's paths and language
-│   ├── scaffold.py             # init / sync / upgrade / migrate
+│   ├── scaffold.py             # init / sync / upgrade
 │   ├── survey.py               # the state and the generated Markdown
 │   ├── api.py                  # Semantic Scholar / OpenAlex
 │   ├── ssci.py                 # SSCI status
@@ -413,6 +422,8 @@ bin/priorwork --help                # run the code of this checkout
 
 When you change `AGENTS.md` or a skill, edit both `priorwork/assets/en/` and
 `priorwork/assets/ja/`; workspaces receive them through `priorwork sync`.
+
+Bug reports and suggestions are welcome in [Issues](https://github.com/yoshida-kd/priorwork/issues).
 
 ## License
 

@@ -4,6 +4,12 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+
+# 自動で実行するのは公開リポジトリ（yoshida-kd/priorwork）だけ（Octavo と同じ）。公開リポジトリの Actions は無料で、
+# リリースのたびに main への push で全部が実行される。非公開の開発用リポジトリ（priorwork-dev）では
+# Actions の時間を使わないよう、Actions タブの「Run workflow」で手で実行したときだけ動く。
+# だからここでマージする前に、手元でテスト（と拡張機能の vsce package）を通しておく。
 
 # テストは英語の原文を突き合わせるものと、日本語を見るもの（conftest が PRIORWORK_LANG=ja にする）がある。
 # ランナーのロケールで揺れないよう、既定はここで英語に固定する。
@@ -12,6 +18,7 @@ env:
 
 jobs:
   pytest:
+    if: github.repository == 'yoshida-kd/priorwork' || github.event_name == 'workflow_dispatch'
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -22,8 +29,8 @@ jobs:
           - os: macos-latest
             python-version: '3.14'
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
       - run: python -m pip install -e ".[dev]"
@@ -32,10 +39,11 @@ jobs:
   # pip で入れたときに同梱物（assets/）が付いてくるか。リポジトリの外で init から export まで通す
   # （中で走らせると手元の priorwork/ を拾ってしまい、wheel に入っていなくても通る）。
   package:
+    if: github.repository == 'yoshida-kd/priorwork' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.14'
       - name: Build the wheel and sdist
@@ -63,7 +71,7 @@ jobs:
             ./priorwork doctor || true
             cd /tmp
           done
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: priorwork-dist
           path: dist/*
@@ -71,13 +79,14 @@ jobs:
   # VS Code の拡張機能がコンパイルでき、.vsix にまとまるか。strict + noUnused* なので使われない変数1つでも落ちる。
   # Node 22 なのは @vscode/vsce の依存が node >= 22 を要求するため。
   extension:
+    if: github.repository == 'yoshida-kd/priorwork' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: vscode-extension
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: npm
@@ -85,7 +94,7 @@ jobs:
       - run: npm ci
       # vsce package が vscode:prepublish（compile と media の構文検査）も走らせる
       - run: npx vsce package -o priorwork.vsix
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: priorwork-vsix
           path: vscode-extension/priorwork.vsix

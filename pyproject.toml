@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "priorwork"
-version = "0.1.0"
+version = "0.1.1"
 description = "Build literature reviews for the social sciences in conversation with an AI agent (Semantic Scholar + OpenAlex + SSCI)"
 readme = "README.md"
 license = "MIT"
@@ -13,7 +13,7 @@ authors = [{ name = "yoshida-kd" }]
 requires-python = ">=3.10"
 keywords = ["literature review", "systematic review", "social science", "semantic scholar", "openalex", "ssci", "zotero"]
 classifiers = [
-  "Development Status :: 4 - Beta",
+  "Development Status :: 3 - Alpha",
   "Environment :: Console",
   "Intended Audience :: Science/Research",
   "Natural Language :: English",

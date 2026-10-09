@@ -8,9 +8,6 @@ reports/YYYYMMDD_<slug>.md     … 人が読むレポート（管理ブロック
 .priorwork/cache/              … 抽出した本文・Zotero の一覧（Git 管理外）
 .priorwork/data/               … SSCI 収録リストの CSV（Git 管理外）
 .env                           … API キー（Git 管理外）
-
-旧名 lit のワークスペース（`.lit/`）と、さらに古い構成（`surveys/` に md と json が同居）も
-ワークスペースとして見つけ、`priorwork migrate` で移すよう案内する。
 """
 
 import json
@@ -24,10 +21,6 @@ ENGINE_DIR = Path(__file__).resolve().parent
 ASSETS_DIR = ENGINE_DIR / "assets"
 
 META = ".priorwork"
-LEGACY_META = ".lit"   # 旧名 lit のワークスペース
-
-# 目印。旧構成（lit・surveys/）でもワークスペースと認識し、migrate を案内する
-_MARKERS = (META, LEGACY_META, "surveys")
 
 
 def find_root(start: Optional[Path] = None) -> Path:
@@ -37,7 +30,7 @@ def find_root(start: Optional[Path] = None) -> Path:
         return Path(env).expanduser().resolve()
     start = (start or Path.cwd()).resolve()
     for d in (start, *start.parents):
-        if any((d / m).is_dir() for m in _MARKERS):
+        if (d / META).is_dir():
             return d
     return start
 
@@ -80,9 +73,9 @@ def save_config(root: Path, config: dict):
 
 
 def workspace_lang(root: Path) -> str:
-    """ワークスペースの言語（レポートの見出し・AGENTS.md・スキル）。設定が無ければ日本語
-    （設定を持たないのは lit から移したワークスペースで、中身は日本語のため）。"""
-    return i18n.normalize(load_config(root).get("lang") or "ja")
+    """ワークスペースの言語（レポートの見出し・AGENTS.md・スキル）。`priorwork init` が config.json に書く。
+    設定が無ければ英語。"""
+    return i18n.normalize(load_config(root).get("lang") or "en")
 
 
 def assets_dir(lang: str) -> Path:

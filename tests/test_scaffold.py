@@ -53,81 +53,18 @@ def test_sync_removes_skills_that_the_engine_dropped(tmp_path):
 
 
 def test_gitignore_tracks_state_but_ignores_cache(tmp_path):
-    (tmp_path / ".gitignore").write_text(".env\n.priorwork/\ndata/*.csv\n")
+    (tmp_path / ".gitignore").write_text("notes/\n")
     scaffold.ensure_gitignore(tmp_path)
     lines = (tmp_path / ".gitignore").read_text().splitlines()
-    assert ".priorwork/" not in lines and "data/*.csv" not in lines
+    assert lines[0] == "notes/" and ".priorwork/" not in lines
     assert ".priorwork/cache/" in lines and ".priorwork/data/" in lines
     assert scaffold.ensure_gitignore(tmp_path) is False
-
-
-def legacy_workspace(root):
-    (root / "surveys").mkdir(parents=True)
-    (root / "surveys" / "20260101_topic.md").write_text("# report")
-    (root / "surveys" / "20260101_topic.json").write_text("{}")
-    (root / "surveys" / ".gitkeep").write_text("")
-    (root / "data").mkdir()
-    (root / "data" / "SSCI.csv").write_text("Journal title\n")
-    (root / ".lit" / "fulltext").mkdir(parents=True)          # この頃は .lit/ 直下に本文を置いていた
-    (root / ".lit" / "fulltext" / "001.txt").write_text("text")
-    (root / "AGENTS.md").write_text("old template rules")
-    (root / ".gitignore").write_text(".lit/\n")
-
-
-def test_migrate_moves_legacy_layout(tmp_path):
-    legacy_workspace(tmp_path)
-    assert scaffold.is_legacy(tmp_path)
-
-    out = scaffold.migrate(tmp_path)
-    assert (tmp_path / "reports" / "20260101_topic.md").read_text() == "# report"
-    assert (tmp_path / ".priorwork" / "surveys" / "20260101_topic.json").exists()
-    assert (tmp_path / ".priorwork" / "cache" / "fulltext" / "001.txt").exists()
-    assert (tmp_path / ".priorwork" / "data" / "SSCI.csv").exists()
-    assert not (tmp_path / "surveys").exists() and not (tmp_path / "data").exists()
-    assert not scaffold.is_legacy(tmp_path)
-    assert (tmp_path / ".priorwork" / "cache" / "migrate-backup" / "AGENTS.md").read_text() == "old template rules"
-    assert (tmp_path / "AGENTS.md").read_text() != "old template rules"
-    assert ".lit/" not in (tmp_path / ".gitignore").read_text().splitlines()
-    assert not (tmp_path / ".lit").exists()
-    assert out["moved"]
-
-
-def test_migrate_refuses_to_overwrite_and_changes_nothing(tmp_path):
-    legacy_workspace(tmp_path)
-    (tmp_path / "reports").mkdir()
-    (tmp_path / "reports" / "20260101_topic.md").write_text("already here")
-    with pytest.raises(scaffold.ScaffoldError):
-        scaffold.migrate(tmp_path)
-    assert (tmp_path / "surveys" / "20260101_topic.json").exists()
-
-
-def test_migrate_clean_removes_only_copied_engine_files(tmp_path):
-    legacy_workspace(tmp_path)
-    (tmp_path / "litsurvey").mkdir()
-    (tmp_path / "litsurvey" / "__init__.py").write_text("")
-    (tmp_path / "templates").mkdir()
-    (tmp_path / "templates" / "literature_review.md").write_text("")
-    (tmp_path / "pyproject.toml").write_text("")
-
-    assert scaffold.migrate(tmp_path)["leftover"]
-    assert (tmp_path / "litsurvey").exists()
-    scaffold.migrate(tmp_path, clean=True)
-    assert not (tmp_path / "litsurvey").exists() and not (tmp_path / "templates").exists()
-    assert (tmp_path / "reports" / "20260101_topic.md").exists()
-
-
-def test_clean_ignores_a_directory_that_is_not_a_copied_template(tmp_path):
-    (tmp_path / "litsurvey").mkdir()
-    (tmp_path / "litsurvey" / "__init__.py").write_text("")
-    assert scaffold.leftover_engine_files(tmp_path) == []
 
 
 def test_engine_repo_itself_is_never_rewritten():
     from priorwork.workspace import ENGINE_DIR
     with pytest.raises(scaffold.ScaffoldError):
         scaffold.sync(ENGINE_DIR.parent)
-    with pytest.raises(scaffold.ScaffoldError):
-        scaffold.migrate(ENGINE_DIR.parent)
 
 
 def test_init_pins_engine_to_the_current_release(tmp_path):
@@ -140,12 +77,6 @@ def test_pin_requirements_replaces_only_the_engine_line(tmp_path):
     (tmp_path / "requirements.txt").write_text("pandas\npriorwork==0.3.0\n")
     line = scaffold.pin_requirements(tmp_path, "v0.10.0")
     assert (tmp_path / "requirements.txt").read_text() == f"pandas\n{line}\n" and line == "priorwork==0.10.0"
-
-
-def test_pin_requirements_replaces_the_line_of_lit(tmp_path):
-    (tmp_path / "requirements.txt").write_text("litsurvey @ git+https://github.com/yoshida-kd/lit.git@v0.3.0\npandas\n")
-    scaffold.pin_requirements(tmp_path, "0.2.0")
-    assert (tmp_path / "requirements.txt").read_text() == "priorwork==0.2.0\npandas\n"
 
 
 def test_latest_version_comes_from_pypi(monkeypatch):

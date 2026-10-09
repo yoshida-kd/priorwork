@@ -3,6 +3,41 @@
 Prior Work's command-line tool (`priorwork` on PyPI) and this extension are
 released together, under one version number.
 
+## 0.1.1
+
+- A guide and a web page: <https://yoshida-kd.github.io/priorwork/>.
+- Nothing but the extension is needed to start: when Python 3.10 or later is
+  not found, it offers to install uv, which downloads Python for the
+  workspace's `.venv`.
+- The paper page shows the card of an included paper and lets you fill it in:
+  the evidence level and each field, saved with **Ctrl+S**. Changes not yet
+  saved are kept while you move between papers. The comparison matrix is
+  regenerated on save.
+- **Settings** page (the gear in the sidebar): the API keys, Zotero and WebDAV,
+  importing the SSCI list, and a connection check, without opening `.env`.
+  Keys are never shown. `priorwork settings` does the same from the command
+  line (`--stdin` takes the values as JSON, `--import-ssci CSV`).
+- The next step *Add papers to Zotero* no longer opens a terminal: it copies
+  the DOIs of the included papers missing from Zotero (to paste into Zotero's
+  *Add Item by Identifier*) and reloads the library. No step opens a terminal
+  any more.
+- When the workspace is not on GitHub yet, the sidebar offers to publish it as
+  a private repository (through VS Code's *Publish to GitHub*).
+  `priorwork status --json` has a new `git` key (`repo`, `remote`).
+- **Ask Your Agent…** (on a survey, on the paper page and in the next steps)
+  copies a request — fill in the cards, recommend decisions, chase citations,
+  write the text, check and fix — to paste into your agent's chat. Nothing is
+  sent anywhere by the extension.
+- `priorwork card SURVEY N [--set KEY=VALUE ...]` shows or fills in a card
+  (`--json` for the extension).
+- Removed `priorwork migrate` and **Move a lit Workspace to Prior Work**, with
+  everything that recognised workspaces of lit (Prior Work's unpublished former
+  name). No published version ever wrote that layout.
+- A workspace with no `.priorwork/config.json` is now taken to be in English
+  (it was Japanese). `priorwork init` always writes the setting, so only a
+  workspace that lost the file is affected.
+- `priorwork status --json` no longer has the `legacy` key.
+
 ## 0.1.0
 
 First release of **Prior Work**. (It was developed as `lit` and never
