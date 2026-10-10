@@ -29,6 +29,8 @@ export interface SurveySummary {
     depth: string;
     lang: string;
     report: string;
+    /** 原稿から始めたサーベイの原稿のパス（0.1.4 から。古い CLI には無い） */
+    manuscript?: string | null;
     counts: Counts;
     searches: number;
 }

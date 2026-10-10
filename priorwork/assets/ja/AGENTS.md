@@ -18,6 +18,7 @@
 ## ディレクトリ
 
 - `reports/YYYYMMDD_<slug>.md` … 作業用のレポート（管理ブロックや記入欄を含む）。エージェントが書く。
+- `reports/YYYYMMDD_<slug>.draft.md` … 原稿から作ったサーベイで `./priorwork export --draft` が作る、原稿の 1〜3 章の下書き（参考文献つき）。
 - `reports/YYYYMMDD_<slug>.html` … `./priorwork export` が作る**読むための版。人が読むのはこれ**。
   未記入・未確認・`check` の ERROR が残っていると、冒頭に「下書き」と表示される。
 - `.priorwork/surveys/YYYYMMDD_<slug>.json` … 論文の候補・採否・検索履歴（状態）。`./priorwork` だけが書き換える。
@@ -48,6 +49,9 @@
 | 引用をたどって見落としを補う | `priorwork-snowball` | `snowball` |
 | 各論文カードの記入 | `priorwork-extract` | `fulltext`, `card`, `render` |
 | 検査と修正・書き出し | `priorwork-check` | `check`, `export` |
+| 分析まで済んだ原稿の 1〜3 章を書く | `priorwork-manuscript` | `new --manuscript`, `card --set role=…`, `export --draft` |
+
+ユーザーが自分の原稿（分析まで書いたもの）を示して、イントロ・先行研究・理論と仮説や、それを支える文献を求めたら、`priorwork-manuscript` の手順で進める。原稿は読むだけで、書き換えない。
 
 ## 深さ（quick / full）
 
@@ -103,8 +107,8 @@ Zotero への書き込みはユーザーが手作業で行う。エージェン�
 
 ```bash
 ./priorwork status [SURVEY]          # 一覧 / 進捗と次にやること
-./priorwork new "<テーマ>" --slug <slug> [--depth quick|full] [--question ... --years ... --fields ... --inclusion ... --exclusion ...]
-./priorwork scope SURVEY [--question ...] [--depth quick|full]
+./priorwork new "<テーマ>" --slug <slug> [--depth quick|full] [--manuscript PATH] [--question ... --years ... --fields ... --inclusion ... --exclusion ...]
+./priorwork scope SURVEY [--question ...] [--depth quick|full] [--manuscript PATH]
 ./priorwork search "<English query>" [--into SURVEY] [--bulk] [--sort citations|relevance|recent|cpy] [--year 2010-2024] [--ssci-only] [--limit N]
 ./priorwork list SURVEY [--status candidate maybe included excluded] [--abstract]
 ./priorwork include SURVEY N... --reason "..."   ./priorwork exclude SURVEY N... --reason "..."   ./priorwork maybe SURVEY N... --reason "..."   ./priorwork reset SURVEY N...
@@ -115,6 +119,7 @@ Zotero への書き込みはユーザーが手作業で行う。エージェン�
 ./priorwork render SURVEY
 ./priorwork check SURVEY [--offline]
 ./priorwork export SURVEY [--format html|docx|md] [--with-abstracts]   # 読むための版を書き出す
+./priorwork export SURVEY --draft [--format md|docx|html]             # 原稿の 1〜3 章の下書き（原稿から作ったサーベイ）
 ./priorwork zotero [SURVEY] [--collections] [--collection NAME] [--import] [--dois]
 ./priorwork get <DOI>      ./priorwork citations <DOI> [--sort cited]      ./priorwork references <DOI> [--sort cited]      ./priorwork journal "<誌名>"
 ./priorwork doctor [--online]        # 設定の診断（動作がおかしいとき）

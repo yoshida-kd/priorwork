@@ -4,7 +4,8 @@ description: >-
   The entry point of Priorwork. Makes or continues a social-science literature survey end to end with
   `./priorwork` (scope, searches, screening, citation chasing, paper cards, text, check, export) without
   waiting between steps. Use whenever the user asks, in any words or language, for a literature survey,
-  literature review or prior work on a topic, or to continue, finish or improve an existing survey.
+  literature review or prior work on a topic, for the literature behind their own manuscript, or to
+  continue, finish or improve an existing survey.
 ---
 
 # サーベイを作る・続ける（入口）
@@ -12,6 +13,7 @@ description: >-
 ルールは [AGENTS.md](../../../AGENTS.md) に従う。ユーザーはスキル名を打たずに頼むので、依頼の言葉から次のどれかを判断する。
 
 - 新しいテーマ（「〇〇について先行研究をまとめて」）→ 1 から
+- 自分の原稿の補強（「分析はできているので、イントロ・先行研究・仮説を書いて」「この論文の先行研究を固めて」）→ スキル `priorwork-manuscript`。原稿から作ったサーベイ（`./priorwork status <survey>` に「原稿:」と出る）を続けるときも同じ
 - 既存のサーベイの続き（「続けて」「仕上げて」）→ 2 から
 - 一部だけ（「もっと検索して」「カードを埋めて」「検査して」）→ 該当する工程のスキルだけ
 
@@ -40,7 +42,7 @@ description: >-
 
 ## 3. 文章を書く
 
-レポートの 1 章（背景）と 4〜7 章（理論の潮流・実証手法の変遷・合意と論争・まとめ）を、カードをもとに書く。
+原稿から作ったサーベイは、`priorwork-manuscript` の 5 で書く。それ以外は、レポートの 1 章（背景）と 4〜7 章（理論の潮流・実証手法の変遷・合意と論争・まとめ）を、カードをもとに書く。
 
 - 引用するのは、サーベイに採用した論文だけ。著者 (年) の表記は 8 章の参照文献に合わせる。
 - カードに書かれていないこと（推定値・期間など）を文章に足さない。

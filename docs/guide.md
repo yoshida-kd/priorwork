@@ -265,6 +265,39 @@ choose a collection you made in Zotero (or tell the agent "use my Zotero collect
   scope.
 - Full texts come from the PDFs in that collection first.
 
+### 4.8 Write sections 1–3 of a manuscript whose analysis is done
+
+You can also start from your own manuscript instead of a topic. Put a manuscript with the data and
+methods and the analysis written into the workspace (e.g. `manuscript/paper.md`; .docx, .tex and .pdf
+are fine too) and ask your agent:
+
+> manuscript/paper.md is written up to the analysis. Gather the literature to back it up and write the
+> introduction, literature review and theory and hypotheses.
+
+The agent then:
+
+1. Reads the manuscript and writes "The manuscript in brief" in the report (research question,
+   variables, data, identification, main results, unexpected results).
+2. Lists, with IDs, the claims that need literature (why it matters, the lines of research it
+   contributes to, mechanisms, rival theories, precedents for the methods). For each main result it also
+   makes a claim for **the findings that conflict with it**.
+3. Searches and screens claim by claim, and fills in each card's **Role in the manuscript** (e.g. "C2
+   supports; method precedent"). The comparison matrix gets a Role column too.
+4. Drafts the introduction, literature review and theory and hypotheses in the language of the
+   manuscript, citing only included papers.
+5. Checks the survey and writes the draft to `reports/<name>.draft.md`, with the references it cites
+   (`--format docx` for Word).
+
+Writing hypotheses after seeing the results easily turns into hypothesizing after the results are known
+(HARKing). So the report records, in a section apart from the draft, the literature behind each
+hypothesis, what was added or changed after seeing the results, which results to treat as exploratory,
+and how conflicting literature is handled. That section is for you to judge; it is not part of the
+exported draft. The manuscript itself is never rewritten. Read and edit the draft before moving it into
+your manuscript.
+
+On the command line: `./priorwork new "<topic>" --slug <slug> --manuscript manuscript/paper.md`, then
+`./priorwork export SURVEY --draft`.
+
 ---
 
 ## 5. Doing it yourself
@@ -480,8 +513,9 @@ major journals.
 The workspace carries instructions for agents (`AGENTS.md`) and a skill for each step (`.agent/skills/`,
 also seen through `.claude/skills/`). The entry point is the `priorwork` skill: it looks at the state and
 goes on to the skill of the next step (`priorwork-new`, `priorwork-screen`, `priorwork-snowball`,
-`priorwork-extract`, `priorwork-check`). The agent picks them from the words of your request, so there
-are no names to remember.
+`priorwork-extract`, `priorwork-check`). To write sections 1–3 of a manuscript, it uses
+`priorwork-manuscript` ([4.8](#48-write-sections-13-of-a-manuscript-whose-analysis-is-done)). The agent
+picks them from the words of your request, so there are no names to remember.
 
 Instructions for one workspace only (fields to prefer, writing style, journals to leave out, "ask me
 before deciding each paper", …) go in `AGENTS.local.md`. `AGENTS.md` and the skills are rewritten to

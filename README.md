@@ -221,6 +221,19 @@ on a survey copy ready-made requests.
 | `priorwork-snowball` | chases the references and citations of the included papers |
 | `priorwork-extract` | gets the full texts and fills in the paper cards (RQ, identification, …) |
 | `priorwork-check` | checks the survey, fixes what it finds and exports the report |
+| `priorwork-manuscript` | reads a manuscript whose analysis is done, gathers the literature that supports and conflicts with it, and drafts its sections 1–3 (introduction, literature review, theory and hypotheses) |
+
+### From a manuscript whose analysis is done
+
+If you have a manuscript with the data and methods and the analysis written, put it in the workspace
+and ask "write the introduction, literature review and hypotheses of this manuscript". The agent works
+out from the manuscript which claims need literature (why it matters, lines of research, mechanisms,
+precedents for the methods), searches claim by claim, including findings that conflict with your
+results, fills in each card's "Role in the manuscript", and drafts sections 1–3 in the language of the
+manuscript (`./priorwork new … --manuscript <manuscript>`). `./priorwork export SURVEY --draft` writes
+the draft to `reports/<name>.draft.md`, with the references it cites. So that the hypotheses are not
+written after the fact, the report records separately the literature behind each hypothesis and which
+results to treat as exploratory. The manuscript itself is never rewritten.
 
 The agent decides on its own by default. To decide the scope and each paper yourself, ask it to go
 through it together with you, or write that in `AGENTS.local.md`. When you come back, say "let's

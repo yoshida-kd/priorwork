@@ -146,7 +146,9 @@ export function activate(context: vscode.ExtensionContext): void {
             screen: L.t('Screen the candidates of the survey "{0}" ({1}) with Priorwork against its criteria, recording a reason for each decision.', s.topic, s.name),
             snowball: L.t('Chase the citations of the included papers of the survey "{0}" ({1}) with Priorwork and screen the new candidates.', s.topic, s.name),
             fill: L.t('Fill in the paper cards of the survey "{0}" ({1}) with Priorwork: {2}. Write only what the abstract or the full text says, and update the evidence level.', s.topic, s.name, which),
-            write: L.t('Write the text of the report of the survey "{0}" ({1}): the background (section 1) and sections 4 to 7, based on the paper cards. Cite only papers registered in the survey, and run ./priorwork check at the end.', s.topic, s.name),
+            write: s.manuscript
+                ? L.t('Write the draft of the introduction, literature review and theory and hypotheses of my manuscript ({0}) from the survey "{1}" ({2}), in the language of the manuscript. Cite only papers included in the survey, show where the literature disagrees with my results, run ./priorwork check and export the draft with ./priorwork export {2} --draft.', s.manuscript, s.topic, s.name)
+                : L.t('Write the text of the report of the survey "{0}" ({1}): the background (section 1) and sections 4 to 7, based on the paper cards. Cite only papers registered in the survey, and run ./priorwork check at the end.', s.topic, s.name),
             check: L.t('Check the survey "{0}" ({1}) with Priorwork, fix what it finds and export the report.', s.topic, s.name),
         }[task];
         await copyForAgent(text);
@@ -427,7 +429,9 @@ export function activate(context: vscode.ExtensionContext): void {
                     { label: L.t('Screen the candidates'), description: L.t('decisions with reasons'), task: 'screen' },
                     { label: L.t('Chase citations'), description: L.t('snowball, then screening'), task: 'snowball' },
                     { label: L.t('Fill in the paper cards'), description: L.t('from the abstracts or full texts'), task: 'fill' },
-                    { label: L.t('Write the text of the report'), description: L.t('sections 1 and 4–7'), task: 'write' },
+                    s.manuscript
+                        ? { label: L.t('Write the draft of the manuscript'), description: L.t('introduction, literature review, hypotheses'), task: 'write' }
+                        : { label: L.t('Write the text of the report'), description: L.t('sections 1 and 4–7'), task: 'write' },
                     { label: L.t('Check and fix'), description: L.t('then export the report'), task: 'check' },
                 ];
                 task = (await vscode.window.showQuickPick(items, { placeHolder: L.t('What should your agent do?') }))?.task;
@@ -905,6 +909,8 @@ export function activate(context: vscode.ExtensionContext): void {
                 case 'export': return vscode.commands.executeCommand('priorwork.exportReport', s.name);
                 case 'fill':
                     return vscode.commands.executeCommand('priorwork.askAgent', { name: s.name, task: 'fill' });
+                case 'draft':
+                    return vscode.commands.executeCommand('priorwork.askAgent', { name: s.name, task: 'write' });
                 case 'zotero': return zoteroMissing(s);
                 default:   // 拡張機能がまだ知らない工程（CLI のほうが新しいとき）。ターミナルは開かず、出力パネルに出す
                     try {

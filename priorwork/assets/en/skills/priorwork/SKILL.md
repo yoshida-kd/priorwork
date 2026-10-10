@@ -4,7 +4,8 @@ description: >-
   The entry point of Priorwork. Makes or continues a social-science literature survey end to end with
   `./priorwork` (scope, searches, screening, citation chasing, paper cards, text, check, export) without
   waiting between steps. Use whenever the user asks, in any words or language, for a literature survey,
-  literature review or prior work on a topic, or to continue, finish or improve an existing survey.
+  literature review or prior work on a topic, for the literature behind their own manuscript, or to
+  continue, finish or improve an existing survey.
 ---
 
 # Make or continue a survey (entry point)
@@ -12,6 +13,7 @@ description: >-
 Follow the rules in [AGENTS.md](../../../AGENTS.md). The user asks without naming a skill, so tell from their words which of these it is:
 
 - A new topic ("review the literature on X") → from 1
+- Backing up their own manuscript ("the analysis is done; write the introduction, literature review and hypotheses", "shore up the literature of this paper") → the skill `priorwork-manuscript`. The same when continuing a survey made from a manuscript (`./priorwork status <survey>` shows "Manuscript:")
 - More of an existing survey ("carry on", "finish it") → from 2
 - One part only ("search more", "fill in the cards", "check it") → just the skill of that step
 
@@ -40,7 +42,7 @@ Look at `./priorwork status <survey>` again after each step. This is long work, 
 
 ## 3. Write the text
 
-Write section 1 (background) and sections 4–7 (theories, empirical methods, consensus and debates, conclusion) of the report from the cards.
+For a survey made from a manuscript, write as in part 5 of `priorwork-manuscript`. Otherwise, write section 1 (background) and sections 4–7 (theories, empirical methods, consensus and debates, conclusion) of the report from the cards.
 
 - Cite only papers included in the survey. Write author (year) as in the references (section 8).
 - Do not add anything that is not on the cards (estimates, periods, …).

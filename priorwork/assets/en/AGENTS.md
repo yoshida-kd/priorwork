@@ -18,6 +18,7 @@ You are the research assistant: you find, select and record literature with the 
 ## Directories
 
 - `reports/YYYYMMDD_<slug>.md` … the working report (with managed blocks and card fields). The agent writes it.
+- `reports/YYYYMMDD_<slug>.draft.md` … for a survey made from a manuscript, the draft of the manuscript's sections 1–3 (with references), made by `./priorwork export --draft`.
 - `reports/YYYYMMDD_<slug>.html` … **the version for reading, made by `./priorwork export`. This is what people read.**
   If fields are empty, papers are unchecked or `check` still reports ERRORs, it is marked "Draft" at the top.
 - `.priorwork/surveys/YYYYMMDD_<slug>.json` … candidates, decisions and the search log (the state). Only `./priorwork` changes it.
@@ -48,6 +49,9 @@ The entry point is the `priorwork` skill. It looks at the state and follows the 
 | Chase citations to find what was missed | `priorwork-snowball` | `snowball` |
 | Fill in the paper cards | `priorwork-extract` | `fulltext`, `card`, `render` |
 | Check, fix and export | `priorwork-check` | `check`, `export` |
+| Write sections 1–3 of a manuscript whose analysis is done | `priorwork-manuscript` | `new --manuscript`, `card --set role=…`, `export --draft` |
+
+When the user points to their own manuscript (written up to the analysis) and asks for its introduction, literature review, theory and hypotheses, or the literature behind it, follow `priorwork-manuscript`. Only read the manuscript; do not rewrite it.
 
 ## Depth (quick / full)
 
@@ -103,8 +107,8 @@ The user adds to Zotero by hand. The agent never writes to Zotero.
 
 ```bash
 ./priorwork status [SURVEY]          # the list / progress and next steps
-./priorwork new "<topic>" --slug <slug> [--depth quick|full] [--question ... --years ... --fields ... --inclusion ... --exclusion ...]
-./priorwork scope SURVEY [--question ...] [--depth quick|full]
+./priorwork new "<topic>" --slug <slug> [--depth quick|full] [--manuscript PATH] [--question ... --years ... --fields ... --inclusion ... --exclusion ...]
+./priorwork scope SURVEY [--question ...] [--depth quick|full] [--manuscript PATH]
 ./priorwork search "<English query>" [--into SURVEY] [--bulk] [--sort citations|relevance|recent|cpy] [--year 2010-2024] [--ssci-only] [--limit N]
 ./priorwork list SURVEY [--status candidate maybe included excluded] [--abstract]
 ./priorwork include SURVEY N... --reason "..."   ./priorwork exclude SURVEY N... --reason "..."   ./priorwork maybe SURVEY N... --reason "..."   ./priorwork reset SURVEY N...
@@ -115,6 +119,7 @@ The user adds to Zotero by hand. The agent never writes to Zotero.
 ./priorwork render SURVEY
 ./priorwork check SURVEY [--offline]
 ./priorwork export SURVEY [--format html|docx|md] [--with-abstracts]   # write the version for reading
+./priorwork export SURVEY --draft [--format md|docx|html]             # the draft of the manuscript's sections 1–3 (a survey made from a manuscript)
 ./priorwork zotero [SURVEY] [--collections] [--collection NAME] [--import] [--dois]
 ./priorwork get <DOI>      ./priorwork citations <DOI> [--sort cited]      ./priorwork references <DOI> [--sort cited]      ./priorwork journal "<journal>"
 ./priorwork doctor [--online]        # diagnose the setup (when something is wrong)

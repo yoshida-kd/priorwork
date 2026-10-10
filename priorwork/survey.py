@@ -52,6 +52,9 @@ CARD_FIELDS = [
 ]
 BIBLIO_LABEL = "Source"
 MATRIX_FIELDS = ["rq", "x", "y", "data", "method", "findings", "limits"]
+# 原稿から始めるサーベイ（`new --manuscript`）だけのカードの記入欄: 論文が原稿のどの主張を支える・食い違うか
+ROLE_FIELD = ("role", "Role in the manuscript")
+MANUSCRIPT_CARD_FIELDS = [CARD_FIELDS[0], ROLE_FIELD, *CARD_FIELDS[1:]]
 
 # 確認レベル。キーは状態の判定に使い、表記はサーベイの言語で書く（読むときは両方の言語を受け付ける）
 EVIDENCE_UNCHECKED, EVIDENCE_ABSTRACT, EVIDENCE_FULLTEXT = "unchecked", "abstract", "fulltext"
@@ -211,14 +214,15 @@ class Survey:
     @classmethod
     def create(cls, topic: str, slug: str, scope: Dict[str, str], today: Optional[date] = None,
                reports_dir: Optional[Path] = None, state_dir: Optional[Path] = None,
-               template: Optional[Path] = None, depth: str = DEFAULT_DEPTH, lang: Optional[str] = None) -> "Survey":
+               template: Optional[Path] = None, depth: str = DEFAULT_DEPTH, lang: Optional[str] = None,
+               manuscript: Optional[str] = None) -> "Survey":
         if depth not in DEPTHS:
             raise SurveyError(t("depth is one of {choices}: {depth}", choices=" / ".join(DEPTHS), depth=depth))
         lang = i18n.normalize(lang or workspace_lang(ROOT))
         today = today or date.today()
         reports_dir = reports_dir or REPORTS_DIR
         state_dir = state_dir or STATE_DIR
-        template = template or template_path(lang)
+        template = template or template_path(lang, manuscript=bool(manuscript))
         slug = sanitize_slug(slug) or "survey"
         md_path = reports_dir / f"{today.strftime('%Y%m%d')}_{slug}.md"
         json_path = state_dir / f"{md_path.stem}.json"
@@ -235,6 +239,8 @@ class Survey:
             "papers": {},
             "searches": [],
         }
+        if manuscript:
+            data["manuscript"] = manuscript_ref(manuscript, reports_dir.parent)
         survey = cls(md_path, data, json_path)
         values = {"topic": topic, "topic_yaml": topic.replace("\\", "\\\\").replace('"', '\\"'),
                   "date": today.isoformat()}
@@ -388,6 +394,29 @@ class Survey:
         else:
             self.data.pop("zotero_collection", None)
 
+    @property
+    def root(self) -> Path:
+        """ワークスペースの根（reports/ の親）。"""
+        return self.md_path.parent.parent
+
+    @property
+    def manuscript(self) -> str:
+        """原稿のパス（ワークスペースからの相対。外ならそのまま）。原稿から始めるサーベイでなければ空。"""
+        return self.data.get("manuscript") or ""
+
+    def set_manuscript(self, path: str):
+        """原稿を結び付ける（キーは任意。無い状態ファイルもそのまま読める）。"""
+        self.data["manuscript"] = manuscript_ref(path, self.root)
+
+    @property
+    def card_spec(self) -> List[Tuple[str, str]]:
+        """このサーベイのカードの記入欄。原稿から始めるサーベイには「原稿での役割」がある。"""
+        return MANUSCRIPT_CARD_FIELDS if self.manuscript else CARD_FIELDS
+
+    @property
+    def matrix_fields(self) -> List[str]:
+        return (["role"] if self.manuscript else []) + MATRIX_FIELDS
+
     def update_scope(self, **scope: Optional[str]):
         for k, v in scope.items():
             if v is not None:
@@ -416,10 +445,10 @@ class Survey:
     def set_card(self, number: int, values: Dict[str, str]) -> bool:
         """カードの記入欄を書き換え、マトリクスなどを再生成する。確認レベルはキー（unchecked など）で渡す。変更があれば True。"""
         key = self._card_key(number)
-        unknown = sorted(set(values) - {k for k, _ in CARD_FIELDS})
+        unknown = sorted(set(values) - {k for k, _ in self.card_spec})
         if unknown:
             raise SurveyError(t("Unknown card fields: {names} (use {known})", names=", ".join(unknown),
-                                known=", ".join(k for k, _ in CARD_FIELDS)))
+                                known=", ".join(k for k, _ in self.card_spec)))
         values = dict(values)
         if "evidence" in values:
             if values["evidence"] not in EVIDENCE_KEYS:
@@ -474,7 +503,7 @@ class Survey:
                 cards[new] = cards.pop(old)
             cards.pop(old, None)
         for e in included:
-            body = cards.get(e["key"]) or e.pop("card_archive", None) or new_card_body(e["record"], lang)
+            body = cards.get(e["key"]) or e.pop("card_archive", None) or new_card_body(e["record"], lang, self.card_spec)
             bodies[e["key"]] = body
             card_texts.append(card_block(e, body, labels[e["key"]], lang))
         # 採用から外れた論文のカードは、記入内容を失わないよう状態ファイルに退避する
@@ -491,12 +520,24 @@ class Survey:
         none_yet = "*" + tl(lang, "(No included papers yet)") + "*"
         rendered = {
             "scope": render_scope(self.data, lang),
-            "matrix": render_matrix(included, fields, labels, lang),
+            "matrix": render_matrix(included, fields, labels, lang, role=bool(self.manuscript)),
             "papers": "\n\n".join(card_texts) if card_texts else none_yet,
             "references": render_references(included, labels, lang),
             "log": render_log(self.data, self.papers, lang),
         }
         return replace_blocks(md, rendered)
+
+
+def manuscript_ref(path: str, root: Path) -> str:
+    """原稿のパスを確かめ、ワークスペースからの相対パス（外なら絶対パス）にする。"""
+    p = Path(path).expanduser()
+    p = (p if p.is_absolute() else Path.cwd() / p).resolve()
+    if not p.is_file():
+        raise SurveyError(t("The manuscript is not found: {path}", path=path))
+    try:
+        return p.relative_to(root.resolve()).as_posix()
+    except ValueError:
+        return str(p)
 
 
 def _chronological(e: Dict[str, Any]):
@@ -576,7 +617,7 @@ def parse_cards(papers_block: str) -> Dict[str, str]:
 
 def _field_stems() -> List[Tuple[str, str]]:
     """(ラベルの括弧前の部分, キー)。両方の言語。長いものから照合する（"RQ" と "Data" などの前方一致の取り違え防止）。"""
-    stems = {(_label_stem(tl(lang, label)), key) for key, label in CARD_FIELDS for lang in i18n.LANGS}
+    stems = {(_label_stem(tl(lang, label)), key) for key, label in MANUSCRIPT_CARD_FIELDS for lang in i18n.LANGS}
     return sorted(stems, key=lambda s: -len(s[0]))
 
 
@@ -635,7 +676,7 @@ def card_values(body: str) -> Dict[str, str]:
 def set_card_fields(body: str, values: Dict[str, str], lang: str) -> str:
     """記入欄を書き換えたカード本文（card_values の逆）。ほかの行はそのまま。消されていた欄は最後の欄の後ろに足す。"""
     lines = body.splitlines()
-    labels = dict(CARD_FIELDS)
+    labels = dict(MANUSCRIPT_CARD_FIELDS)
     for key, value in values.items():
         spans = _field_spans(lines)
         parts = value.replace("\r\n", "\n").split("\n")
@@ -650,9 +691,9 @@ def set_card_fields(body: str, values: Dict[str, str], lang: str) -> str:
     return "\n".join(lines)
 
 
-def new_card_body(record: Dict[str, Any], lang: str) -> str:
+def new_card_body(record: Dict[str, Any], lang: str, fields: Optional[List[Tuple[str, str]]] = None) -> str:
     lines = []
-    for key, label in CARD_FIELDS:
+    for key, label in fields or CARD_FIELDS:
         value = evidence_label(EVIDENCE_UNCHECKED, lang) if key == "evidence" else ""
         lines.append(f"- **{tl(lang, label)}**: {value}".rstrip())
     summary = []
@@ -701,6 +742,8 @@ def render_scope(data: Dict[str, Any], lang: str) -> str:
                  else tl(lang, "guessed from the journal name with the built-in list of major journals (verify)"))
     unset = tl(lang, "(not set — set it with `priorwork scope`)")
     lines = [f"- **{tl(lang, k)}**: {v or unset}" for k, v in rows]
+    if data.get("manuscript"):
+        lines.append(f"- **{tl(lang, 'Manuscript')}**: `{data['manuscript']}`")
     depth = data.get("depth", DEFAULT_DEPTH)
     lines.append(f"- **{tl(lang, 'Depth')}**: {depth} — {tl(lang, DEPTHS[depth])}")
     lines.append(f"- **{tl(lang, 'Basis of the SSCI status')}**: {ssci_text}")
@@ -708,12 +751,17 @@ def render_scope(data: Dict[str, Any], lang: str) -> str:
 
 
 def render_matrix(included: List[Dict[str, Any]], fields: Dict[str, Dict[str, str]],
-                  labels: Optional[Dict[str, str]], lang: str) -> str:
+                  labels: Optional[Dict[str, str]], lang: str, role: bool = False) -> str:
+    """比較マトリクス。role（原稿から始めるサーベイ）なら、雑誌の次に「役割」の列を置く。"""
     labels = labels or {}
-    header = ("| " + " | ".join(tl(lang, h) for h in MATRIX_HEADS) + " |\n"
-              "| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |")
+    heads = [tl(lang, h) for h in MATRIX_HEADS]
+    keys = MATRIX_FIELDS
+    if role:
+        heads.insert(2, tl(lang, "Role"))
+        keys = ["role", *MATRIX_FIELDS]
+    header = "| " + " | ".join(heads) + " |\n|" + " :--- |" * len(heads)
     if not included:
-        return header + "\n| " + tl(lang, "(No included papers yet)") + " | | | | | | | | | |"
+        return header + "\n| " + tl(lang, "(No included papers yet)") + " |" + " |" * (len(heads) - 1)
     rows = []
     for e in included:
         r, f = e["record"], fields.get(e["key"], {})
@@ -722,7 +770,7 @@ def render_matrix(included: List[Dict[str, Any]], fields: Dict[str, Dict[str, st
         journal = f"{md_cell(r.get('journal_name') or 'N/A')}<br>{ssci.badge(r['ssci']['status'], lang)}"
         if r.get("warnings"):
             journal += "<br>⚠️ " + tl(lang, "needs checking")
-        cells = [md_cell(f.get(k, "")) for k in MATRIX_FIELDS]
+        cells = [md_cell(f.get(k, "")) for k in keys]
         evidence = f.get("evidence") or evidence_label(EVIDENCE_UNCHECKED, lang)
         rows.append(f"| {paper} | {journal} | " + " | ".join(cells) + f" | {md_cell(evidence)} |")
     return header + "\n" + "\n".join(rows)

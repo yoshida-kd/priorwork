@@ -3,6 +3,23 @@
 Priorwork's command-line tool (`priorwork` on PyPI) and this extension are
 released together, under one version number.
 
+## 0.1.4
+
+- **Start from your manuscript.** If the data, methods and analysis of a paper
+  are written, ask your agent to write its introduction, literature review and
+  theory and hypotheses. It reads the manuscript, lists the claims that need
+  literature (including findings that conflict with your results), searches
+  and screens claim by claim, records each paper's *Role in the manuscript* on
+  its card (a Role column in the matrix too), and drafts sections 1–3 in the
+  language of the manuscript. A separate section records the literature
+  behind each hypothesis and which results to treat as exploratory, so that
+  the hypotheses are not written after the fact. The manuscript itself is
+  never rewritten. New skill `priorwork-manuscript`;
+  `priorwork new … --manuscript PATH`; `priorwork export SURVEY --draft`
+  writes the draft with the references it cites (`reports/<name>.draft.md`).
+- *Ask Your Agent…* and the next step *Write the draft* ask for the draft of
+  the manuscript on a survey made from one.
+
 ## 0.1.3
 
 - **Hand the survey to your agent.** The agent now carries a survey through to

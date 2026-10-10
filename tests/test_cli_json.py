@@ -108,7 +108,7 @@ def test_the_extension_reads_only_keys_the_cli_writes():
     expected = {
         "WorkspaceStatus": {"version", "root", "workspace", "lang", "git", "sync", "surveys"},
         "GitInfo": {"repo", "remote"},
-        "SurveySummary": {"name", "topic", "created", "depth", "lang", "report", "counts", "searches"},
+        "SurveySummary": {"name", "topic", "created", "depth", "lang", "report", "manuscript", "counts", "searches"},
         "SurveyDetail": {"scope", "unfilled", "zotero_missing", "zotero_collection", "sync", "next"},
         "ZoteroCollectionLink": {"key", "name"},
         "ZoteroCollections": {"collections"},
@@ -140,3 +140,19 @@ def test_the_extension_reads_only_keys_the_cli_writes():
     for name, keys in expected.items():
         assert name in declared, name
         assert declared[name] <= keys, (name, declared[name] - keys)
+
+
+def test_a_survey_from_a_manuscript(ws, tmp_path):
+    (tmp_path / "paper.md").write_text("# 5. Results\n")
+    made = ws("new", "t", "--slug", "mp", "--manuscript", str(tmp_path / "paper.md"), "--json")
+    assert made["manuscript"] == "paper.md"
+    ws("search", "minimum wage", "--into", "mp", "--limit", "1", "--json")
+    ws("include", "mp", "1", "--json")
+    detail = ws("status", "mp", "--json")
+    assert detail["manuscript"] == "paper.md" and "draft" in [s["id"] for s in detail["next"]]
+    card = ws("card", "mp", "1", "--set", "role=C1 supports", "--json")
+    assert next(f["value"] for f in card["fields"] if f["key"] == "role") == "C1 supports"
+    with pytest.raises(SystemExit) as e:   # まだ下書きが無い
+        cli.main(["export", "mp", "--draft", "--json"])
+    assert "not written yet" in str(e.value) or "まだ" in str(e.value)
+    assert ws("status", "--json")["surveys"][0]["manuscript"] == "paper.md"

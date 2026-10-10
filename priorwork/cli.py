@@ -16,12 +16,12 @@ from . import __version__, i18n, scaffold, settings, ssci
 from .api import ApiError, LiteratureClient
 from .check import ERROR, INFO, WARN, check_survey
 from .doctor import NG, OK, run_checks
-from .export import FORMATS, export
+from .export import FORMATS, export, export_draft
 from .fulltext import FulltextError, fetch_fulltext
 from .i18n import t, tl
 from .snowball import snowball
 from .survey import (
-    CANDIDATE, CARD_FIELDS, DEFAULT_DEPTH, DEPTHS, EVIDENCE_KEYS, EXCLUDED, INCLUDED, MAYBE, STATUSES, Survey,
+    CANDIDATE, DEFAULT_DEPTH, DEPTHS, EVIDENCE_KEYS, EXCLUDED, INCLUDED, MAYBE, STATUSES, Survey,
     SurveyError, author_short, evidence_key, evidence_label, status_label, status_trail,
 )
 from .workspace import ROOT, meta_dir, workspace_lang
@@ -52,6 +52,7 @@ USAGE_LINES = [
     "Surveys",
     "  status [SURVEY]            list the surveys / progress and next steps",
     "  new TOPIC --slug SLUG      create a survey (reports/YYYYMMDD_<slug>.md and .priorwork/surveys/*.json)",
+    "  new ... --manuscript PATH  start from a manuscript whose analysis is done (drafts its sections 1–3)",
     "  scope SURVEY ...           set the scope (research question, period, criteria)",
     "  list SURVEY                list the papers (numbers, decisions, SSCI)",
     "  include / exclude / maybe  record decisions (e.g. priorwork include SURVEY 2 5 7)",
@@ -59,6 +60,7 @@ USAGE_LINES = [
     "  card SURVEY N [--set ...]  show or fill in the card of an included paper",
     "  render SURVEY              regenerate the managed blocks of the Markdown",
     "  export SURVEY              write the report for reading (HTML / Word / Markdown)",
+    "  export SURVEY --draft      write the draft of the manuscript's sections 1–3 with its references",
     "  check SURVEY               find empty fields, unregistered citations and DOI mismatches",
     "  fulltext SURVEY N          get the full text (Zotero / open-access PDF)",
     "  zotero [SURVEY]            check the Zotero link / which included papers are in Zotero",
@@ -153,7 +155,8 @@ def added_json(added: List[tuple]) -> List[Dict[str, Any]]:
 
 def survey_summary(s: Survey) -> Dict[str, Any]:
     return {"name": s.name, "topic": s.data["topic"], "created": s.data.get("created", ""), "depth": s.depth,
-            "lang": s.lang, "report": str(s.md_path), "counts": s.counts(), "searches": len(s.data["searches"])}
+            "lang": s.lang, "report": str(s.md_path), "manuscript": s.manuscript or None, "counts": s.counts(),
+            "searches": len(s.data["searches"])}
 
 
 # ---------------- Workspace commands ----------------
@@ -289,6 +292,9 @@ def next_steps(s: Survey, zotero_missing: List[Dict[str, Any]], zotero_pending: 
                   n=len(unfilled), numbers=numbers) if s.depth == "quick"
                 else t("Fill in {n|# card|# cards} from the full texts ({numbers})", n=len(unfilled), numbers=numbers))
         step("fill", text, ["fulltext", s.name, str(unfilled[0]["number"])])
+    if s.manuscript and c[INCLUDED]:
+        step("draft", t("Write the draft of the manuscript's introduction, literature review and hypotheses, "
+                        "then export it"), ["export", s.name, "--draft"])
     step("check", t("Check"), ["check", s.name])
     if c[INCLUDED]:
         step("export", t("Write the version for reading (HTML)"), ["export", s.name])
@@ -324,6 +330,8 @@ def cmd_status(args, client):
                           "sync": scaffold.sync_status(ROOT), "next": steps})
     print(f"# {s.name}: {s.data['topic']}")
     print(t("Report: {path}", path=s.md_path))
+    if s.manuscript:
+        print(t("Manuscript: {path}", path=s.manuscript))
     notice = scaffold.sync_status(ROOT)
     if notice:
         print(f"⚠️ {notice}")
@@ -361,7 +369,8 @@ def zotero_unregistered(s: Survey) -> List[Dict[str, Any]]:
 
 def cmd_new(args, client):
     scope = {k: getattr(args, k) or "" for k in ("question", "years", "fields", "inclusion", "exclusion")}
-    s = Survey.create(args.topic, args.slug, scope, depth=args.depth or DEFAULT_DEPTH, lang=args.lang)
+    s = Survey.create(args.topic, args.slug, scope, depth=args.depth or DEFAULT_DEPTH, lang=args.lang,
+                      manuscript=args.manuscript)
     if args.json:
         return dump_json({**survey_summary(s), "state": str(s.json_path)})
     print(t("Created: {path}", path=s.md_path))
@@ -374,12 +383,16 @@ def cmd_scope(args, client):
     s.update_scope(**{k: getattr(args, k) for k in ("question", "years", "fields", "inclusion", "exclusion")})
     if args.depth:
         s.set_depth(args.depth)
+    if args.manuscript:
+        s.set_manuscript(args.manuscript)
     render_and_report(s)
     if args.json:
-        return dump_json({"scope": s.data["scope"], "depth": s.depth})
+        return dump_json({"scope": s.data["scope"], "depth": s.depth, "manuscript": s.manuscript or None})
     for k, v in s.data["scope"].items():
         print(f"{k}: {v}")
     print(f"depth: {s.depth}")
+    if s.manuscript:
+        print(f"manuscript: {s.manuscript}")
 
 
 def cmd_list(args, client):
@@ -443,7 +456,7 @@ def card_json(s: Survey, number: int) -> Dict[str, Any]:
     return {"number": number, "evidence": evidence_key(values.get("evidence", "")),
             "evidence_options": [{"key": k, "label": evidence_label(k, lang)} for k in EVIDENCE_KEYS],
             "fields": [{"key": k, "label": tl(lang, label), "value": values.get(k, "")}
-                       for k, label in CARD_FIELDS if k != "evidence"]}
+                       for k, label in s.card_spec if k != "evidence"]}
 
 
 def cmd_card(args, client):
@@ -502,8 +515,12 @@ def cmd_check(args, client):
 
 def cmd_export(args, client):
     s = Survey.load(args.survey)
+    output = Path(args.output) if args.output else None
     try:
-        out, issues = export(s, args.format, Path(args.output) if args.output else None, args.with_abstracts)
+        if args.draft:
+            out, issues = export_draft(s, args.format or "md", output)
+        else:
+            out, issues = export(s, args.format or "html", output, args.with_abstracts)
     except (RuntimeError, OSError) as e:
         sys.exit(t("Error: {message}", message=e))
     if args.json:
@@ -842,6 +859,9 @@ def build_parser() -> argparse.ArgumentParser:
     scope_args.add_argument("--exclusion", help=t("exclusion criteria"))
     scope_args.add_argument("--depth", choices=list(DEPTHS),
                             help=t("the depth of the survey (quick or full; default full)"))
+    scope_args.add_argument("--manuscript", metavar="PATH",
+                            help=t("your manuscript whose analysis is done: the survey then backs it up and drafts "
+                                   "its introduction, literature review and hypotheses"))
 
     p = sub.add_parser("new", parents=[common, scope_args, as_json], help=t("create a survey"))
     p.add_argument("topic", help=t("the topic (any language)"))
@@ -872,7 +892,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("number", type=int, help=t("the paper number"))
     p.add_argument("--set", nargs="+", metavar="KEY=VALUE",
                    help=t("fields to write (evidence=unchecked|abstract|fulltext, rq, x, y, data, method, findings, "
-                          "limits, memo); a new line starts the bullet points below"))
+                          "limits, memo, and role for a survey with a manuscript); a new line starts the bullet points below"))
 
     p = sub.add_parser("render", parents=[common], help=t("regenerate the managed blocks of the Markdown"))
     p.add_argument("survey")
@@ -883,9 +903,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("export", parents=[common, as_json], help=t("write the report for reading"))
     p.add_argument("survey")
-    p.add_argument("--format", choices=list(FORMATS), default="html", help=t("the format (default: html)"))
+    p.add_argument("--format", choices=list(FORMATS), help=t("the format (default: html; md with --draft)"))
     p.add_argument("-o", "--output", help=t("where to write it (default: next to the report in reports/)"))
     p.add_argument("--with-abstracts", action="store_true", help=t("also include each paper's abstract"))
+    p.add_argument("--draft", action="store_true",
+                   help=t("write only the draft of the manuscript's sections 1–3, with its references "
+                          "(a survey made with --manuscript)"))
 
     p = sub.add_parser("fulltext", parents=[common, as_json], help=t("get the full text"))
     p.add_argument("survey")

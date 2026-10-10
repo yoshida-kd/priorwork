@@ -9,7 +9,7 @@ from typing import Any, Dict, List, NamedTuple, Optional, Set, Tuple
 from . import ssci
 from .i18n import t
 from .survey import (
-    CANDIDATE, EVIDENCE_ABSTRACT, EVIDENCE_KEYS, EVIDENCE_UNCHECKED, INCLUDED, MATRIX_FIELDS, MAYBE, Survey, SurveyError,
+    CANDIDATE, EVIDENCE_ABSTRACT, EVIDENCE_KEYS, EVIDENCE_UNCHECKED, INCLUDED, MAYBE, Survey, SurveyError,
     evidence_key, evidence_label, extract_blocks, first_surname, parse_card_fields, parse_cards, strip_blocks, surname,
     year_labels,
 )
@@ -125,7 +125,7 @@ def check_survey(survey: Survey, client: Optional[Any] = None) -> List[Finding]:
                                      unchecked=evidence_label(EVIDENCE_UNCHECKED, survey.lang))))
         elif level == EVIDENCE_ABSTRACT:
             abstract_only.append(e)
-        empty = [k for k in MATRIX_FIELDS if not fields.get(k)]
+        empty = [k for k in survey.matrix_fields if not fields.get(k)]
         if empty:
             findings.append((WARN, t("{label}: some fields are empty ({fields})", label=label, fields=", ".join(empty))))
         if r["ssci"]["status"] not in (ssci.SSCI, ssci.SSCI_LIKELY):
@@ -205,7 +205,12 @@ def check_survey(survey: Survey, client: Optional[Any] = None) -> List[Finding]:
                 findings.append((ERROR, t("{label}: the DOI points to another title: \"{title}\"", label=label,
                                           title=w.get("title"))))
 
-    # 5. 進捗
+    # 5. 原稿から始めるサーベイ: 原稿が動いていないか（エージェントは原稿を読み直して下書きを書く）
+    if survey.manuscript and not (survey.root / survey.manuscript).is_file():
+        findings.append((WARN, t("The manuscript {path} is not found. If it moved, set it again with "
+                                 "`priorwork scope {name} --manuscript <path>`", path=survey.manuscript, name=survey.name)))
+
+    # 6. 進捗
     pending = survey.by_status(CANDIDATE, MAYBE)
     if pending:
         findings.append((INFO, t("{n|# candidate is|# candidates are} not screened yet "
@@ -213,7 +218,7 @@ def check_survey(survey: Survey, client: Optional[Any] = None) -> List[Finding]:
     if not included:
         findings.append((INFO, t("No paper is included yet")))
 
-    # 6. 深さ（full は網羅性を求める。quick は要旨のみ・スナウボール省略でよいので何も言わない）
+    # 7. 深さ（full は網羅性を求める。quick は要旨のみ・スナウボール省略でよいので何も言わない）
     if survey.depth == "full" and included:
         if not any(q["kind"] == "snowball" for q in survey.data["searches"]):
             findings.append((WARN, t("The depth is full, but the citations have not been chased (`priorwork snowball {name}`). "

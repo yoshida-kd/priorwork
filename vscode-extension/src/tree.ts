@@ -36,7 +36,7 @@ export function statusIcon(status: Status): vscode.ThemeIcon {
 
 const STEP_ICON: Record<string, string> = {
     scope: 'settings', search: 'search', screen: 'checklist', snowball: 'references', zotero: 'library',
-    fill: 'edit', check: 'pass', export: 'open-preview',
+    fill: 'edit', draft: 'book', check: 'pass', export: 'open-preview',
 };
 
 /** 'Card & Krueger (1994)' の形。 */

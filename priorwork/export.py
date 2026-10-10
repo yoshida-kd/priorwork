@@ -4,6 +4,10 @@
 `reports/*.md` は作業用で、管理ブロックのコメントや未記入の記入欄、テンプレートの説明文を含む。
 ここでは、それらを除いた「読むための版」を Markdown / HTML / Word で作る。
 未記入・未確認・検査エラーが残っていれば、冒頭に「下書き」の表示を付けて、完成品と取り違えないようにする。
+
+原稿から始めるサーベイ（`new --manuscript`）では、`--draft` で原稿の 1〜3 章の下書きだけを書き出す。
+レポートの `<!-- priorwork:draft -->` の直後の節を取り出し、本文で引用した採用論文の参照文献を付ける。
+原稿に貼るためのものなので、「下書き」の表示は付けない（問題はコマンドの出力で伝える）。
 """
 
 import html
@@ -14,17 +18,19 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from . import i18n
-from .check import ERROR, check_survey
+from .check import ERROR, check_survey, find_citations
 from .i18n import t, tl
-from .survey import BIBLIO_LABEL, CARD_FIELDS, Survey
+from .survey import BIBLIO_LABEL, CARD_FIELDS, INCLUDED, Survey, first_surname, render_references, year_labels
 
 FORMATS = {"html": ".html", "md": ".clean.md", "docx": ".docx"}
+DRAFT_FORMATS = {"html": ".draft.html", "md": ".draft.md", "docx": ".draft.docx"}
+DRAFT_ANCHOR = "<!-- priorwork:draft -->"
 
-# テンプレート（assets/<lang>/templates/literature_review.md）にある、執筆者向けの説明文。両方の言語
+# テンプレート（assets/<lang>/templates/*.md）にある、執筆者向けの説明文。両方の言語
 _HINTS = [
-    re.compile(r"^3章のカードの記入内容から自動で作られます。\s*$"),
+    re.compile(r"^[34]章のカードの記入内容から自動で作られます。\s*$"),
     re.compile(r"^引用キーは Zotero で管理する（ここではキーを作らない）。\s*$"),
-    re.compile(r"^Built automatically from the paper cards in section 3\.\s*$"),
+    re.compile(r"^Built automatically from the paper cards in section [34]\.\s*$"),
     re.compile(r"^Citation keys are managed in Zotero \(none are made here\)\.\s*$"),
 ]
 _RULES_HEADING = re.compile(r"^(?:記入のルール|How to fill in a card):\s*$")
@@ -212,16 +218,56 @@ def to_html(md: str, title: str, lang: str = "ja") -> str:
             f"<title>{html.escape(title)}</title>\n<style>{_CSS}</style>\n</head>\n<body>\n<main>\n{body}</main>\n</body>\n</html>\n")
 
 
-def export(survey: Survey, fmt: str = "html", out: Optional[Path] = None, with_abstracts: bool = False) -> Tuple[Path, List[str]]:
-    """レポートを書き出す。戻り値: (出力先, 下書きの理由（表示の言語）)"""
-    if fmt not in FORMATS:
-        raise ValueError(t("The format is one of {choices}: {fmt}", choices=" / ".join(FORMATS), fmt=fmt))
-    lang = survey.lang
-    text, title, empty_sections = clean_markdown(survey.md_path.read_text(encoding="utf-8"), with_abstracts, lang)
-    issues = draft_issues(survey, empty_sections)
-    text = _with_banner(text, issues[lang], lang)
-    title = title or survey.data["topic"]
-    out = out or survey.md_path.with_name(survey.md_path.stem + FORMATS[fmt])
+def draft_section(md: str) -> str:
+    """`<!-- priorwork:draft -->` の直後の節（見出しの下から次の `## ` まで）。小見出し（###）は ## に上げる。"""
+    i = md.find(DRAFT_ANCHOR)
+    if i < 0:
+        raise RuntimeError(t("The report has no draft of the manuscript ({anchor} before its heading). "
+                             "Only a survey made with `priorwork new --manuscript` has one", anchor=DRAFT_ANCHOR))
+    lines = md[i + len(DRAFT_ANCHOR):].lstrip("\n").splitlines()
+    body = []
+    for line in lines[1:] if lines and lines[0].startswith("## ") else lines:
+        if line.startswith("## "):
+            break
+        body.append(line[1:] if line.startswith("### ") else line)
+    text = re.sub(r"<!--.*?-->[ \t]*\n?", "", "\n".join(body), flags=re.DOTALL)
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(_drop_empty_items(text.splitlines()))).strip() + "\n"
+
+
+def cited_papers(survey: Survey, text: str) -> List[dict]:
+    """本文で引用した採用論文（筆頭著者・年・a/b で照合。a/b の無い引用は、その著者・年の採用論文すべて）。"""
+    included = survey.by_status(INCLUDED)
+    labels = year_labels(included)
+    cites = find_citations(text)
+    return [e for e in included
+            if any(c.name == first_surname(e["record"]) and str(c.year) == labels[e["key"]][:4]
+                   and (not c.suffix or labels[e["key"]][4:] == c.suffix) for c in cites)]
+
+
+def _draft_lang(text: str) -> str:
+    """下書きの言語（原稿の言語）。仮名があれば日本語。"""
+    return "ja" if re.search(r"[\u3040-\u30ff]", text) else "en"
+
+
+def export_draft(survey: Survey, fmt: str = "md", out: Optional[Path] = None) -> Tuple[Path, List[str]]:
+    """原稿の 1〜3 章の下書きを書き出す。戻り値: (出力先, 問題（表示の言語）)"""
+    if fmt not in DRAFT_FORMATS:
+        raise ValueError(t("The format is one of {choices}: {fmt}", choices=" / ".join(DRAFT_FORMATS), fmt=fmt))
+    text = draft_section(survey.md_path.read_text(encoding="utf-8"))
+    if not re.search(r"^(?!#)\S", text, re.MULTILINE):
+        raise RuntimeError(t("The draft of the manuscript is not written yet"))
+    lang = _draft_lang(text)
+    cited = cited_papers(survey, text)
+    labels = year_labels(survey.by_status(INCLUDED))
+    text += "\n## " + tl(lang, "References") + "\n\n" + render_references(cited, labels, lang) + "\n"
+    errors = [m for level, m in check_survey(survey, None) if level == ERROR]
+    issues = [t("`priorwork check` reports {n|# ERROR|# ERRORs}", n=len(errors))] if errors else []
+    out = out or survey.md_path.with_name(survey.md_path.stem + DRAFT_FORMATS[fmt])
+    _write(out, text, survey.data["topic"], fmt, lang)
+    return out, issues
+
+
+def _write(out: Path, text: str, title: str, fmt: str, lang: str):
     out.parent.mkdir(parents=True, exist_ok=True)
     if fmt == "html":
         out.write_text(to_html(text, title, lang), encoding="utf-8")
@@ -232,4 +278,17 @@ def export(survey: Survey, fmt: str = "html", out: Optional[Path] = None, with_a
             raise RuntimeError(t("Word output needs pandoc (https://pandoc.org/). You can also export HTML and print it to PDF from a browser"))
         subprocess.run(["pandoc", "-f", "commonmark+pipe_tables", "-o", str(out), "--metadata", f"title={title}"],
                        input=text, text=True, check=True)
+
+
+def export(survey: Survey, fmt: str = "html", out: Optional[Path] = None, with_abstracts: bool = False) -> Tuple[Path, List[str]]:
+    """レポートを書き出す。戻り値: (出力先, 下書きの理由（表示の言語）)"""
+    if fmt not in FORMATS:
+        raise ValueError(t("The format is one of {choices}: {fmt}", choices=" / ".join(FORMATS), fmt=fmt))
+    lang = survey.lang
+    text, title, empty_sections = clean_markdown(survey.md_path.read_text(encoding="utf-8"), with_abstracts, lang)
+    issues = draft_issues(survey, empty_sections)
+    text = _with_banner(text, issues[lang], lang)
+    title = title or survey.data["topic"]
+    out = out or survey.md_path.with_name(survey.md_path.stem + FORMATS[fmt])
+    _write(out, text, title, fmt, lang)
     return out, issues[i18n.language()]

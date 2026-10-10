@@ -34,6 +34,7 @@ MESSAGES = {
     "Limitations": "限界",
     "Notes": "メモ",
     "Source": "書誌",
+    "Role in the manuscript": "原稿での役割",
 
     # -- レポートの管理ブロック（survey.py） ----------------------------------------------
     "Research question": "リサーチクエスチョン",
@@ -43,6 +44,8 @@ MESSAGES = {
     "Exclusion criteria": "除外基準",
     "(not set — set it with `priorwork scope`)": "（未設定 — `priorwork scope` で設定）",
     "Depth": "深さ",
+    "Manuscript": "原稿",
+    "Role": "役割",
     "Basis of the SSCI status": "SSCI 判定の根拠",
     "checked against the Clarivate list ({file})": "Clarivate 収録リスト照合（{file}）",
     "guessed from the journal name with the built-in list of major journals (verify)": "内蔵の主要誌リストによる誌名推定（要確認）",
@@ -104,8 +107,15 @@ MESSAGES = {
     "The format is one of {choices}: {fmt}": "形式は {choices} のいずれかです: {fmt}",
     "Word output needs pandoc (https://pandoc.org/). You can also export HTML and print it to PDF from a browser":
         "Word 形式には pandoc が必要です（https://pandoc.org/）。HTML を書き出してブラウザで印刷（PDF）もできます",
+    "The report has no draft of the manuscript ({anchor} before its heading). "
+    "Only a survey made with `priorwork new --manuscript` has one":
+        "レポートに原稿の下書きの節がありません（見出しの前に {anchor}）。"
+        "下書きの節があるのは `priorwork new --manuscript` で作ったサーベイだけです",
+    "The draft of the manuscript is not written yet": "原稿の下書きがまだ書かれていません",
+    "References": "参考文献",
 
     # -- 状態ファイル（survey.py） -----------------------------------------------------
+    "The manuscript is not found: {path}": "原稿が見つかりません: {path}",
     "{name} was written by a newer priorwork (format v{version}; this one reads v{supported}). "
     "Update it with `priorwork upgrade`":
         "{name} は新しい版のエンジンで作られています（形式 v{version}、このエンジンは v{supported}）。"
@@ -162,6 +172,9 @@ MESSAGES = {
     "(if one is a paper, register it with `priorwork add`)":
         "組織名・図表番号とみなして照合しなかった引用: {cites}（論文なら `priorwork add` で登録）",
     "The DOI {doi} in the text is not registered": "本文中の DOI {doi} が登録されていません",
+    "The manuscript {path} is not found. If it moved, set it again with "
+    "`priorwork scope {name} --manuscript <path>`":
+        "原稿 {path} が見つかりません。動かしたなら `priorwork scope {name} --manuscript <パス>` で設定し直してください",
     "{label}: OpenAlex does not know the DOI {doi}": "{label}: DOI {doi} が OpenAlex に見つかりません",
     "{label}: the DOI points to another title: \"{title}\"": "{label}: DOI が別タイトルを指しています: \"{title}\"",
     "{n|# candidate is|# candidates are} not screened yet (`priorwork list {name} --status candidate maybe`)":
@@ -340,11 +353,14 @@ MESSAGES = {
     "Fill in {n|# card|# cards} from the full texts ({numbers})": "カード未記入の採用論文 {n} 件（{numbers}）を本文を取得して埋める",
     "Check": "検査する",
     "Write the version for reading (HTML)": "読むための版（HTML）を書き出す",
+    "Write the draft of the manuscript's introduction, literature review and hypotheses, then export it":
+        "原稿のイントロ・先行研究・理論と仮説の下書きを書き、書き出す",
     "No surveys yet. Create one with `priorwork new \"<topic>\" --slug <english_slug>`.":
         "サーベイはまだありません。`priorwork new \"<テーマ>\" --slug <english_slug>` で作成します。",
     "included {included} / maybe {maybe} / candidates {candidate} / excluded {excluded}":
         "採用 {included} / 保留 {maybe} / 候補 {candidate} / 除外 {excluded}",
     "Report: {path}": "レポート: {path}",
+    "Manuscript: {path}": "原稿: {path}",
     "RQ: {question} | period: {years} | depth: {depth}": "RQ: {question} | 期間: {years} | 深さ: {depth}",
     "{n|# search|# searches}": "検索 {n} 回",
     "Next:": "次にやること:",
@@ -419,6 +435,8 @@ MESSAGES = {
         "  status [SURVEY]            サーベイ一覧 / 進捗と次にやること",
     "  new TOPIC --slug SLUG      create a survey (reports/YYYYMMDD_<slug>.md and .priorwork/surveys/*.json)":
         "  new TOPIC --slug SLUG      サーベイを作成（reports/YYYYMMDD_<slug>.md と .priorwork/surveys/*.json）",
+    "  new ... --manuscript PATH  start from a manuscript whose analysis is done (drafts its sections 1–3)":
+        "  new ... --manuscript PATH  分析まで済んだ原稿から始める（1〜3 章を下書きする）",
     "  scope SURVEY ...           set the scope (research question, period, criteria)":
         "  scope SURVEY ...           調査範囲（RQ・期間・採否基準）を設定",
     "  list SURVEY                list the papers (numbers, decisions, SSCI)":
@@ -435,6 +453,8 @@ MESSAGES = {
         "  render SURVEY              Markdown の管理ブロックを再生成",
     "  export SURVEY              write the report for reading (HTML / Word / Markdown)":
         "  export SURVEY              読むためのレポートを書き出す（HTML / Word / Markdown）",
+    "  export SURVEY --draft      write the draft of the manuscript's sections 1–3 with its references":
+        "  export SURVEY --draft      原稿の 1〜3 章の下書きを参考文献つきで書き出す",
     "  check SURVEY               find empty fields, unregistered citations and DOI mismatches":
         "  check SURVEY               記入漏れ・未登録の引用・DOI の不整合を検査",
     "  fulltext SURVEY N          get the full text (Zotero / open-access PDF)":
@@ -491,17 +511,22 @@ MESSAGES = {
     "register papers by DOI or ID (included by default)": "DOI / ID を指定して登録（既定で採用）",
     "register as a candidate, not as included": "採用ではなく候補として登録",
     "show or fill in the card of an included paper": "採用論文のカードを表示・記入",
-    "fields to write (evidence=unchecked|abstract|fulltext, rq, x, y, data, method, findings, limits, memo); "
-    "a new line starts the bullet points below":
-        "書き込む欄（evidence=unchecked|abstract|fulltext、rq、x、y、data、method、findings、limits、memo）。"
-        "改行の後ろは直下の箇条書きになる",
+    "fields to write (evidence=unchecked|abstract|fulltext, rq, x, y, data, method, findings, limits, memo, "
+    "and role for a survey with a manuscript); a new line starts the bullet points below":
+        "書き込む欄（evidence=unchecked|abstract|fulltext、rq、x、y、data、method、findings、limits、memo。"
+        "原稿から始めたサーベイでは role も）。改行の後ろは直下の箇条書きになる",
     "regenerate the managed blocks of the Markdown": "Markdown の管理ブロックを再生成",
     "check the survey": "サーベイを検査",
     "do not re-check the DOIs with OpenAlex": "OpenAlex での DOI 再確認をしない",
     "write the report for reading": "読むためのレポートを書き出す",
-    "the format (default: html)": "出力形式（既定: html）",
+    "the format (default: html; md with --draft)": "出力形式（既定: html。--draft のときは md）",
     "where to write it (default: next to the report in reports/)": "出力先（既定: reports/ 内、レポートと同じ名前）",
     "also include each paper's abstract": "各論文の要旨も載せる",
+    "write only the draft of the manuscript's sections 1–3, with its references (a survey made with --manuscript)":
+        "原稿の 1〜3 章の下書きだけを、参考文献つきで書き出す（--manuscript で作ったサーベイ）",
+    "your manuscript whose analysis is done: the survey then backs it up and drafts its introduction, "
+    "literature review and hypotheses":
+        "分析まで済んだ原稿。サーベイはそれを補強する文献を集め、イントロ・先行研究・理論と仮説を下書きする",
     "get the full text": "本文テキストを取得",
     "the paper number": "論文番号",
     "the path of the PDF": "PDF のパスを直接指定",
