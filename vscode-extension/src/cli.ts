@@ -31,6 +31,10 @@ export interface SurveySummary {
     report: string;
     /** 原稿から始めたサーベイの原稿のパス（0.1.4 から。古い CLI には無い） */
     manuscript?: string | null;
+    /** 結び付けた Zotero のコレクション（0.1.5 から一覧にも出る。古い CLI では詳細にだけある） */
+    zotero_collection?: ZoteroCollectionLink | null;
+    /** アーカイブした日時（0.1.5 から） */
+    archived?: string | null;
     counts: Counts;
     searches: number;
 }
@@ -47,7 +51,11 @@ export interface WorkspaceStatus {
     lang: string;
     git: GitInfo;
     sync: string | null;
+    /** Zotero の連携が設定されているか（0.1.5 から） */
+    zotero?: boolean;
     surveys: SurveySummary[];
+    /** アーカイブしたサーベイ（0.1.5 から） */
+    archived?: SurveySummary[];
 }
 
 export interface Scope {
@@ -68,7 +76,6 @@ export interface SurveyDetail extends SurveySummary {
     scope: Scope;
     unfilled: number[];
     zotero_missing: number[];
-    zotero_collection: ZoteroCollectionLink | null;
     sync: string | null;
     next: NextStep[];
 }

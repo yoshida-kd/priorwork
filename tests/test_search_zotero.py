@@ -114,3 +114,25 @@ def test_link_a_collection_import_and_list_dois(ws, tmp_path, monkeypatch, capsy
     assert capsys.readouterr().out.split() == ["10.1/1", "10.1/2"]
 
     assert ws("zotero", "mw", "--collection", "", "--json")["collection"] is None
+
+
+def test_the_zotero_cache_survives_concurrent_writers(tmp_path):
+    """サイドバーは status を同時に走らせる。一時ファイルを共有すると、片方の rename が失敗していた。"""
+    import threading
+    from priorwork.zotero import ZoteroClient
+    z = ZoteroClient("1", "k", index_path=tmp_path / "zotero" / "index.json")
+    errors = []
+
+    def write(n):
+        try:
+            for _ in range(100):
+                z._save_index({"version": n, "items": {}})
+        except Exception as e:   # noqa: BLE001
+            errors.append(e)
+    threads = [threading.Thread(target=write, args=(n,)) for n in range(4)]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join()
+    assert not errors and z._load_index()["version"] in range(4)
+    assert not list((tmp_path / "zotero").glob("*.tmp"))

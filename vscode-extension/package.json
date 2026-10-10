@@ -2,7 +2,7 @@
   "name": "priorwork",
   "displayName": "Priorwork",
   "description": "%extension.description%",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "publisher": "yoshida-kd",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -91,7 +91,9 @@
       { "command": "priorwork.showOutput", "title": "%command.showOutput%", "category": "Priorwork" },
       { "command": "priorwork.runStep", "title": "%command.runStep%", "category": "Priorwork" },
       { "command": "priorwork.viewHtml", "title": "%command.viewHtml%", "category": "Priorwork", "icon": "$(open-preview)" },
-      { "command": "priorwork.zoteroCollection", "title": "%command.zoteroCollection%", "category": "Priorwork", "icon": "$(library)" }
+      { "command": "priorwork.zoteroCollection", "title": "%command.zoteroCollection%", "category": "Priorwork", "icon": "$(library)" },
+      { "command": "priorwork.archive", "title": "%command.archive%", "category": "Priorwork", "icon": "$(archive)" },
+      { "command": "priorwork.unarchive", "title": "%command.unarchive%", "category": "Priorwork", "icon": "$(discard)" }
     ],
     "menus": {
       "view/title": [
@@ -119,6 +121,9 @@
         { "command": "priorwork.askAgent", "when": "view == priorwork.surveys && viewItem == priorwork.survey", "group": "0_agent@1" },
         { "command": "priorwork.zoteroCollection", "when": "view == priorwork.surveys && viewItem == priorwork.survey", "group": "5_zotero@1" },
         { "command": "priorwork.exportReport", "when": "view == priorwork.surveys && viewItem == priorwork.survey", "group": "3_report@3" },
+        { "command": "priorwork.archive", "when": "view == priorwork.surveys && viewItem == priorwork.survey", "group": "9_archive@1" },
+        { "command": "priorwork.unarchive", "when": "view == priorwork.surveys && viewItem == priorwork.survey.archived", "group": "inline@1" },
+        { "command": "priorwork.unarchive", "when": "view == priorwork.surveys && viewItem == priorwork.survey.archived", "group": "1_archive@1" },
 
         { "command": "priorwork.include", "when": "view == priorwork.surveys && viewItem =~ /^priorwork\\.paper\\.(candidate|maybe|excluded)$/", "group": "inline@1" },
         { "command": "priorwork.maybe", "when": "view == priorwork.surveys && viewItem =~ /^priorwork\\.paper\\.(candidate|included|excluded)$/", "group": "inline@2" },
@@ -133,12 +138,11 @@
       "explorer/context": [
         { "command": "priorwork.viewHtml", "when": "resourceExtname == .html && resourceDirname =~ /[\\\\/]reports$/", "group": "navigation@9" }
       ],
-      "editor/title": [
-        { "command": "priorwork.viewHtml", "when": "resourceExtname == .html && resourceDirname =~ /[\\\\/]reports$/", "group": "navigation" }
-      ],
       "commandPalette": [
         { "command": "priorwork.openPaper", "when": "false" },
         { "command": "priorwork.runStep", "when": "false" },
+        { "command": "priorwork.unarchive", "when": "false" },
+        { "command": "priorwork.archive", "when": "priorwork.hasSurveys" },
         { "command": "priorwork.include", "when": "false" },
         { "command": "priorwork.maybe", "when": "false" },
         { "command": "priorwork.exclude", "when": "false" },

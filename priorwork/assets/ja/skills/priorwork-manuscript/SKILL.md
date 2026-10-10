@@ -14,13 +14,19 @@ description: >-
 
 ## 1. 原稿を読み、サーベイを作る
 
-原稿の場所が分からなければ聞く（ワークスペースの中に置いてもらう。例: `manuscript/paper.md`。.docx・.tex・.pdf でもよい。読めない形式ならテキストに直してもらう）。原稿を読み、次を決める。
+原稿は、ワークスペースの `manuscripts/<論文名>/` に置く決まり（`manuscripts/README.md`）。フォルダには原稿（4・5 章まで）と、原稿に入っていない結果の表・図・ログが入っていることがある。**フォルダの中のファイルをすべて読む。**
+
+- どの原稿か分からなければ、`manuscripts/` の中を見て、1 つならそれ、複数なら聞く。
+- `manuscripts/` に無ければ、そこに置いてもらう（外のファイルを勝手に写さない）。
+- .md・.tex・.txt はそのまま読む。.docx・.pdf は読めればそのまま、読めなければ `pandoc` などでテキストにして読む。それもできなければ、テキストの版を置いてもらう。
+
+原稿を読み、次を決める。
 
 - テーマ（原稿の題名か RQ）、英語の slug、深さ（既定は full）
 - 範囲: リサーチクエスチョンは原稿のもの。期間・分野・基準は原稿の分野に合わせて決める
 
 ```bash
-./priorwork new "<テーマ>" --slug <slug> --manuscript <原稿のパス> --depth full --question "..." --fields "..." --inclusion "..." --exclusion "..."
+./priorwork new "<テーマ>" --slug <slug> --manuscript manuscripts/<論文名> --depth full --question "..." --fields "..." --inclusion "..." --exclusion "..."
 ```
 
 レポートの 1 章「原稿の要約」を、原稿に書かれていることだけで埋める（RQ・Y・X・データ・識別戦略・主な結果・予想と違った結果）。推定値を写すときは、原稿の表の値そのままにする。

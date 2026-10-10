@@ -47,5 +47,7 @@
   "walkthrough.agent.title": "続きを頼む",
   "walkthrough.agent.description": "サーベイを右クリック →「エージェントに頼む…」で、続き・検索の追加・引用の追跡・カードの記入・検査の修正を頼めます。採否を自分で決めたいときは、エージェントに「相談しながら進めて」と伝えます。",
   "command.viewHtml": "Priorwork でレポートを見る",
-  "command.zoteroCollection": "Zotero のコレクションを結び付ける…"
+  "command.zoteroCollection": "Zotero のコレクションを結び付ける…",
+  "command.archive": "サーベイをアーカイブする…",
+  "command.unarchive": "アーカイブから戻す"
 }

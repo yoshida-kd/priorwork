@@ -106,10 +106,11 @@ def test_the_extension_reads_only_keys_the_cli_writes():
     for name, body in re.findall(r"export interface (\w+)(?: extends [\w, ]+)? \{(.*?)\n\}", text, re.S):
         declared[name] = set(re.findall(r"^\s+(\w+)\??:", body, re.M))
     expected = {
-        "WorkspaceStatus": {"version", "root", "workspace", "lang", "git", "sync", "surveys"},
+        "WorkspaceStatus": {"version", "root", "workspace", "lang", "git", "sync", "zotero", "surveys", "archived"},
         "GitInfo": {"repo", "remote"},
-        "SurveySummary": {"name", "topic", "created", "depth", "lang", "report", "manuscript", "counts", "searches"},
-        "SurveyDetail": {"scope", "unfilled", "zotero_missing", "zotero_collection", "sync", "next"},
+        "SurveySummary": {"name", "topic", "created", "depth", "lang", "report", "manuscript", "zotero_collection",
+                          "archived", "counts", "searches"},
+        "SurveyDetail": {"scope", "unfilled", "zotero_missing", "sync", "next"},
         "ZoteroCollectionLink": {"key", "name"},
         "ZoteroCollections": {"collections"},
         "ZoteroCollection": {"key", "name", "path", "items"},
@@ -156,3 +157,19 @@ def test_a_survey_from_a_manuscript(ws, tmp_path):
         cli.main(["export", "mp", "--draft", "--json"])
     assert "not written yet" in str(e.value) or "まだ" in str(e.value)
     assert ws("status", "--json")["surveys"][0]["manuscript"] == "paper.md"
+
+
+def test_archive_hides_a_survey_and_brings_it_back(ws, capsys):
+    ws("new", "行政需要", "--slug", "mob", "--json")
+    capsys.readouterr()
+    cli.main(["new", "行政需要", "--slug", "mob_v2", "--json"])
+    assert "mob" in capsys.readouterr().err             # 同じテーマがあると知らせる
+    top = ws("status", "--json")
+    assert [s["name"].split("_", 1)[1] for s in top["surveys"]] == ["mob", "mob_v2"] and top["archived"] == []
+    assert top["zotero"] is False and top["surveys"][0]["zotero_collection"] is None
+    assert ws("archive", "mob", "--json")["archived"]
+    top = ws("status", "--json")
+    assert [s["name"].split("_", 1)[1] for s in top["surveys"]] == ["mob_v2"]
+    assert top["archived"][0]["archived"] and ws("status", "mob", "--json")["archived"]
+    assert ws("archive", "mob", "--undo", "--json")["archived"] is None
+    assert len(ws("status", "--json")["surveys"]) == 2

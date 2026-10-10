@@ -7,8 +7,11 @@ import { Entry, NextStep, Status, SurveySummary } from './cli';
 import { Model } from './model';
 
 export type Node =
-    | { kind: 'survey'; survey: SurveySummary }
+    | { kind: 'survey'; survey: SurveySummary; dup?: boolean }
     | { kind: 'steps'; survey: SurveySummary }
+    | { kind: 'zotero'; survey: SurveySummary }
+    | { kind: 'archive'; surveys: SurveySummary[] }
+    | { kind: 'archived'; survey: SurveySummary }
     | { kind: 'step'; survey: SurveySummary; step: NextStep }
     | { kind: 'group'; survey: SurveySummary; status: Status; count: number }
     | { kind: 'paper'; survey: SurveySummary; entry: Entry }
@@ -58,13 +61,23 @@ export function surveyDescription(s: SurveySummary): string {
     return parts.join(' · ');
 }
 
+/** 同じテーマのサーベイを見分ける部分（日付を除いた名前。例: make_or_buy_v2）。 */
+export function surveyTag(s: SurveySummary): string {
+    return s.name.replace(/^\d{8}_/, '');
+}
+
 export class SurveyTree implements vscode.TreeDataProvider<Node>, vscode.Disposable {
     private readonly changed = new vscode.EventEmitter<Node | undefined>();
     readonly onDidChangeTreeData = this.changed.event;
     private readonly sub: vscode.Disposable;
+    /** 次にやることの読み込みに一度失敗し、自動でやり直したサーベイ（2度目の失敗で「再読み込み」を出す） */
+    private readonly retried = new Set<string>();
 
     constructor(private readonly model: Model) {
-        this.sub = model.onDidChange(() => this.changed.fire(undefined));
+        this.sub = model.onDidChange(() => {
+            this.retried.clear();
+            this.changed.fire(undefined);
+        });
     }
 
     dispose(): void {
@@ -97,10 +110,24 @@ export class SurveyTree implements vscode.TreeDataProvider<Node>, vscode.Disposa
                 rows.push({ kind: 'message', label: vscode.l10n.t('AGENTS.md and the skills are out of date — update them'),
                             icon: 'warning', command: { command: 'priorwork.sync', title: '' } });
             }
-            return [...rows, ...ws.surveys.map((s): Node => ({ kind: 'survey', survey: s }))];
+            const topics = new Map<string, number>();
+            for (const s of ws.surveys) {
+                topics.set(s.topic.trim(), (topics.get(s.topic.trim()) ?? 0) + 1);
+            }
+            rows.push(...ws.surveys.map((s): Node => ({ kind: 'survey', survey: s, dup: (topics.get(s.topic.trim()) ?? 0) > 1 })));
+            if (ws.archived?.length) {
+                rows.push({ kind: 'archive', surveys: ws.archived });
+            }
+            return rows;
+        }
+        if (node.kind === 'archive') {
+            return node.surveys.map((s): Node => ({ kind: 'archived', survey: s }));
         }
         if (node.kind === 'survey') {
             const rows: Node[] = [{ kind: 'steps', survey: node.survey }];
+            if ((await this.model.workspace())?.zotero) {
+                rows.push({ kind: 'zotero', survey: node.survey });
+            }
             for (const status of GROUP_ORDER) {
                 const count = node.survey.counts[status];
                 if (count) {
@@ -112,9 +139,22 @@ export class SurveyTree implements vscode.TreeDataProvider<Node>, vscode.Disposa
         if (node.kind === 'steps') {
             try {
                 const d = await this.model.detail(node.survey.name);
+                this.retried.delete(node.survey.name);
                 return d.next.map((step): Node => ({ kind: 'step', survey: node.survey, step }));
             } catch (e) {
-                return [{ kind: 'message', label: e instanceof Error ? e.message : String(e), icon: 'error' }];
+                // 一時的な失敗（同時に走った CLI・Zotero の待ち）が多いので、一度は自動でやり直す
+                if (!this.retried.has(node.survey.name)) {
+                    this.retried.add(node.survey.name);
+                    setTimeout(() => this.changed.fire(node), 3000);
+                    return [{ kind: 'message', label: vscode.l10n.t('Could not read the next steps; trying again…'), icon: 'sync~spin' }];
+                }
+                return [
+                    { kind: 'message', label: e instanceof Error ? e.message : String(e), icon: 'error' },
+                    { kind: 'message', label: vscode.l10n.t('Reload'), icon: 'refresh',
+                      command: { command: 'priorwork.refresh', title: '' } },
+                    { kind: 'message', label: vscode.l10n.t('Show the output'), icon: 'output',
+                      command: { command: 'priorwork.showOutput', title: '' } },
+                ];
             }
         }
         if (node.kind === 'group') {
@@ -135,12 +175,41 @@ export class SurveyTree implements vscode.TreeDataProvider<Node>, vscode.Disposa
             case 'survey': {
                 const it = new vscode.TreeItem(node.survey.topic, C.Expanded);
                 it.id = `survey:${node.survey.name}`;
-                it.description = surveyDescription(node.survey);
+                // 同じテーマが並ぶとき（やり直したときなど）は、名前で見分けられるようにする
+                it.description = (node.dup ? `${surveyTag(node.survey)} · ${node.survey.created} · ` : '')
+                    + surveyDescription(node.survey);
                 it.iconPath = new vscode.ThemeIcon('book');
                 it.contextValue = 'priorwork.survey';
                 it.tooltip = new vscode.MarkdownString(
                     `**${node.survey.topic}**\n\n${node.survey.name} · ${node.survey.depth} · ${node.survey.lang}\n\n`
                     + vscode.l10n.t('searches: {0}', node.survey.searches));
+                return it;
+            }
+            case 'zotero': {
+                const coll = node.survey.zotero_collection;
+                const it = new vscode.TreeItem(coll ? `Zotero: ${coll.name}` : vscode.l10n.t('Link a Zotero collection…'), C.None);
+                it.id = `zotero:${node.survey.name}`;
+                it.iconPath = new vscode.ThemeIcon('library');
+                it.tooltip = coll ? vscode.l10n.t('Linked to the Zotero collection "{0}". Click to change it.', coll.name)
+                    : vscode.l10n.t('Papers you put in a Zotero collection can be read first and registered as candidates');
+                it.command = { command: 'priorwork.zoteroCollection', title: '', arguments: [node] };
+                return it;
+            }
+            case 'archive': {
+                const it = new vscode.TreeItem(vscode.l10n.t('Archived'), C.Collapsed);
+                it.id = 'archive';
+                it.description = String(node.surveys.length);
+                it.iconPath = new vscode.ThemeIcon('archive');
+                return it;
+            }
+            case 'archived': {
+                const it = new vscode.TreeItem(node.survey.topic, C.None);
+                it.id = `archived:${node.survey.name}`;
+                it.description = `${surveyTag(node.survey)} · ${node.survey.created}`;
+                it.iconPath = new vscode.ThemeIcon('book', new vscode.ThemeColor('disabledForeground'));
+                it.contextValue = 'priorwork.survey.archived';
+                it.tooltip = `${node.survey.name}\n` + vscode.l10n.t('Archived on {0}', (node.survey.archived ?? '').slice(0, 10));
+                it.command = { command: 'priorwork.openReport', title: '', arguments: [node] };
                 return it;
             }
             case 'steps': {

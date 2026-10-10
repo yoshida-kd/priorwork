@@ -3,6 +3,46 @@
 Priorwork's command-line tool (`priorwork` on PyPI) and this extension are
 released together, under one version number.
 
+## 0.1.5
+
+- **The sidebar no longer sticks at "priorwork status failed".** The cause
+  was two `status` runs (one per survey) writing the Zotero cache through the
+  same temporary file at once. The cache now uses a file per process, a
+  Zotero problem no longer stops `status`, and the next steps retry by
+  themselves once, then offer *Reload*.
+- **Archive a survey** (right-click → *Archive the Survey…*, or
+  `priorwork archive SURVEY`). It moves to an *Archived* group at the bottom
+  of the sidebar; nothing is deleted, and it can be brought back (`--undo`).
+  `priorwork status` lists the archived ones with `--archived`.
+- **Surveys with the same topic are told apart** in the sidebar by name and
+  date (e.g. `make_or_buy_v2`). `priorwork new` says when the topic already
+  exists. Asked to redo a survey, the agent makes a new one and archives the
+  old one once you say so.
+- **Zotero collection in the sidebar.** Each survey has a row *Link a Zotero
+  collection…*, which reads *Zotero: <collection>* once linked.
+- **The agent leaves Git alone** unless you ask (it used to commit at each
+  break); at the end it asks whether to commit.
+- The title bar of an HTML file no longer shows Priorwork's viewer icon next
+  to Live Preview's (right-click the file in the explorer instead).
+- **Claude Code runs `./priorwork` without asking.** Making a workspace, and
+  `priorwork sync`, add `Bash(./priorwork:*)` to `.claude/settings.json`
+  (other settings are kept; other commands are still checked). Antigravity
+  has no workspace settings file, so the guide explains adding `./priorwork`
+  to its allow list once. The permission is only for the agent: the sidebar
+  never needs it.
+- **Full surveys read every included paper in the full text.** "Core papers
+  only" proved too vague. A card may stay "abstract only" only when no full
+  text could be found: `fulltext` now records a failed attempt, and `check`
+  warns about abstract-only cards whose full text was never tried (or was
+  fetched but not used) and lists the ones with no full text, so you can
+  attach their PDFs in Zotero. In a survey made from a manuscript, the papers
+  the draft cites must be checked in the full text.
+- **A place for manuscripts.** Put a manuscript whose analysis is done, with
+  its tables, in `manuscripts/<paper name>/` (the workspace gets the folder
+  and a README). `--manuscript` takes the folder, and the agent reads all of
+  it. **New Survey → Start from my manuscript** picks it (offering to copy one
+  from outside the workspace) and copies the request for your agent.
+
 ## 0.1.4
 
 - **Start from your manuscript.** If the data, methods and analysis of a paper

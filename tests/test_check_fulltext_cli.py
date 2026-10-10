@@ -127,3 +127,20 @@ def test_cli_interactive_flow(monkeypatch, capsys):
     assert [q["kind"] for q in s.data["searches"]] == ["search", "snowball"]
     cli.main(["status", "mw"])
     assert "次にやること" in capsys.readouterr().out
+
+
+def test_a_failed_fulltext_is_recorded_and_a_success_clears_it(included_survey, monkeypatch):
+    from priorwork.fulltext import FulltextError
+    s, e = included_survey
+
+    def missing(*a, **k):
+        raise FulltextError("No full-text PDF was found:\n  - No open-access PDF")
+    monkeypatch.setattr(cli, "fetch_fulltext", missing)
+    with pytest.raises(SystemExit):
+        cli.main(["fulltext", "check", str(e["number"])])
+    assert Survey.load("check").get(e["number"])["fulltext_failed"]["reason"] == "No full-text PDF was found:"
+
+    monkeypatch.setattr(cli, "fetch_fulltext", lambda *a, **k: {"path": "x.txt", "source": "oa:x", "pages": 1,
+                                                                 "chars": 900, "page_markers": True})
+    cli.main(["fulltext", "check", str(e["number"])])
+    assert "fulltext_failed" not in Survey.load("check").get(e["number"])

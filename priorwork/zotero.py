@@ -21,6 +21,7 @@ import json
 import os
 import re
 import sys
+import tempfile
 import time
 import zipfile
 from pathlib import Path
@@ -222,10 +223,16 @@ class ZoteroClient:
             return {"version": 0, "items": {}}
 
     def _save_index(self, index: Dict[str, Any]):
-        self.index_path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self.index_path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(index, ensure_ascii=False), encoding="utf-8")
-        tmp.replace(self.index_path)
+        """一覧のキャッシュを書く。VS Code のサイドバーは複数の `status` を同時に走らせるので、
+        一時ファイルはプロセスごとに分ける。書けなくても（キャッシュなので）止めない。"""
+        try:
+            self.index_path.parent.mkdir(parents=True, exist_ok=True)
+            fd, tmp = tempfile.mkstemp(prefix="index.", suffix=".tmp", dir=self.index_path.parent)
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(index, f, ensure_ascii=False)
+            os.replace(tmp, self.index_path)
+        except OSError as e:
+            print("[Notice] " + t("Could not save the Zotero cache: {error}", error=e), file=sys.stderr)
 
     @property
     def index(self) -> Dict[str, Any]:

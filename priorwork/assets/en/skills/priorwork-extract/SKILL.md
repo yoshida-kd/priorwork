@@ -12,10 +12,13 @@ Follow the rules in [AGENTS.md](../../../AGENTS.md).
 
 ## By depth
 
-- `full`: for the core papers (highly cited, central to the research question, many links), get the full text and set the evidence level to "full text checked". The others may be "abstract only".
+- `full`: for **every included paper**, get the full text (`./priorwork fulltext`), fill in the card from it and set the evidence level to "full text checked". Do not pick papers to read by whether they are "core". "Abstract only" is allowed only for papers whose full text `fulltext` tried and could not find (the failure is recorded, and `check` tells it apart from not trying).
+  - You need not read the full text from start to end. Focus on the data and sample, the identification, the main results (tables) and the limitations, and fill in the card's fields.
 - `quick`: filling in from the abstracts is fine (evidence level "abstract only").
 
 Either way, write only what the abstract or full text says, and always update the evidence level.
+
+In a survey made from a manuscript (`priorwork-manuscript`), the papers the draft cites must be "full text checked" at any depth (`check` gives a WARN otherwise).
 
 ## Steps (one paper at a time, until every included paper is done)
 

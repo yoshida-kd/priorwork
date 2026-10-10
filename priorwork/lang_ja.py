@@ -184,8 +184,18 @@ MESSAGES = {
     "If quick is enough, change it with `priorwork scope {name} --depth quick`":
         "深さが full ですが、引用をたどっていません（`priorwork snowball {name}`）。"
         "quick で足りるなら `priorwork scope {name} --depth quick` に変えてください",
-    "The depth is full, but {n|# card is|# cards are} \"{abstract}\" (take the core papers to the full text: {numbers})":
-        "深さが full ですが、{n} 件が「{abstract}」です（中核論文は本文確認まで進める: {numbers}）",
+    "The depth is full, but {n|# card is|# cards are} \"{abstract}\" without trying the full text "
+    "(`priorwork fulltext {name} N`): {numbers}":
+        "深さが full ですが、本文を試さずに「{abstract}」のカードが {n} 件あります（`priorwork fulltext {name} N`）: {numbers}",
+    "The full text was fetched, but {n|# card is|# cards are} still \"{abstract}\" (fill them in from the full text): "
+    "{numbers}":
+        "本文を取得したのに「{abstract}」のままのカードが {n} 件あります（本文から記入する）: {numbers}",
+    "No full text could be found for {numbers}, so {n|its card is|their cards are} \"{abstract}\". "
+    "Attach the PDF in Zotero (or give it with `--pdf`) to read it":
+        "{numbers} は本文が見つからなかったため「{abstract}」です（{n} 件）。Zotero に PDF を添付する"
+        "（または `--pdf` で渡す）と本文で確かめられます",
+    "The draft of the manuscript cites {n|# paper|# papers} not checked against the full text: {numbers}":
+        "原稿の下書きが、本文で確かめていない論文を {n} 件引用しています: {numbers}",
 
     # -- 文献 API（api.py） -----------------------------------------------------------
     "an HTML error page": "HTML のエラーページ",
@@ -360,6 +370,25 @@ MESSAGES = {
     "included {included} / maybe {maybe} / candidates {candidate} / excluded {excluded}":
         "採用 {included} / 保留 {maybe} / 候補 {candidate} / 除外 {excluded}",
     "Report: {path}": "レポート: {path}",
+    "Archived on {date}. Bring it back with `priorwork archive {name} --undo`":
+        "{date} にアーカイブしました。`priorwork archive {name} --undo` で戻せます",
+    "No archived surveys.": "アーカイブしたサーベイはありません。",
+    "({n|# archived survey|# archived surveys} not shown: `priorwork status --archived`)":
+        "（アーカイブしたサーベイ {n} 件は表示していません: `priorwork status --archived`）",
+    "Other surveys have the same topic: {names}. If this one redoes them, archive the old ones with "
+    "`priorwork archive <survey>` (nothing is deleted)":
+        "同じテーマのサーベイがあります: {names}。やり直しなら、古いほうを `priorwork archive <サーベイ>` で"
+        "アーカイブしてください（何も消えません）",
+    "Archived {name} (hidden from the list; the report and state stay). Undo with `priorwork archive {name} --undo`":
+        "{name} をアーカイブしました（一覧に出なくなります。レポートと状態は残ります）。"
+        "`priorwork archive {name} --undo` で戻せます",
+    "Brought back {name}": "{name} を戻しました",
+    "list the archived surveys instead": "アーカイブしたサーベイを一覧する",
+    "archive a survey: hide it from the list, keeping its files": "サーベイをアーカイブする（ファイルは残し、一覧から隠す）",
+    "bring it back": "アーカイブから戻す",
+    "{path} could not be read, so `./priorwork` was not allowed in it. Add {rule} to permissions.allow yourself":
+        "{path} を読めなかったため、`./priorwork` の許可を書き足していません。permissions.allow に {rule} を手で足してください",
+    "Could not save the Zotero cache: {error}": "Zotero の一覧のキャッシュを保存できませんでした: {error}",
     "Manuscript: {path}": "原稿: {path}",
     "RQ: {question} | period: {years} | depth: {depth}": "RQ: {question} | 期間: {years} | 深さ: {depth}",
     "{n|# search|# searches}": "検索 {n} 回",
@@ -439,6 +468,8 @@ MESSAGES = {
         "  new ... --manuscript PATH  分析まで済んだ原稿から始める（1〜3 章を下書きする）",
     "  scope SURVEY ...           set the scope (research question, period, criteria)":
         "  scope SURVEY ...           調査範囲（RQ・期間・採否基準）を設定",
+    "  archive SURVEY [--undo]    hide a survey from the list, keeping its files (e.g. one that was redone)":
+        "  archive SURVEY [--undo]    サーベイを一覧から隠す（ファイルは残す。やり直した古いものなど）",
     "  list SURVEY                list the papers (numbers, decisions, SSCI)":
         "  list SURVEY                論文の一覧（番号・採否・SSCI）",
     "  include / exclude / maybe  record decisions (e.g. priorwork include SURVEY 2 5 7)":
@@ -524,9 +555,10 @@ MESSAGES = {
     "also include each paper's abstract": "各論文の要旨も載せる",
     "write only the draft of the manuscript's sections 1–3, with its references (a survey made with --manuscript)":
         "原稿の 1〜3 章の下書きだけを、参考文献つきで書き出す（--manuscript で作ったサーベイ）",
-    "your manuscript whose analysis is done: the survey then backs it up and drafts its introduction, "
-    "literature review and hypotheses":
-        "分析まで済んだ原稿。サーベイはそれを補強する文献を集め、イントロ・先行研究・理論と仮説を下書きする",
+    "your manuscript whose analysis is done (a file, or a folder under manuscripts/ with the manuscript and its "
+    "tables): the survey then backs it up and drafts its introduction, literature review and hypotheses":
+        "分析まで済んだ原稿（ファイル、または原稿と結果の表を入れた manuscripts/ の下のフォルダ）。"
+        "サーベイはそれを補強する文献を集め、イントロ・先行研究・理論と仮説を下書きする",
     "get the full text": "本文テキストを取得",
     "the paper number": "論文番号",
     "the path of the PDF": "PDF のパスを直接指定",

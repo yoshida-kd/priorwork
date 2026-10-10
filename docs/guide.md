@@ -122,6 +122,21 @@ Open the gear in the sidebar (**Settings**).
 3. If you have the SSCI journal list, import it with **Import the SSCI List (CSV)…**
    ([8.3](#83-the-ssci-journal-list)).
 4. **Save and Check the Connections** shows the diagnosis at the bottom of the page.
+5. So that your agent does not ask before every `./priorwork` command, allow `./priorwork` in the agent:
+   - **When it is needed**: when you hand work to the agent (ask in the chat). The agent runs
+     `./priorwork …` in the terminal for every search, decision and card, tens to hundreds of times per
+     survey; without the permission it asks each time. The sidebar's buttons and the `./priorwork` you
+     type yourself do not need it (they do not go through the agent).
+   - **What it allows**: only commands starting with `./priorwork`. Priorwork touches only the workspace
+     (`reports/`, `.priorwork/`) and the literature APIs; it never writes to Zotero and never runs Git.
+     Other commands are still checked.
+   - **Claude Code**: automatic. Making the workspace (and every `priorwork sync`) adds
+     `Bash(./priorwork:*)` to the allowed rules in `.claude/settings.json`, keeping your other settings.
+     To stop it, move the rule from `allow` to `deny` (just removing it, the next sync adds it back;
+     it is not added while it is under `deny`).
+   - **Antigravity**: it has no settings file in the workspace, so this cannot be automatic. Add
+     `./priorwork` once to the terminal commands allowed to run without review in its settings (the
+     allow list; the menu names differ between versions). Other commands are still checked.
 
 The settings are saved in the workspace's `.env`, which is kept out of Git. The page never shows the
 values of the keys.
@@ -134,7 +149,7 @@ The reports and state files contain abstracts, so keep the workspace in a **priv
 2. When VS Code asks, choose **Publish to GitHub private repository** and include all the files it
    suggests (`.env` is left out by `.gitignore`).
 
-The agent commits the changes at each natural break, and pushes only when you agree.
+The agent does not touch Git unless you ask: when it finishes, it asks whether to commit. Ask it to commit (and push) when you want, or allow it in `AGENTS.local.md`.
 
 ### 3.4 Continue on another machine
 
@@ -197,7 +212,7 @@ or "thorough", the agent follows it; otherwise it decides from how broad the top
 | Suits | a narrow topic, or just an overview | a broad topic with subtopics, or when coverage matters |
 | Searches | 2–3 queries (10 results each) | 2–4 queries per subtopic (25 results each), aiming at 100+ candidates |
 | Citation chasing | optional | yes |
-| Cards | abstracts are fine | core papers checked in the full text |
+| Cards | abstracts are fine | every included paper checked in the full text (abstract only when none can be found) |
 | Text | an overview and the comparison table | background, theories, debates and gaps |
 
 When a full survey has too few searches, **Search more** appears in the **Next steps** in the sidebar.
@@ -239,6 +254,12 @@ works from there.
   only recommends the scope and decisions and waits for your answers. To make this the rule, write
   "Ask the user before deciding the scope and each paper" in the workspace's `AGENTS.local.md`.
 
+- **Redo**: ask "redo this survey" and the agent makes a new one (e.g. `…_v2`). When surveys share a
+  topic, the sidebar shows their names and dates side by side. Once you no longer need the old one,
+  right-click it → **Archive the Survey…** (or ask the agent). It leaves the list for the **Archived**
+  group at the bottom; nothing is deleted, and the button on it brings it back
+  (`./priorwork archive SURVEY [--undo]`).
+
 When you come back to a conversation, "let's continue" is enough: the agent checks the state and takes
 the next step.
 
@@ -256,8 +277,10 @@ see [8.2](#82-zotero)).
    selected collection.
 4. Click **Reload from Zotero** to update the status.
 
-**Link a Zotero collection to the survey.** Right-click the survey → **Link a Zotero Collection…** and
-choose a collection you made in Zotero (or tell the agent "use my Zotero collection X"). Once linked:
+**Link a Zotero collection to the survey.** Under each survey in the sidebar, click **Link a Zotero
+collection…** (shown once Zotero is set up) and choose a collection you made in Zotero (or tell the agent
+"use my Zotero collection X"). The row then reads **Zotero: <collection>**; click it to change or unlink
+it. Once linked:
 
 - "In Zotero" means in that collection.
 - Papers you put into the collection yourself can be registered as candidates (**Register … papers from
@@ -267,12 +290,28 @@ choose a collection you made in Zotero (or tell the agent "use my Zotero collect
 
 ### 4.8 Write sections 1–3 of a manuscript whose analysis is done
 
-You can also start from your own manuscript instead of a topic. Put a manuscript with the data and
-methods and the analysis written into the workspace (e.g. `manuscript/paper.md`; .docx, .tex and .pdf
-are fine too) and ask your agent:
+You can also start from your own manuscript instead of a topic.
 
-> manuscript/paper.md is written up to the analysis. Gather the literature to back it up and write the
-> introduction, literature review and theory and hypotheses.
+**Where to put the manuscript.** In the workspace's `manuscripts/`, one folder per paper (the same
+explanation is in `manuscripts/README.md`):
+
+```text
+manuscripts/
+  make_or_buy/          ← one folder per paper (an English name)
+    paper.md            ← the manuscript; only the parts that are written (data and methods, results)
+    tables/             ← tables, figures and logs of the results (any not in the manuscript)
+```
+
+.md, .tex and .txt read most reliably; .docx and .pdf are fine too (if the agent cannot read them, it
+converts them to text). If the results are in separate files (regression tables in .tex, …), put them
+in the same folder. The agent reads everything in it.
+
+**How to ask.** **New Survey → Start from my manuscript** in the sidebar lets you choose the manuscript
+(or its folder) and copies the request. If you choose one outside the workspace, it offers to copy it
+into `manuscripts/` (the original stays where it is). You can also ask in the chat:
+
+> The manuscript in manuscripts/make_or_buy is written up to the analysis. Gather the literature to back
+> it up and write the introduction, literature review and theory and hypotheses.
 
 The agent then:
 
@@ -295,7 +334,7 @@ and how conflicting literature is handled. That section is for you to judge; it 
 exported draft. The manuscript itself is never rewritten. Read and edit the draft before moving it into
 your manuscript.
 
-On the command line: `./priorwork new "<topic>" --slug <slug> --manuscript manuscript/paper.md`, then
+On the command line: `./priorwork new "<topic>" --slug <slug> --manuscript manuscripts/make_or_buy`, then
 `./priorwork export SURVEY --draft`.
 
 ---
@@ -404,8 +443,9 @@ text of the report**.
 | abstract only | checked against the abstract |
 | full text checked | checked against the full text |
 
-Unchecked cards are flagged by the checks, and the export is marked *Draft*. In a full survey, check
-the core papers in the full text.
+Unchecked cards are flagged by the checks, and the export is marked *Draft*. In a full survey, every
+included paper is checked in the full text; a card may stay "abstract only" only when no full text
+could be found, and the checks list those papers so that you can attach their PDFs in Zotero.
 
 ### 6.3 Full texts
 
@@ -538,7 +578,8 @@ match the engine's version; do not edit them.
 
 ```text
 my-surveys/
-├── reports/                 # the reports (the working .md, and the exported .html etc.)
+├── reports/                 # the reports (the working .md, the exported .html, the manuscript drafts .draft.md, …)
+├── manuscripts/             # manuscripts to start from, with their tables (one folder per paper; only read)
 ├── AGENTS.md, CLAUDE.md     # instructions for agents (updated automatically; do not edit)
 ├── AGENTS.local.md          # instructions for this workspace only (edit freely)
 ├── .agent/skills/           # the skills for each step (also seen through .claude/skills)
@@ -587,6 +628,7 @@ Everything the extension does is also a `./priorwork` command (the agent uses th
 ./priorwork status [SURVEY]                        # the list / progress and next steps
 ./priorwork new "<topic>" --slug <slug> [--depth quick|full] [--question ...]
 ./priorwork scope SURVEY --question "..." [--years ... --fields ... --inclusion ... --exclusion ... --depth ...]
+./priorwork archive SURVEY [--undo]       # hide it from the list (the files stay); status --archived lists them
 ./priorwork list SURVEY [--status candidate maybe] [--abstract]
 ./priorwork include SURVEY 2 5 7 [--reason "..."]
 ./priorwork exclude SURVEY 3 --reason "theory only"

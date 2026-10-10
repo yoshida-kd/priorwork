@@ -94,3 +94,19 @@ def test_the_full_report_still_exports(ms):
 def test_check_warns_when_the_manuscript_moved(ms, manuscript):
     manuscript.unlink()
     assert any(level == WARN and "paper.md" in m for level, m in check_survey(ms))
+
+
+def test_a_folder_can_be_the_manuscript(tmp_path):
+    folder = tmp_path / "manuscripts" / "mob"
+    (folder / "tables").mkdir(parents=True)
+    (folder / "paper.md").write_text("# 5. Results\n")
+    s = Survey.create("t", "folder", {}, manuscript=str(folder))
+    assert s.manuscript == "manuscripts/mob" and "role" in dict(s.card_spec)
+
+
+def test_the_draft_must_cite_papers_read_in_full(ms):
+    write_draft(ms, "Card and Krueger (1994) found no fall in employment.")
+    shallow = [m for level, m in check_survey(ms) if level == WARN and "本文で確かめていない" in m]
+    assert shallow and "#1" in shallow[0]
+    ms.set_card(1, {"evidence": "fulltext"})
+    assert not [m for level, m in check_survey(ms) if "本文で確かめていない" in m]

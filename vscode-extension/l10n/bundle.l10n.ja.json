@@ -242,5 +242,22 @@
   "then export the report": "書き出しまで",
   "{0} included papers are not in the Zotero collection \"{1}\": {2}.": "Zotero のコレクション「{1}」に無い採用論文が {0} 本あります: {2}。",
   "{0} items": "{0} 件",
-  "{0} papers in the collection are not in the survey yet.": "コレクションにあってサーベイにまだ無い論文が {0} 本あります。"
+  "{0} papers in the collection are not in the survey yet.": "コレクションにあってサーベイにまだ無い論文が {0} 本あります。",
+  "Could not read the next steps; trying again…": "次にやることを読めませんでした。読み直しています…",
+  "Reload": "再読み込み",
+  "Link a Zotero collection…": "Zotero のコレクションを結び付ける…",
+  "Linked to the Zotero collection \"{0}\". Click to change it.": "Zotero のコレクション「{0}」に結び付いています。押すと変えられます。",
+  "Papers you put in a Zotero collection can be read first and registered as candidates": "Zotero のコレクションに入れた論文を優先して読み、候補に登録できます",
+  "Archived": "アーカイブ",
+  "Archived on {0}": "{0} にアーカイブ",
+  "Archive": "アーカイブする",
+  "Archive \"{0}\" ({1})? It is hidden from the list; its report and papers stay, and you can bring it back.": "「{0}」（{1}）をアーカイブしますか？一覧には出なくなりますが、レポートと論文は残り、あとで戻せます。",
+  "Start from my manuscript": "原稿から始める",
+  "The analysis is written; the agent gathers the literature behind it and drafts the introduction, literature review and hypotheses.": "分析まで書いた原稿から。エージェントが裏付けとなる文献を集め、イントロ・先行研究・仮説を下書きします。",
+  "Choose the manuscript, or its folder in manuscripts/": "原稿か、manuscripts/ の中の原稿のフォルダを選ぶ",
+  "Use This": "これを使う",
+  "Copy It into manuscripts/": "manuscripts/ に写す",
+  "The manuscript is outside the workspace. The agent reads it from manuscripts/ in the workspace (the original stays where it is).": "原稿がワークスペースの外にあります。エージェントはワークスペースの manuscripts/ から読みます（元のファイルはそのまま残ります）。",
+  "manuscripts/{0} already exists. Rename or remove it first.": "manuscripts/{0} はもうあります。先に名前を変えるか、取り除いてください。",
+  "The analysis of my manuscript in {0} is done. With Priorwork, make a survey from it, gather the literature that supports and conflicts with it, and draft its introduction, literature review and theory and hypotheses in the language of the manuscript, without stopping. Do not rewrite the manuscript. Report at the end.": "{0} にある原稿は分析まで済んでいます。Priorwork で、この原稿からサーベイを作り、原稿を支える文献と食い違う文献を集めて、イントロ・先行研究・理論と仮説を原稿の言語で、止まらずに下書きしてください。原稿は書き換えないでください。最後に報告してください。"
 }

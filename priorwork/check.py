@@ -9,7 +9,8 @@ from typing import Any, Dict, List, NamedTuple, Optional, Set, Tuple
 from . import ssci
 from .i18n import t
 from .survey import (
-    CANDIDATE, EVIDENCE_ABSTRACT, EVIDENCE_KEYS, EVIDENCE_UNCHECKED, INCLUDED, MAYBE, Survey, SurveyError,
+    CANDIDATE, EVIDENCE_ABSTRACT, EVIDENCE_FULLTEXT, EVIDENCE_KEYS, EVIDENCE_UNCHECKED, INCLUDED, MAYBE, Survey,
+    SurveyError,
     evidence_key, evidence_label, extract_blocks, first_surname, parse_card_fields, parse_cards, strip_blocks, surname,
     year_labels,
 )
@@ -206,7 +207,7 @@ def check_survey(survey: Survey, client: Optional[Any] = None) -> List[Finding]:
                                           title=w.get("title"))))
 
     # 5. 原稿から始めるサーベイ: 原稿が動いていないか（エージェントは原稿を読み直して下書きを書く）
-    if survey.manuscript and not (survey.root / survey.manuscript).is_file():
+    if survey.manuscript and not (survey.root / survey.manuscript).exists():
         findings.append((WARN, t("The manuscript {path} is not found. If it moved, set it again with "
                                  "`priorwork scope {name} --manuscript <path>`", path=survey.manuscript, name=survey.name)))
 
@@ -224,12 +225,41 @@ def check_survey(survey: Survey, client: Optional[Any] = None) -> List[Finding]:
             findings.append((WARN, t("The depth is full, but the citations have not been chased (`priorwork snowball {name}`). "
                                      "If quick is enough, change it with `priorwork scope {name} --depth quick`",
                                      name=survey.name)))
-        if abstract_only:
-            findings.append((INFO, t("The depth is full, but {n|# card is|# cards are} \"{abstract}\" "
-                                     "(take the core papers to the full text: {numbers})", n=len(abstract_only),
-                                     abstract=evidence_label(EVIDENCE_ABSTRACT, survey.lang),
-                                     numbers=", ".join(f"#{e['number']}" for e in abstract_only[:8]))))
+        # full では採用論文すべての本文を読む。要旨のみでよいのは、本文が取れなかった論文だけ
+        abstract = evidence_label(EVIDENCE_ABSTRACT, survey.lang)
+        fetched = [e for e in abstract_only if e.get("fulltext")]
+        failed = [e for e in abstract_only if not e.get("fulltext") and e.get("fulltext_failed")]
+        untried = [e for e in abstract_only if not e.get("fulltext") and not e.get("fulltext_failed")]
+        if untried:
+            findings.append((WARN, t("The depth is full, but {n|# card is|# cards are} \"{abstract}\" without trying the "
+                                     "full text (`priorwork fulltext {name} N`): {numbers}", n=len(untried),
+                                     abstract=abstract, name=survey.name, numbers=_numbers(untried))))
+        if fetched:
+            findings.append((WARN, t("The full text was fetched, but {n|# card is|# cards are} still \"{abstract}\" "
+                                     "(fill them in from the full text): {numbers}", n=len(fetched), abstract=abstract,
+                                     numbers=_numbers(fetched))))
+        if failed:
+            findings.append((INFO, t("No full text could be found for {numbers}, so {n|its card is|their cards are} "
+                                     "\"{abstract}\". Attach the PDF in Zotero (or give it with `--pdf`) to read it",
+                                     n=len(failed), abstract=abstract, numbers=_numbers(failed))))
+
+    # 8. 原稿の下書きで引用する論文は、深さによらず本文で確かめる
+    if survey.manuscript:
+        from .export import cited_papers, draft_section   # export が check を読むので、ここで読む
+        try:
+            cited = cited_papers(survey, draft_section(md))
+        except RuntimeError:
+            cited = []
+        shallow = [e for e in cited if evidence_key(parse_card_fields(cards.get(e["key"], "")).get("evidence", ""))
+                   != EVIDENCE_FULLTEXT]
+        if shallow:
+            findings.append((WARN, t("The draft of the manuscript cites {n|# paper|# papers} not checked against the "
+                                     "full text: {numbers}", n=len(shallow), numbers=_numbers(shallow))))
     return findings
+
+
+def _numbers(entries: List[dict], limit: int = 10) -> str:
+    return ", ".join(f"#{e['number']}" for e in entries[:limit]) + (" …" if len(entries) > limit else "")
 
 
 def re_blocks_removed(md: str) -> str:

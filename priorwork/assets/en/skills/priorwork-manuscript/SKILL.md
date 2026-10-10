@@ -14,13 +14,19 @@ Follow the rules in [AGENTS.md](../../../AGENTS.md). The user has a manuscript w
 
 ## 1. Read the manuscript and create the survey
 
-If you do not know where the manuscript is, ask (have it put inside the workspace, e.g. `manuscript/paper.md`; .docx, .tex and .pdf are fine too; if you cannot read the format, ask for a text version). Read it and decide:
+The manuscript goes in `manuscripts/<paper name>/` in the workspace (see `manuscripts/README.md`). Besides the manuscript (up to the results), the folder may hold tables, figures and logs of results that are not in the manuscript. **Read every file in the folder.**
+
+- If you do not know which manuscript, look in `manuscripts/`: take it if there is one, ask if there are several.
+- If it is not in `manuscripts/`, ask the user to put it there (do not copy files from outside on your own).
+- Read .md, .tex and .txt as they are. Read .docx and .pdf directly if you can, otherwise convert them to text (`pandoc` or similar); failing that, ask for a text version.
+
+Read it and decide:
 
 - the topic (the title or the research question), an English slug and the depth (full by default)
 - the scope: the research question is the manuscript's; set the period, fields and criteria to suit its field
 
 ```bash
-./priorwork new "<topic>" --slug <slug> --manuscript <path of the manuscript> --depth full --question "..." --fields "..." --inclusion "..." --exclusion "..."
+./priorwork new "<topic>" --slug <slug> --manuscript manuscripts/<paper name> --depth full --question "..." --fields "..." --inclusion "..." --exclusion "..."
 ```
 
 Fill in section 1 of the report, "The manuscript in brief", with only what the manuscript says (research question, Y, X, data, identification, main results, unexpected results). Copy estimates exactly as they are in the manuscript's tables.

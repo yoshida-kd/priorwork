@@ -13,6 +13,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from . import __version__, i18n, scaffold, settings, ssci
+import requests
+
 from .api import ApiError, LiteratureClient
 from .check import ERROR, INFO, WARN, check_survey
 from .doctor import NG, OK, run_checks
@@ -22,7 +24,7 @@ from .i18n import t, tl
 from .snowball import snowball
 from .survey import (
     CANDIDATE, DEFAULT_DEPTH, DEPTHS, EVIDENCE_KEYS, EXCLUDED, INCLUDED, MAYBE, STATUSES, Survey,
-    SurveyError, author_short, evidence_key, evidence_label, status_label, status_trail,
+    SurveyError, author_short, evidence_key, evidence_label, now_iso, status_label, status_trail,
 )
 from .workspace import ROOT, meta_dir, workspace_lang
 from .zotero import ZoteroClient, ZoteroError
@@ -54,6 +56,7 @@ USAGE_LINES = [
     "  new TOPIC --slug SLUG      create a survey (reports/YYYYMMDD_<slug>.md and .priorwork/surveys/*.json)",
     "  new ... --manuscript PATH  start from a manuscript whose analysis is done (drafts its sections 1–3)",
     "  scope SURVEY ...           set the scope (research question, period, criteria)",
+    "  archive SURVEY [--undo]    hide a survey from the list, keeping its files (e.g. one that was redone)",
     "  list SURVEY                list the papers (numbers, decisions, SSCI)",
     "  include / exclude / maybe  record decisions (e.g. priorwork include SURVEY 2 5 7)",
     "  add SURVEY DOI...          register papers by DOI (included by default)",
@@ -153,10 +156,22 @@ def added_json(added: List[tuple]) -> List[Dict[str, Any]]:
             for e, is_new in added]
 
 
+# Zotero を見る処理の失敗は、status などを止めない（ネットワーク・キャッシュの読み書き・壊れた応答）
+ZOTERO_SOFT_ERRORS = (ZoteroError, OSError, ValueError, requests.RequestException)
+
+
 def survey_summary(s: Survey) -> Dict[str, Any]:
     return {"name": s.name, "topic": s.data["topic"], "created": s.data.get("created", ""), "depth": s.depth,
-            "lang": s.lang, "report": str(s.md_path), "manuscript": s.manuscript or None, "counts": s.counts(),
-            "searches": len(s.data["searches"])}
+            "lang": s.lang, "report": str(s.md_path), "manuscript": s.manuscript or None,
+            "zotero_collection": s.zotero_collection or None, "archived": s.archived or None,
+            "counts": s.counts(), "searches": len(s.data["searches"])}
+
+
+def same_topic(s: Survey, surveys: List[Survey]) -> List[Survey]:
+    """同じテーマ（大文字小文字・空白を無視）のほかのサーベイ（アーカイブしたものは除く）。"""
+    key = re.sub(r"\s+", " ", s.data["topic"]).strip().lower()
+    return [o for o in surveys if o.name != s.name and not o.archived
+            and re.sub(r"\s+", " ", o.data["topic"]).strip().lower() == key]
 
 
 # ---------------- Workspace commands ----------------
@@ -303,20 +318,27 @@ def next_steps(s: Survey, zotero_missing: List[Dict[str, Any]], zotero_pending: 
 
 def cmd_status(args, client):
     if not args.survey:
-        surveys = Survey.list_all()
+        everything = Survey.list_all()
+        surveys = [s for s in everything if not s.archived]
+        archived = [s for s in everything if s.archived]
         if args.json:
             return dump_json({"version": __version__, "root": str(ROOT), "workspace": meta_dir(ROOT).is_dir(),
                               "lang": workspace_lang(ROOT),
                               "git": {"repo": (repo := scaffold.in_git_repo(ROOT)),
                                       "remote": repo and scaffold.has_remote(ROOT)}, "sync": scaffold.sync_status(ROOT),
-                              "surveys": [survey_summary(s) for s in surveys]})
-        if not surveys:
-            print(t("No surveys yet. Create one with `priorwork new \"<topic>\" --slug <english_slug>`."))
-            return
-        for s in surveys:
+                              "zotero": ZoteroClient.from_env() is not None,
+                              "surveys": [survey_summary(s) for s in surveys],
+                              "archived": [survey_summary(s) for s in archived]})
+        shown = archived if args.archived else surveys
+        if not shown:
+            print(t("No archived surveys.") if args.archived
+                  else t("No surveys yet. Create one with `priorwork new \"<topic>\" --slug <english_slug>`."))
+        for s in shown:
             c = s.counts()
             print(f"{s.name}: {s.data['topic']} | " + t("included {included} / maybe {maybe} / candidates {candidate} / "
                                                        "excluded {excluded}", **c))
+        if archived and not args.archived:
+            print(t("({n|# archived survey|# archived surveys} not shown: `priorwork status --archived`)", n=len(archived)))
         return
 
     s = Survey.load(args.survey)
@@ -324,11 +346,14 @@ def cmd_status(args, client):
     pending = zotero_pending(s)
     steps = next_steps(s, zotero_missing, pending)
     if args.json:
-        return dump_json({**survey_summary(s), "scope": s.data["scope"], "zotero_collection": s.zotero_collection or None,
+        return dump_json({**survey_summary(s), "scope": s.data["scope"],
                           "unfilled": [e["number"] for e in s.unfilled()],
                           "zotero_missing": [e["number"] for e in zotero_missing],
                           "sync": scaffold.sync_status(ROOT), "next": steps})
     print(f"# {s.name}: {s.data['topic']}")
+    if s.archived:
+        print("⚠️ " + t("Archived on {date}. Bring it back with `priorwork archive {name} --undo`",
+                        date=s.archived[:10], name=s.name))
     print(t("Report: {path}", path=s.md_path))
     if s.manuscript:
         print(t("Manuscript: {path}", path=s.manuscript))
@@ -362,7 +387,7 @@ def zotero_unregistered(s: Survey) -> List[Dict[str, Any]]:
     try:
         return [e for e in s.by_status(INCLUDED)
                 if not (st := z.status(e["record"], coll))["registered"] or (coll and not st["in_collection"])]
-    except ZoteroError as e:
+    except ZOTERO_SOFT_ERRORS as e:
         print(f"[Notice] {e}", file=sys.stderr)
         return []
 
@@ -371,6 +396,11 @@ def cmd_new(args, client):
     scope = {k: getattr(args, k) or "" for k in ("question", "years", "fields", "inclusion", "exclusion")}
     s = Survey.create(args.topic, args.slug, scope, depth=args.depth or DEFAULT_DEPTH, lang=args.lang,
                       manuscript=args.manuscript)
+    others = same_topic(s, Survey.list_all())
+    if others:
+        print("[Notice] " + t("Other surveys have the same topic: {names}. If this one redoes them, archive the old "
+                              "ones with `priorwork archive <survey>` (nothing is deleted)",
+                              names=", ".join(o.name for o in others)), file=sys.stderr)
     if args.json:
         return dump_json({**survey_summary(s), "state": str(s.json_path)})
     print(t("Created: {path}", path=s.md_path))
@@ -393,6 +423,17 @@ def cmd_scope(args, client):
     print(f"depth: {s.depth}")
     if s.manuscript:
         print(f"manuscript: {s.manuscript}")
+
+
+def cmd_archive(args, client):
+    s = Survey.load(args.survey)
+    s.set_archived(not args.undo)
+    s.save()
+    if args.json:
+        return dump_json({"name": s.name, "archived": s.archived or None})
+    print(t("Archived {name} (hidden from the list; the report and state stay). Undo with "
+            "`priorwork archive {name} --undo`", name=s.name) if s.archived
+          else t("Brought back {name}", name=s.name))
 
 
 def cmd_list(args, client):
@@ -535,8 +576,15 @@ def cmd_export(args, client):
 def cmd_fulltext(args, client):
     s = Survey.load(args.survey)
     entry = s.get(args.number)
-    info = fetch_fulltext(entry, client, pdf_path=args.pdf, zotero=ZoteroClient.from_env())
+    try:
+        info = fetch_fulltext(entry, client, pdf_path=args.pdf, zotero=ZoteroClient.from_env())
+    except FulltextError as e:
+        # 「試して取れなかった」を残す（check が「試していない」と区別する）
+        entry["fulltext_failed"] = {"at": now_iso(), "reason": str(e).splitlines()[0]}
+        s.save()
+        raise
     entry["fulltext"] = info
+    entry.pop("fulltext_failed", None)
     s.save()
     if args.json:
         return dump_json({"number": entry["number"], **info})
@@ -556,7 +604,7 @@ def zotero_pending(s: Survey) -> int:
         return 0
     try:
         return len(zotero_to_import(s, z))
-    except ZoteroError as e:
+    except ZOTERO_SOFT_ERRORS as e:
         print(f"[Notice] {e}", file=sys.stderr)
         return 0
 
@@ -850,6 +898,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("status", parents=[common, as_json], help=t("list the surveys / progress and next steps"))
     p.add_argument("survey", nargs="?")
+    p.add_argument("--archived", action="store_true", help=t("list the archived surveys instead"))
+
+    p = sub.add_parser("archive", parents=[common, as_json],
+                       help=t("archive a survey: hide it from the list, keeping its files"))
+    p.add_argument("survey")
+    p.add_argument("--undo", action="store_true", help=t("bring it back"))
 
     scope_args = argparse.ArgumentParser(add_help=False)
     scope_args.add_argument("--question", help=t("the research question"))
@@ -860,7 +914,8 @@ def build_parser() -> argparse.ArgumentParser:
     scope_args.add_argument("--depth", choices=list(DEPTHS),
                             help=t("the depth of the survey (quick or full; default full)"))
     scope_args.add_argument("--manuscript", metavar="PATH",
-                            help=t("your manuscript whose analysis is done: the survey then backs it up and drafts "
+                            help=t("your manuscript whose analysis is done (a file, or a folder under manuscripts/ "
+                                   "with the manuscript and its tables): the survey then backs it up and drafts "
                                    "its introduction, literature review and hypotheses"))
 
     p = sub.add_parser("new", parents=[common, scope_args, as_json], help=t("create a survey"))
@@ -962,7 +1017,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 HANDLERS = {
     "init": cmd_init, "sync": cmd_sync, "upgrade": cmd_upgrade, "doctor": cmd_doctor, "settings": cmd_settings,
-    "status": cmd_status, "new": cmd_new, "scope": cmd_scope, "list": cmd_list,
+    "status": cmd_status, "archive": cmd_archive, "new": cmd_new, "scope": cmd_scope, "list": cmd_list,
     "include": cmd_set_status, "exclude": cmd_set_status, "maybe": cmd_set_status, "reset": cmd_set_status,
     "add": cmd_add, "card": cmd_card, "render": cmd_render, "check": cmd_check, "export": cmd_export, "fulltext": cmd_fulltext, "zotero": cmd_zotero,
     "search": cmd_search, "snowball": cmd_snowball, "get": cmd_get,

@@ -137,3 +137,36 @@ def test_init_keeps_an_existing_repo_and_env_example_is_tracked(tmp_path):
     (root / ".env").write_text("X=1")
     ignored = lambda rel: subprocess.run(["git", "check-ignore", "-q", rel], cwd=root).returncode == 0
     assert ignored(".env") and not ignored(".env.example")
+
+
+def test_sync_makes_the_manuscripts_folder_once(tmp_path):
+    root = tmp_path / "ws"
+    scaffold.init(root, lang="ja")
+    readme = root / "manuscripts" / "README.md"
+    assert "manuscripts/" in readme.read_text() and "原稿" in readme.read_text()
+    readme.write_text("mine")
+    scaffold.sync(root)
+    assert readme.read_text() == "mine"           # ユーザーのものなので、以後は触らない
+
+
+def test_sync_lets_claude_code_run_priorwork_and_keeps_other_settings(tmp_path):
+    root = tmp_path / "ws"
+    scaffold.init(root)
+    path = root / ".claude" / "settings.json"
+    assert json.loads(path.read_text())["permissions"]["allow"] == ["Bash(./priorwork:*)"]
+
+    path.write_text(json.dumps({"model": "x", "permissions": {"allow": ["Bash(ls:*)"], "deny": ["Bash(rm:*)"]}}))
+    assert ".claude/settings.json" in scaffold.sync(root).written
+    settings = json.loads(path.read_text())
+    assert settings["model"] == "x" and settings["permissions"]["deny"] == ["Bash(rm:*)"]
+    assert settings["permissions"]["allow"] == ["Bash(ls:*)", "Bash(./priorwork:*)"]
+    assert ".claude/settings.json" not in scaffold.sync(root).written    # 二度は足さない
+
+    path.write_text(json.dumps({"permissions": {"deny": ["Bash(./priorwork:*)"]}}))
+    scaffold.sync(root)
+    assert "allow" not in json.loads(path.read_text())["permissions"]      # deny で断ったら足さない
+
+    path.write_text("{ not json")
+    again = scaffold.sync(root)
+    assert ".claude/settings.json" not in again.written + again.skipped and scaffold.sync_status(root) is None
+    assert path.read_text() == "{ not json"                                # 読めない設定は壊さない

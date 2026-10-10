@@ -63,7 +63,7 @@ code, so updates never conflict.
    (recommended), and Zotero and the SSCI list if you have them. **Save and Check the Connections**
    tells you whether they work.
 4. **Publish it to GitHub** from the row in the sidebar, as a **private** repository. The agent
-   commits at each natural break; it pushes only when you agree.
+   does not touch Git unless you ask (it commits or pushes only when asked).
 5. **New Survey** → **Ask your agent to do it**: give the topic and paste the copied request into
    the agent's chat (or just ask in the chat). The agent works through to the exported report.
 6. Read the report (**Export and View the Report**, or right-click `reports/*.html` → **View the
@@ -225,12 +225,14 @@ on a survey copy ready-made requests.
 
 ### From a manuscript whose analysis is done
 
-If you have a manuscript with the data and methods and the analysis written, put it in the workspace
-and ask "write the introduction, literature review and hypotheses of this manuscript". The agent works
+If you have a manuscript with the data and methods and the analysis written, put it with its tables in
+`manuscripts/<paper name>/` in the workspace and ask "write the introduction, literature review and
+hypotheses of the manuscript in manuscripts/<paper name>" (**New Survey → Start from my manuscript** in
+the sidebar writes the request too). The agent works
 out from the manuscript which claims need literature (why it matters, lines of research, mechanisms,
 precedents for the methods), searches claim by claim, including findings that conflict with your
 results, fills in each card's "Role in the manuscript", and drafts sections 1–3 in the language of the
-manuscript (`./priorwork new … --manuscript <manuscript>`). `./priorwork export SURVEY --draft` writes
+manuscript (`./priorwork new … --manuscript manuscripts/<paper name>`). `./priorwork export SURVEY --draft` writes
 the draft to `reports/<name>.draft.md`, with the references it cites. So that the hypotheses are not
 written after the fact, the report records separately the literature behind each hypothesis and which
 results to treat as exploratory. The manuscript itself is never rewritten.
@@ -249,7 +251,7 @@ A survey has a depth, taken from the request (or chosen by the agent) and change
 | Suits | a narrow topic, or just an overview | a broad topic with subtopics, or when coverage matters |
 | Searches | 2–3 queries (10 results each) | 2–4 queries per subtopic (25 results each), 100+ candidates |
 | Citation chasing | optional | yes |
-| Cards | abstracts are fine | core papers checked in the full text |
+| Cards | abstracts are fine | every included paper checked in the full text (abstract only when none can be found) |
 
 The numbers are guides, not limits. The rules and `priorwork check` are the same at both depths.
 
@@ -290,6 +292,7 @@ The numbers are guides, not limits. The rules and `priorwork check` are the same
 ./priorwork status [SURVEY]                                    # the list / progress and next steps
 ./priorwork new "<topic>" --slug <slug> [--depth quick|full] [--question ... --years ... --fields ... --inclusion ... --exclusion ...]
 ./priorwork scope SURVEY --question "..." [--depth quick|full]  # change the scope
+./priorwork archive SURVEY [--undo]                          # hide it from the list (the files stay)
 ./priorwork list SURVEY [--status candidate maybe] [--abstract]
 ./priorwork include SURVEY 2 5 7
 ./priorwork exclude SURVEY 3 --reason "theory only"            # an exclusion needs a reason

@@ -18,6 +18,7 @@
 ## ディレクトリ
 
 - `reports/YYYYMMDD_<slug>.md` … 作業用のレポート（管理ブロックや記入欄を含む）。エージェントが書く。
+- `manuscripts/<論文名>/` … 分析まで済んだユーザーの原稿と結果の表・図（`priorwork-manuscript` で使う）。**読むだけで、書き換えない。**
 - `reports/YYYYMMDD_<slug>.draft.md` … 原稿から作ったサーベイで `./priorwork export --draft` が作る、原稿の 1〜3 章の下書き（参考文献つき）。
 - `reports/YYYYMMDD_<slug>.html` … `./priorwork export` が作る**読むための版。人が読むのはこれ**。
   未記入・未確認・`check` の ERROR が残っていると、冒頭に「下書き」と表示される。
@@ -33,7 +34,8 @@
 - **状態は `./priorwork` が管理する。** JSON（`.priorwork/surveys/`）を直接編集しない。
 - **Markdown は部分的に自動生成される。** `<!-- BEGIN priorwork:… -->` 〜 `<!-- END priorwork:… -->` の範囲は `./priorwork` が再生成する。手で書くのは、各論文カードの記入欄と、ブロック外の文章（背景・学説・論争点など）だけ。
 - **`./priorwork status` が「スキルが古い」と警告したら、`./priorwork sync` を実行してから続ける。**
-- **ワークスペースは Git で管理し、GitHub（非公開リポジトリ）に push する。** 一区切りついたら `reports/*.md` と `.priorwork/surveys/` などの変更をコミットしてよい。push はユーザーの了承を得てから行う。`.env`（API キー）はコミットしない。
+- **Git を操作しない。** ワークスペースは Git で管理し、GitHub（非公開リポジトリ）に置くが、コミット・push・ブランチの作成や切り替え・リセットなど Git の操作は、ユーザーが頼んだとき（または `AGENTS.local.md` で許可されているとき）だけ行う。頼まれていなければ、終わったときに「変更をコミットしてよいか」を報告で聞くだけにする。履歴を見る（`git log` / `git diff`）のはよい。`.env`（API キー）はコミットしない。
+- **やり直しを頼まれたら、新しいサーベイを作る**（slug は `<元の slug>_v2` など）。古いほうはユーザーが要らないと言ったら `./priorwork archive <古いサーベイ>` でアーカイブする（一覧から隠れるだけで、何も消えない。`--undo` で戻る）。アーカイブしたサーベイは、頼まれない限り続けない。
 - **会話を再開したら、まず状態を見る。** `./priorwork status`（一覧）→ `./priorwork status <survey>`（進捗と次にやること）。
 - **ユーザーは VS Code の Priorwork のサイドバーからも操作する**（採否の記録・論文カードの直し・書き出しなど）。
 
@@ -63,10 +65,10 @@
 | 件数の目安 | 候補 30 本前後、採用 15〜20 本 | 候補 **100 本以上**、採用 30 本以上。`./priorwork status` が「検索を足す」と出す間は検索を足す |
 | `--limit` | 既定（10）のまま | 既定（25）のまま。減らさない |
 | スナウボール | 任意 | 行う（採用が増えたら再実行） |
-| カード | 要旨のみでよい | 中核論文は本文確認済まで |
+| カード | 要旨のみでよい | **採用論文すべて**本文を取得して本文確認済まで（要旨のみは本文が取れなかった論文だけ） |
 | 文章 | 概観と比較表 | 背景・学説・論争点・研究の空白まで |
 
-件数は目安で、固定の上限ではない。0 件だった検索は、語を減らすか言い換えて検索し直す。ルールと `./priorwork check` は深さによらず同じ。ただし full では、`./priorwork check` がスナウボール未実施を WARN、「要旨のみ」のカードを INFO で伝える。深さは後から `./priorwork scope SURVEY --depth full` で変えられる。
+件数は目安で、固定の上限ではない。0 件だった検索は、語を減らすか言い換えて検索し直す。ルールと `./priorwork check` は深さによらず同じ。ただし full では、`./priorwork check` がスナウボール未実施と、本文を試さずに「要旨のみ」にしたカードを WARN、本文が見つからなかったカードを INFO で伝える。深さは後から `./priorwork scope SURVEY --depth full` で変えられる。
 
 ## レポートを見せる
 
@@ -109,6 +111,7 @@ Zotero への書き込みはユーザーが手作業で行う。エージェン�
 ./priorwork status [SURVEY]          # 一覧 / 進捗と次にやること
 ./priorwork new "<テーマ>" --slug <slug> [--depth quick|full] [--manuscript PATH] [--question ... --years ... --fields ... --inclusion ... --exclusion ...]
 ./priorwork scope SURVEY [--question ...] [--depth quick|full] [--manuscript PATH]
+./priorwork archive SURVEY [--undo]  # 一覧から隠す（ファイルは残る）。アーカイブの一覧は status --archived
 ./priorwork search "<English query>" [--into SURVEY] [--bulk] [--sort citations|relevance|recent|cpy] [--year 2010-2024] [--ssci-only] [--limit N]
 ./priorwork list SURVEY [--status candidate maybe included excluded] [--abstract]
 ./priorwork include SURVEY N... --reason "..."   ./priorwork exclude SURVEY N... --reason "..."   ./priorwork maybe SURVEY N... --reason "..."   ./priorwork reset SURVEY N...

@@ -417,6 +417,17 @@ class Survey:
     def matrix_fields(self) -> List[str]:
         return (["role"] if self.manuscript else []) + MATRIX_FIELDS
 
+    @property
+    def archived(self) -> str:
+        """アーカイブした日（ISO）。していなければ空。アーカイブしたサーベイは一覧に出さない（ファイルは残る）。"""
+        return self.data.get("archived") or ""
+
+    def set_archived(self, archived: bool):
+        if archived:
+            self.data["archived"] = now_iso()
+        else:
+            self.data.pop("archived", None)
+
     def update_scope(self, **scope: Optional[str]):
         for k, v in scope.items():
             if v is not None:
@@ -529,10 +540,11 @@ class Survey:
 
 
 def manuscript_ref(path: str, root: Path) -> str:
-    """原稿のパスを確かめ、ワークスペースからの相対パス（外なら絶対パス）にする。"""
+    """原稿（ファイル、または原稿と結果の表・図を入れたフォルダ）のパスを確かめ、
+    ワークスペースからの相対パス（外なら絶対パス）にする。"""
     p = Path(path).expanduser()
     p = (p if p.is_absolute() else Path.cwd() / p).resolve()
-    if not p.is_file():
+    if not p.exists():
         raise SurveyError(t("The manuscript is not found: {path}", path=path))
     try:
         return p.relative_to(root.resolve()).as_posix()

@@ -154,6 +154,43 @@ export function activate(context: vscode.ExtensionContext): void {
         await copyForAgent(text);
     }
 
+    /**
+     * 原稿から始めるサーベイの依頼文を作る。原稿（ファイルか、原稿と結果の表を入れたフォルダ）は
+     * ワークスペースの manuscripts/ に置く決まり。外にあれば、そこへ写すかを聞く（元のファイルは動かさない）。
+     */
+    async function fromManuscript(r: string): Promise<void> {
+        const L = vscode.l10n;
+        const dir = path.join(r, 'manuscripts');
+        const picked = await vscode.window.showOpenDialog({
+            title: L.t('Choose the manuscript, or its folder in manuscripts/'),
+            defaultUri: vscode.Uri.file(fs.existsSync(dir) ? dir : r),
+            canSelectFiles: true, canSelectFolders: true, canSelectMany: false, openLabel: L.t('Use This'),
+        });
+        if (!picked?.length) {
+            return;
+        }
+        let file = picked[0].fsPath;
+        if (path.relative(r, file).startsWith('..') || path.isAbsolute(path.relative(r, file))) {
+            const copy = L.t('Copy It into manuscripts/');
+            const choice = await vscode.window.showWarningMessage(
+                L.t('The manuscript is outside the workspace. The agent reads it from manuscripts/ in the workspace (the original stays where it is).'),
+                { modal: true }, copy);
+            if (choice !== copy) {
+                return;
+            }
+            const dest = path.join(dir, path.basename(file));
+            if (fs.existsSync(dest)) {
+                void vscode.window.showErrorMessage(L.t('manuscripts/{0} already exists. Rename or remove it first.', path.basename(file)));
+                return;
+            }
+            fs.mkdirSync(dir, { recursive: true });
+            fs.cpSync(file, dest, { recursive: true });
+            file = dest;
+        }
+        const rel = path.relative(r, file).split(path.sep).join('/');
+        await copyForAgent(L.t('The analysis of my manuscript in {0} is done. With Priorwork, make a survey from it, gather the literature that supports and conflicts with it, and draft its introduction, literature review and theory and hypotheses in the language of the manuscript, without stopping. Do not rewrite the manuscript. Report at the end.', rel));
+    }
+
     /** 依頼文をコピーし、入っているエージェントのチャットを開けるようにする。 */
     async function copyForAgent(text: string): Promise<void> {
         const L = vscode.l10n;
@@ -454,9 +491,14 @@ export function activate(context: vscode.ExtensionContext): void {
             const L = vscode.l10n;
             const how = await vscode.window.showQuickPick([
                 { label: L.t('Ask your agent to do it'), detail: L.t('Recommended. Give the topic; the agent sets the scope, searches, screens, fills in the cards and writes the report.'), agent: true },
+                { label: L.t('Start from my manuscript'), detail: L.t('The analysis is written; the agent gathers the literature behind it and drafts the introduction, literature review and hypotheses.'), agent: true, manuscript: true },
                 { label: L.t('Set it up myself'), detail: L.t('Give the topic, slug, depth and question, then search and screen in the sidebar.'), agent: false },
             ], { title: L.t('New survey'), placeHolder: L.t('How do you want to make it?') });
             if (!how) {
+                return;
+            }
+            if ('manuscript' in how) {
+                await fromManuscript(r);
                 return;
             }
             if (how.agent) {
@@ -750,6 +792,42 @@ export function activate(context: vscode.ExtensionContext): void {
             } else if (picked) {
                 void vscode.commands.executeCommand('priorwork.check', s.name);
             }
+        },
+
+        'priorwork.archive': async (arg?: unknown) => {
+            const s = await surveyOf(arg);
+            if (!s) {
+                return;
+            }
+            const L = vscode.l10n;
+            const ok = L.t('Archive');
+            const picked = await vscode.window.showWarningMessage(
+                L.t('Archive "{0}" ({1})? It is hidden from the list; its report and papers stay, and you can bring it back.',
+                    s.topic, s.name), { modal: true }, ok);
+            if (picked !== ok) {
+                return;
+            }
+            try {
+                await runJson(model.root, ['archive', s.name]);
+            } catch (e) {
+                fail(e);
+                return;
+            }
+            model.refresh();
+        },
+
+        'priorwork.unarchive': async (arg?: unknown) => {
+            const s = arg && typeof arg === 'object' && 'survey' in arg ? (arg as { survey: SurveySummary }).survey : undefined;
+            if (!s) {
+                return;
+            }
+            try {
+                await runJson(model.root, ['archive', s.name, '--undo']);
+            } catch (e) {
+                fail(e);
+                return;
+            }
+            model.refresh();
         },
 
         'priorwork.zoteroCollection': async (arg?: unknown) => {

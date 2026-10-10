@@ -47,5 +47,7 @@
   "walkthrough.agent.title": "Ask for more",
   "walkthrough.agent.description": "Right-click a survey → Ask Your Agent… to have it carry on, search more, chase citations, fill in cards or fix the check. If you want to decide on each paper yourself, tell the agent to go through it together with you.",
   "command.viewHtml": "View the Report in Priorwork",
-  "command.zoteroCollection": "Link a Zotero Collection…"
+  "command.zoteroCollection": "Link a Zotero Collection…",
+  "command.archive": "Archive the Survey…",
+  "command.unarchive": "Bring Back from the Archive"
 }
