@@ -5,7 +5,8 @@ SSCI (Web of Science Social Sciences Citation Index) status classification.
 SSCI 収録の可否は Clarivate の Master Journal List でしか確定できない。
 そのため判定は次の優先順で行う:
 
-1. 収録リスト CSV（.priorwork/data/ssci_journals.csv など）があれば ISSN / 誌名で照合 → 確定判定
+1. 収録リスト CSV（.priorwork/data/ssci_journals.csv など）があれば ISSN で照合 → 確定判定
+   （誌名で照合するのは ISSN が分からないときだけ。同名の別誌を取り違えないため）
 2. リストが無ければ、内蔵の主要誌リストと誌名の完全一致 → 「推定」
 3. それ以外は「学術誌（SSCI未確認）」「プレプリント／WP」「掲載誌不明」に分類
 """
@@ -155,8 +156,12 @@ class SSCIJournalList:
                         self.issns.add(i)
 
     def contains(self, journal_name: str, issns: Iterable[str]) -> bool:
-        if any(normalize_issn(i) in self.issns for i in issns):
+        issns = {normalize_issn(i) for i in issns} - {""}
+        if issns & self.issns:
             return True
+        # ISSN が分かっていて一致しないなら、誌名が同じでも別の雑誌（同名誌の取り違えを防ぐ）
+        if issns and self.issns:
+            return False
         return normalize_title(journal_name) in self.titles
 
 

@@ -628,4 +628,57 @@ MESSAGES = {
     "register the papers of the linked collection as candidates": "結び付けたコレクションの論文を候補に登録する",
     "print only the DOIs of the papers not in Zotero (for the magic wand)":
         "Zotero に無い論文の DOI だけを出す（魔法の杖に貼る用）",
+
+    # 監査（書いたのと別のモデル）
+    "  audit SURVEY --by MODEL    record an audit by an AI model other than the one that wrote the survey":
+        "  audit SURVEY --by MODEL    サーベイを書いたのと別の AI モデルによる監査を記録する",
+    "record an audit by an AI model other than the one that wrote the survey":
+        "サーベイを書いたのと別の AI モデルによる監査を記録する",
+    "the AI model writing the survey (e.g. \"Gemini 3.1 Pro\"); the audit must then be by another model":
+        "サーベイを書く AI モデル（例: \"Gemini 3.1 Pro\"）。監査はこれと別のモデルで行う",
+    "the model that audited it (e.g. \"Claude Opus 5.5\")": "監査したモデル（例: \"Claude Opus 5.5\"）",
+    "what was checked and fixed, in one line": "確かめたこと・直したこと（1 行）",
+    "Give the model that audited the survey with --by": "監査したモデルを --by で指定してください",
+    "{model} wrote this survey, so it cannot audit it. Ask another model (written by: {writers})":
+        "{model} はこのサーベイを書いたモデルなので、監査できません。別のモデルに頼んでください（書いたモデル: {writers}）",
+    "Recorded the audit by {model}": "{model} による監査を記録しました",
+    "Written by": "書いたモデル",
+    "Audit": "監査",
+    "Written by: {writers}": "書いたモデル: {writers}",
+    "(not recorded)": "（記録なし）",
+    "audited by {models}": "監査: {models}",
+    "not audited yet": "監査はまだ",
+    "Not audited yet. Ask another AI model to audit it, then record it with `priorwork audit {name} --by \"<model>\"`":
+        "まだ監査されていません。別の AI モデルに監査を頼み、`priorwork audit {name} --by \"<モデル>\"` で記録してください",
+    "Have another AI model audit it (not the one that wrote it), then record the audit":
+        "書いたのと別の AI モデルに監査を頼み、記録する",
+    "Not audited by another AI model yet. Ask a model other than the one that wrote it to audit the survey, "
+    "then record it with `priorwork audit {name} --by \"<model>\"`":
+        "書いたのと別の AI モデルによる監査がまだです。別のモデルに監査を頼み、"
+        "`priorwork audit {name} --by \"<モデル>\"` で記録してください",
+    # カードと本文の検査
+    "(page not checked)": "（ページ未確認）",
+    "Japanese": "日本語",
+    "English": "英語",
+    "{n|# card is|# cards are} not written in the language of the report ({language}). "
+    "Write the cards in it, keeping terms in the original in brackets: {numbers}":
+        "{n} 枚のカードがレポートの言語（{language}）で書かれていません。用語の原語は括弧内に残して、"
+        "レポートの言語で書いてください: {numbers}",
+    "{n|# card is|# cards are} \"{fulltext}\", but no full text was fetched for {n|it|them} (`priorwork fulltext`). "
+    "Read the full text, or set the level to what was actually read: {numbers}":
+        "{n} 枚のカードが「{fulltext}」ですが、本文を取得した記録がありません（`priorwork fulltext`）。"
+        "本文を読むか、実際に読んだものに確認レベルを直してください: {numbers}",
+    "{n|# card is|# cards are} \"{fulltext}\", but the data, identification and findings give no page. "
+    "Add (p. N), or \"{unchecked}\" when the full text has no page breaks: {numbers}":
+        "{n} 枚のカードが「{fulltext}」ですが、データ・識別戦略・主な結果にページがありません。"
+        "（p. N）を添えるか、本文にページ区切りが無ければ「{unchecked}」と書いてください: {numbers}",
+    "{label}: {values} in the card {n|is|are} not in the full text. Check against the full text, or remove {n|it|them}":
+        "{label}: カードの {values}（{n} 個）が本文に見つかりません。本文と突き合わせるか、消してください",
+    "{label}: the card cites {pages}, which {n|is|are} not in the paper":
+        "{label}: カードが引く {pages}（{n} 個）は、論文にありません",
+    "The section \"{section}\" cites no paper. Base it on the included papers and cite them as Author (year)":
+        "節「{section}」が論文を 1 本も引いていません。採用論文に基づいて書き、著者 (年) で引用してください",
+    "The text says {n|# paper is|# papers are} included, but {included} are. Do not write the count by hand "
+    "(the appendix gives it)":
+        "本文では採用が {n} 本とありますが、実際は {included} 本です。本数は手で書かないでください（付録の記録にあります）",
 }

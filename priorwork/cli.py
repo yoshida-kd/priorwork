@@ -65,6 +65,7 @@ USAGE_LINES = [
     "  export SURVEY              write the report for reading (HTML / Word / Markdown)",
     "  export SURVEY --draft      write the draft of the manuscript's sections 1–3 with its references",
     "  check SURVEY               find empty fields, unregistered citations and DOI mismatches",
+    "  audit SURVEY --by MODEL    record an audit by an AI model other than the one that wrote the survey",
     "  fulltext SURVEY N          get the full text (Zotero / open-access PDF)",
     "  zotero [SURVEY]            check the Zotero link / which included papers are in Zotero",
     "  zotero SURVEY --collection NAME   link a Zotero collection (--import registers its papers, --dois lists the DOIs to add)",
@@ -161,8 +162,8 @@ ZOTERO_SOFT_ERRORS = (ZoteroError, OSError, ValueError, requests.RequestExceptio
 
 
 def survey_summary(s: Survey) -> Dict[str, Any]:
-    return {"name": s.name, "topic": s.data["topic"], "created": s.data.get("created", ""), "depth": s.depth,
-            "lang": s.lang, "report": str(s.md_path), "manuscript": s.manuscript or None,
+    return {"name": s.name, "topic": s.data["topic"], "created": s.data.get("created", ""), "version": s.version,
+            "depth": s.depth, "lang": s.lang, "report": str(s.md_path), "manuscript": s.manuscript or None,
             "zotero_collection": s.zotero_collection or None, "archived": s.archived or None,
             "counts": s.counts(), "searches": len(s.data["searches"])}
 
@@ -313,6 +314,9 @@ def next_steps(s: Survey, zotero_missing: List[Dict[str, Any]], zotero_pending: 
     step("check", t("Check"), ["check", s.name])
     if c[INCLUDED]:
         step("export", t("Write the version for reading (HTML)"), ["export", s.name])
+    if c[INCLUDED] and not unfilled and not s.audits:
+        step("audit", t("Have another AI model audit it (not the one that wrote it), then record the audit"),
+             ["audit", s.name, "--by", "<model>"])
     return steps
 
 
@@ -349,6 +353,7 @@ def cmd_status(args, client):
         return dump_json({**survey_summary(s), "scope": s.data["scope"],
                           "unfilled": [e["number"] for e in s.unfilled()],
                           "zotero_missing": [e["number"] for e in zotero_missing],
+                          "written_by": s.written_by, "audits": s.audits,
                           "sync": scaffold.sync_status(ROOT), "next": steps})
     print(f"# {s.name}: {s.data['topic']}")
     if s.archived:
@@ -366,6 +371,10 @@ def cmd_status(args, client):
             years=sc.get("years") or unset, depth=s.depth))
     print(t("included {included} / maybe {maybe} / candidates {candidate} / excluded {excluded}", **s.counts())
           + " | " + t("{n|# search|# searches}", n=len(s.data["searches"])))
+    if s.written_by or s.audits:
+        print(t("Written by: {writers}", writers=", ".join(s.written_by) or t("(not recorded)")) + " | "
+              + (t("audited by {models}", models=", ".join(a["by"] for a in s.audits)) if s.audits
+                 else t("not audited yet")))
     print("\n" + t("Next:"))
     for i, st in enumerate(steps, 1):
         print(f"  {i}. {st['text']}: priorwork {' '.join(_shell(a) for a in st['args'])}")
@@ -396,6 +405,10 @@ def cmd_new(args, client):
     scope = {k: getattr(args, k) or "" for k in ("question", "years", "fields", "inclusion", "exclusion")}
     s = Survey.create(args.topic, args.slug, scope, depth=args.depth or DEFAULT_DEPTH, lang=args.lang,
                       manuscript=args.manuscript)
+    if args.by:
+        s.add_writer(args.by)
+        s.save()
+        s.render()
     others = same_topic(s, Survey.list_all())
     if others:
         print("[Notice] " + t("Other surveys have the same topic: {names}. If this one redoes them, archive the old "
@@ -415,6 +428,8 @@ def cmd_scope(args, client):
         s.set_depth(args.depth)
     if args.manuscript:
         s.set_manuscript(args.manuscript)
+    if args.by:
+        s.add_writer(args.by)
     render_and_report(s)
     if args.json:
         return dump_json({"scope": s.data["scope"], "depth": s.depth, "manuscript": s.manuscript or None})
@@ -531,13 +546,34 @@ def cmd_render(args, client):
     print(f"{s.md_path}: " + (t("updated") if changed else t("no changes")))
 
 
+def cmd_audit(args, client):
+    s = Survey.load(args.survey)
+    if not args.by:
+        if args.json:
+            return dump_json({"written_by": s.written_by, "audits": s.audits})
+        print(t("Written by: {writers}", writers=", ".join(s.written_by) or t("(not recorded)")))
+        for a in s.audits:
+            print(f"  {a['at'][:16].replace('T', ' ')} {a['by']}" + (f" — {a['note']}" if a.get("note") else ""))
+        if not s.audits:
+            print(t("Not audited yet. Ask another AI model to audit it, then record it with "
+                    "`priorwork audit {name} --by \"<model>\"`", name=s.name))
+        return
+    audit = s.add_audit(args.by, args.note)
+    s.save()
+    s.render()
+    if args.json:
+        return dump_json(audit)
+    print(t("Recorded the audit by {model}", model=audit["by"]))
+
+
 def cmd_check(args, client):
     s = Survey.load(args.survey)
     findings = check_survey(s, None if args.offline else client)
     if not args.offline:
         missing = zotero_unregistered(s)
         if missing:
-            findings.append((INFO, t("{n|# included paper is|# included papers are} not in Zotero: {numbers} "
+            # 採用論文は、本文を別に取得できたかによらず、すべて Zotero に入れる（参考文献の管理はそちらで行う）
+            findings.append((WARN, t("{n|# included paper is|# included papers are} not in Zotero: {numbers} "
                                      "(`priorwork zotero {name}`)", n=len(missing),
                                      numbers=", ".join(f"#{e['number']}" for e in missing), name=s.name)))
     order = {ERROR: 0, WARN: 1, INFO: 2}
@@ -913,6 +949,9 @@ def build_parser() -> argparse.ArgumentParser:
     scope_args.add_argument("--exclusion", help=t("exclusion criteria"))
     scope_args.add_argument("--depth", choices=list(DEPTHS),
                             help=t("the depth of the survey (quick or full; default full)"))
+    scope_args.add_argument("--by", metavar="MODEL",
+                            help=t("the AI model writing the survey (e.g. \"Gemini 3.1 Pro\"); "
+                                   "the audit must then be by another model"))
     scope_args.add_argument("--manuscript", metavar="PATH",
                             help=t("your manuscript whose analysis is done (a file, or a folder under manuscripts/ "
                                    "with the manuscript and its tables): the survey then backs it up and drafts "
@@ -955,6 +994,12 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("check", parents=[common, as_json], help=t("check the survey"))
     p.add_argument("survey")
     p.add_argument("--offline", action="store_true", help=t("do not re-check the DOIs with OpenAlex"))
+
+    p = sub.add_parser("audit", parents=[common, as_json],
+                       help=t("record an audit by an AI model other than the one that wrote the survey"))
+    p.add_argument("survey")
+    p.add_argument("--by", metavar="MODEL", help=t("the model that audited it (e.g. \"Claude Opus 5.5\")"))
+    p.add_argument("--note", default="", help=t("what was checked and fixed, in one line"))
 
     p = sub.add_parser("export", parents=[common, as_json], help=t("write the report for reading"))
     p.add_argument("survey")
@@ -1019,7 +1064,7 @@ HANDLERS = {
     "init": cmd_init, "sync": cmd_sync, "upgrade": cmd_upgrade, "doctor": cmd_doctor, "settings": cmd_settings,
     "status": cmd_status, "archive": cmd_archive, "new": cmd_new, "scope": cmd_scope, "list": cmd_list,
     "include": cmd_set_status, "exclude": cmd_set_status, "maybe": cmd_set_status, "reset": cmd_set_status,
-    "add": cmd_add, "card": cmd_card, "render": cmd_render, "check": cmd_check, "export": cmd_export, "fulltext": cmd_fulltext, "zotero": cmd_zotero,
+    "add": cmd_add, "card": cmd_card, "render": cmd_render, "check": cmd_check, "audit": cmd_audit, "export": cmd_export, "fulltext": cmd_fulltext, "zotero": cmd_zotero,
     "search": cmd_search, "snowball": cmd_snowball, "get": cmd_get,
     "citations": cmd_linked, "references": cmd_linked, "journal": cmd_journal,
 }

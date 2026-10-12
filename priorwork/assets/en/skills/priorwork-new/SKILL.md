@@ -19,12 +19,14 @@ Settle these from the request. For anything the request does not say, decide som
 - The fields (e.g. public administration, labour economics)
 - Inclusion criteria (e.g. empirical studies, international peer-reviewed journals)
 - Exclusion criteria (e.g. theory only, working papers)
-- An English slug (e.g. `minimum_wage_employment`)
+- An English slug (e.g. `minimum_wage_employment`). For a redo, use the old slug (the engine numbers the version as `20261012_v2_<slug>`; do not add `_v2` yourself)
 - The depth (`quick` / `full`): decide with the table in AGENTS.md, "Depth".
 
 ```bash
-./priorwork new "<topic (any language)>" --slug <slug> --depth quick|full --question "..." --years "..." --fields "..." --inclusion "..." --exclusion "..."
+./priorwork new "<topic (any language)>" --slug <slug> --by "<your model name>" --depth quick|full --question "..." --years "..." --fields "..." --inclusion "..." --exclusion "..."
 ```
+
+Give your own model name with `--by` (e.g. `"Gemini 3.1 Pro"`, `"Claude Opus 5.5"`). The audit is then done by another model (AGENTS.md, "Audit").
 
 ## 2. Search
 

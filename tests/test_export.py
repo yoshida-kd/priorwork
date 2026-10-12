@@ -86,3 +86,10 @@ def test_to_html_escapes_title():
 def test_label_with_a_parenthetical_note_is_still_an_empty_item():
     text, _, empty = clean_markdown("## 5. 手法\n- **識別戦略の発展**（OLS 等 → DID / IV）:\n- **外的妥当性**:\n  - 中身\n")
     assert "識別戦略の発展" not in text and "外的妥当性" in text and "中身" in text and empty == []
+
+
+def test_mermaid_blocks_become_diagrams():
+    page = to_html("# x\n\n```mermaid\nflowchart TD\n  A[需要] --> B[委託]\n```\n\n```python\nx = 1\n```\n", "t")
+    assert '<pre class="mermaid">flowchart TD\n  A[需要] --&gt; B[委託]\n</pre>' in page
+    assert 'class="language-python"' in page and page.count("<script") == 1 and "mermaid.min.js" in page
+    assert "<script" not in to_html("# x\n\n```python\nx = 1\n```\n", "t")   # 図が無ければ読み込まない

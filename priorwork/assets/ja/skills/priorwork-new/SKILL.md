@@ -19,12 +19,14 @@ description: >-
 - 分野（例: 行政学、労働経済学）
 - 採用基準（例: 実証研究、国際査読誌）
 - 除外基準（例: 理論のみ、WP）
-- 英語の slug（例: `minimum_wage_employment`）
+- 英語の slug（例: `minimum_wage_employment`）。やり直しなら元と同じ slug にする（版はエンジンが `20261012_v2_<slug>` と振る。`_v2` を自分で付けない）
 - 深さ（`quick` / `full`）: AGENTS.md「深さ」の表で決める。
 
 ```bash
-./priorwork new "<テーマ（日本語可）>" --slug <slug> --depth quick|full --question "..." --years "..." --fields "..." --inclusion "..." --exclusion "..."
+./priorwork new "<テーマ（日本語可）>" --slug <slug> --by "<自分のモデル名>" --depth quick|full --question "..." --years "..." --fields "..." --inclusion "..." --exclusion "..."
 ```
+
+`--by` には自分のモデル名（例: `"Gemini 3.1 Pro"`、`"Claude Opus 5.5"`）を書く。監査はこれと別のモデルが行う（AGENTS.md「監査」）。
 
 ## 2. 検索する
 

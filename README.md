@@ -221,6 +221,7 @@ on a survey copy ready-made requests.
 | `priorwork-snowball` | chases the references and citations of the included papers |
 | `priorwork-extract` | gets the full texts and fills in the paper cards (RQ, identification, …) |
 | `priorwork-check` | checks the survey, fixes what it finds and exports the report |
+| `priorwork-audit` | audits a survey another model wrote: checks the cards against the full text, the direction of citations, hypotheses mixed into the literature, mechanical exclusions and the SSCI status, fixes them and records it with `./priorwork audit` |
 | `priorwork-manuscript` | reads a manuscript whose analysis is done, gathers the literature that supports and conflicts with it, and drafts its sections 1–3 (introduction, literature review, theory and hypotheses) |
 
 ### From a manuscript whose analysis is done
@@ -236,6 +237,12 @@ manuscript (`./priorwork new … --manuscript manuscripts/<paper name>`). `./pri
 the draft to `reports/<name>.draft.md`, with the references it cites. So that the hypotheses are not
 written after the fact, the report records separately the literature behind each hypothesis and which
 results to treat as exploratory. The manuscript itself is never rewritten.
+
+A survey is **done only once a model other than the one that wrote it has audited it**. The writing
+agent records its model name with `--by`, and when it finishes it asks you to have another model (e.g.
+Claude if Gemini wrote it) "audit the survey <name>" in its chat. The audit is recorded with
+`./priorwork audit SURVEY --by "<model>"` (refused for the model that wrote it); until then
+`./priorwork check` reminds you.
 
 The agent decides on its own by default. To decide the scope and each paper yourself, ask it to go
 through it together with you, or write that in `AGENTS.local.md`. When you come back, say "let's
@@ -259,7 +266,7 @@ The numbers are guides, not limits. The rules and `priorwork check` are the same
 
 | File | Contents | Editing |
 | :--- | :--- | :--- |
-| `reports/YYYYMMDD_<slug>.md` | the working report | write the text and the card fields by hand; `priorwork` regenerates everything between `<!-- BEGIN priorwork:… -->` and `<!-- END priorwork:… -->` |
+| `reports/YYYYMMDD_<slug>.md` | the working report (a redone survey is `YYYYMMDD_v2_<slug>.md`: `new` with the same slug numbers the version) | write the text and the card fields by hand; `priorwork` regenerates everything between `<!-- BEGIN priorwork:… -->` and `<!-- END priorwork:… -->` |
 | `.priorwork/surveys/YYYYMMDD_<slug>.json` | candidates, decisions and reasons (with their history), the search log, the scope, the depth, the report's language | changed only by `priorwork` (and the VS Code extension) |
 
 - **The version for reading** comes from `./priorwork export <survey>` (`reports/YYYYMMDD_<slug>.html`,
@@ -267,9 +274,15 @@ The numbers are guides, not limits. The rules and `priorwork check` are the same
   hints and the abstracts (`--with-abstracts` keeps them). `--format docx` (needs pandoc) and
   `--format md` are also available. While cards are unchecked or empty, or `check` reports
   ERRORs, it is marked *Draft* at the top. The output stays out of Git.
-- **The comparison matrix** (section 2) is built from the paper cards (section 3). After editing
-  cards, run `./priorwork render`.
-- **The references** (section 8) are generated from the included papers, with DOIs (no citation
+- **The report puts the synthesis first** and the single papers after it: background (section 1),
+  the literature's theories, methods, debates and gaps (sections 2–5, citing included papers for each
+  claim), the hypotheses and implications for this study (section 6, kept apart from the literature),
+  the comparison matrix (7), the paper cards (8), the references (9) and the appendix. Each section
+  says what to write (reports made up to 0.1.5 keep their old layout and still work).
+- **The comparison matrix** (section 7) is built from the paper cards (section 8). After editing
+  cards, run `./priorwork render`. Mermaid diagrams in the Markdown (```` ```mermaid ````) are drawn
+  in the HTML.
+- **The references** (section 9) are generated from the included papers, with DOIs (no citation
   keys; add papers to Zotero by hand). Included papers that would be cited the same way in the
   text are told apart as 2001a / 2001b, by title (the cards and the matrix use the same labels).
 - **The search log** (appendix) records the searches, the counts, the reasons for exclusion and how
@@ -290,8 +303,8 @@ The numbers are guides, not limits. The rules and `priorwork check` are the same
 
 # Surveys
 ./priorwork status [SURVEY]                                    # the list / progress and next steps
-./priorwork new "<topic>" --slug <slug> [--depth quick|full] [--question ... --years ... --fields ... --inclusion ... --exclusion ...]
-./priorwork scope SURVEY --question "..." [--depth quick|full]  # change the scope
+./priorwork new "<topic>" --slug <slug> [--by "<model>"] [--depth quick|full] [--question ... --years ... --fields ... --inclusion ... --exclusion ...]
+./priorwork scope SURVEY --question "..." [--depth quick|full] [--by "<model>"]  # change the scope
 ./priorwork archive SURVEY [--undo]                          # hide it from the list (the files stay)
 ./priorwork list SURVEY [--status candidate maybe] [--abstract]
 ./priorwork include SURVEY 2 5 7
@@ -301,6 +314,7 @@ The numbers are guides, not limits. The rules and `priorwork check` are the same
 ./priorwork card SURVEY 3 [--set rq="..." evidence=abstract]   # show or fill in a card
 ./priorwork render SURVEY
 ./priorwork check SURVEY [--offline]
+./priorwork audit SURVEY [--by "<model>" --note "..."]       # record an audit by another model / show the record
 ./priorwork export SURVEY [--format html|docx|md] [-o PATH] [--with-abstracts]
 ./priorwork fulltext SURVEY <number> [--pdf <path>]
 ./priorwork zotero [SURVEY] [--refresh]
@@ -314,7 +328,7 @@ The numbers are guides, not limits. The rules and `priorwork check` are the same
 ./priorwork journal "<journal or ISSN>"
 ```
 
-`SURVEY` is the file name without the extension, or the slug. Most commands print JSON with
+`SURVEY` is the file name without the extension, or the slug (with the version for a redone survey, e.g. `v2_<slug>`). Most commands print JSON with
 `--json` (for the VS Code extension and scripts).
 
 ---

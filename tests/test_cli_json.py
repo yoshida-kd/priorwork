@@ -108,9 +108,10 @@ def test_the_extension_reads_only_keys_the_cli_writes():
     expected = {
         "WorkspaceStatus": {"version", "root", "workspace", "lang", "git", "sync", "zotero", "surveys", "archived"},
         "GitInfo": {"repo", "remote"},
-        "SurveySummary": {"name", "topic", "created", "depth", "lang", "report", "manuscript", "zotero_collection",
+        "SurveySummary": {"name", "topic", "created", "version", "depth", "lang", "report", "manuscript", "zotero_collection",
                           "archived", "counts", "searches"},
-        "SurveyDetail": {"scope", "unfilled", "zotero_missing", "sync", "next"},
+        "SurveyDetail": {"scope", "unfilled", "zotero_missing", "written_by", "audits", "sync", "next"},
+        "Audit": {"at", "by", "note", "included"},
         "ZoteroCollectionLink": {"key", "name"},
         "ZoteroCollections": {"collections"},
         "ZoteroCollection": {"key", "name", "path", "items"},
@@ -160,16 +161,29 @@ def test_a_survey_from_a_manuscript(ws, tmp_path):
 
 
 def test_archive_hides_a_survey_and_brings_it_back(ws, capsys):
-    ws("new", "行政需要", "--slug", "mob", "--json")
+    first = ws("new", "行政需要", "--slug", "mob", "--json")["name"]
     capsys.readouterr()
-    cli.main(["new", "行政需要", "--slug", "mob_v2", "--json"])
+    cli.main(["new", "行政需要", "--slug", "mob", "--json"])   # やり直し: 同じ slug で作ると版が付く
     assert "mob" in capsys.readouterr().err             # 同じテーマがあると知らせる
     top = ws("status", "--json")
-    assert [s["name"].split("_", 1)[1] for s in top["surveys"]] == ["mob", "mob_v2"] and top["archived"] == []
+    assert [s["name"].split("_", 1)[1] for s in top["surveys"]] == ["mob", "v2_mob"] and top["archived"] == []
+    assert [s["version"] for s in top["surveys"]] == [1, 2]
     assert top["zotero"] is False and top["surveys"][0]["zotero_collection"] is None
-    assert ws("archive", "mob", "--json")["archived"]
+    assert ws("archive", first, "--json")["archived"]
     top = ws("status", "--json")
-    assert [s["name"].split("_", 1)[1] for s in top["surveys"]] == ["mob_v2"]
-    assert top["archived"][0]["archived"] and ws("status", "mob", "--json")["archived"]
-    assert ws("archive", "mob", "--undo", "--json")["archived"] is None
+    assert [s["name"].split("_", 1)[1] for s in top["surveys"]] == ["v2_mob"]
+    assert top["archived"][0]["archived"] and ws("status", first, "--json")["archived"]
+    assert ws("archive", first, "--undo", "--json")["archived"] is None
     assert len(ws("status", "--json")["surveys"]) == 2
+
+
+def test_audit_must_be_by_another_model(ws):
+    name = ws("new", "t", "--slug", "au", "--by", "Gemini 3.8 Flash", "--json")["name"]
+    with pytest.raises(SystemExit, match="Gemini 3.8 Flash"):        # 書いたモデルは監査できない
+        cli.main(["audit", name, "--by", "gemini-3.8-flash"])
+    assert ws("status", name, "--json")["audits"] == []
+    audit = ws("audit", name, "--by", "Claude Opus 5.5", "--note", "カードを本文と突き合わせた", "--json")
+    assert audit["by"] == "Claude Opus 5.5" and audit["included"] == 0
+    detail = ws("status", name, "--json")
+    assert detail["written_by"] == ["Gemini 3.8 Flash"] and detail["audits"][0]["note"] == "カードを本文と突き合わせた"
+    assert ws("audit", name, "--json")["audits"][0]["by"] == "Claude Opus 5.5"

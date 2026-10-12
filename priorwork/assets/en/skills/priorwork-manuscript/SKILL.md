@@ -26,7 +26,7 @@ Read it and decide:
 - the scope: the research question is the manuscript's; set the period, fields and criteria to suit its field
 
 ```bash
-./priorwork new "<topic>" --slug <slug> --manuscript manuscripts/<paper name> --depth full --question "..." --fields "..." --inclusion "..." --exclusion "..."
+./priorwork new "<topic>" --slug <slug> --by "<your model name>" --manuscript manuscripts/<paper name> --depth full --question "..." --fields "..." --inclusion "..." --exclusion "..."
 ```
 
 Fill in section 1 of the report, "The manuscript in brief", with only what the manuscript says (research question, Y, X, data, identification, main results, unexpected results). Copy estimates exactly as they are in the manuscript's tables.

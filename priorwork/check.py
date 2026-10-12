@@ -4,10 +4,11 @@
 
 import re
 import unicodedata
+from pathlib import Path
 from typing import Any, Dict, List, NamedTuple, Optional, Set, Tuple
 
 from . import ssci
-from .i18n import t
+from .i18n import t, tl
 from .survey import (
     CANDIDATE, EVIDENCE_ABSTRACT, EVIDENCE_FULLTEXT, EVIDENCE_KEYS, EVIDENCE_UNCHECKED, INCLUDED, MAYBE, Survey,
     SurveyError,
@@ -36,6 +37,26 @@ _NON_AUTHOR_WORDS = {
     "fig", "section", "appendix", "chapter", "wave", "round", "model", "column", "panel", "equation", "act",
 }  # May・Law など姓にもなる語は入れない（架空の引用を見逃すため）
 _IGNORE_RE = re.compile(r"<!--\s*priorwork:ignore-citation\s+(.+?)\s*\(?\s*(\d{4})[a-z]?\s*\)?\s*-->")
+
+# 先行研究のまとめの節（テンプレートの見出しの直後にある印）。採用論文を引かずに書いていないかを見る
+SYNTHESIS_MARK = "<!-- priorwork:synthesis -->"
+_LABEL_ONLY = re.compile(r"^\s*(?:[-*]|\d+\.)\s+\S.*[:：]\s*$")
+# カードの根拠: ページ（p. 12 / pp. 12-13）、または本文にページ区切りが無いときの「（ページ未確認）」
+_PAGE_RE = re.compile(r"\bpp?\.\s*(\d+)(?:\s*[-–]\s*(\d+))?", re.IGNORECASE)
+_PAGE_UNCHECKED_RE = re.compile(r"ページ未確認|page not checked", re.IGNORECASE)
+_NUMBER_RE = re.compile(r"(?<![\w.])\d[\d,]*(?:\.\d+)?")
+_CJK_RE = re.compile(r"[\u3040-\u30ff\u4e00-\u9fff]")
+# 本文に手で書いた採用論文の数（「採用した57本」「66 included papers」）。数は付録の記録が正しい
+_COUNT_RES = [
+    re.compile(r"採用(?:した|された|論文|文献|研究)*(?:は|が|の|数は?)?\s*(?:計|合計|全)?\s*(\d+)\s*(?:本|件|編)"),
+    re.compile(r"(\d+)\s*(?:本|件|編)(?:の(?:論文|文献|研究))?を採用"),
+    re.compile(r"(\d+)\s+included\s+(?:papers|studies|articles)", re.IGNORECASE),
+    re.compile(r"\bincluded?\s+(\d+)\s+(?:papers|studies|articles)", re.IGNORECASE),
+    re.compile(r"(\d+)\s+(?:papers|studies|articles)\s+(?:were|are)\s+included", re.IGNORECASE),
+]
+# 本文と突き合わせるカードの欄（確認レベル・メモ以外）
+_CONTENT_FIELDS = ("rq", "x", "y", "data", "method", "findings", "limits")
+_EVIDENCE_FIELDS = ("data", "method", "findings")   # ページの根拠を求める欄
 
 
 class Citation(NamedTuple):
@@ -206,6 +227,15 @@ def check_survey(survey: Survey, client: Optional[Any] = None) -> List[Finding]:
                 findings.append((ERROR, t("{label}: the DOI points to another title: \"{title}\"", label=label,
                                           title=w.get("title"))))
 
+    # 4b. カードの書き方: サーベイの言語・本文の根拠
+    findings += _check_cards(survey, included, cards)
+
+    # 4c. 先行研究のまとめの節が採用論文を引いているか・本文に手で書いた採用数が合っているか
+    findings += _check_synthesis(md)
+    for n in sorted(_written_counts(re_blocks_removed(md)) - {len(included)}):
+        findings.append((WARN, t("The text says {n|# paper is|# papers are} included, but {included} are. Do not write "
+                                 "the count by hand (the appendix gives it)", n=n, included=len(included))))
+
     # 5. 原稿から始めるサーベイ: 原稿が動いていないか（エージェントは原稿を読み直して下書きを書く）
     if survey.manuscript and not (survey.root / survey.manuscript).exists():
         findings.append((WARN, t("The manuscript {path} is not found. If it moved, set it again with "
@@ -243,6 +273,12 @@ def check_survey(survey: Survey, client: Optional[Any] = None) -> List[Finding]:
                                      "\"{abstract}\". Attach the PDF in Zotero (or give it with `--pdf`) to read it",
                                      n=len(failed), abstract=abstract, numbers=_numbers(failed))))
 
+    # 7b. 書いたのと別のモデルによる監査（同じモデルは自分の誤読に気付きにくい）
+    if included and not survey.unfilled() and not survey.audits:
+        findings.append((WARN if survey.depth == "full" else INFO,
+                         t("Not audited by another AI model yet. Ask a model other than the one that wrote it to audit "
+                           "the survey, then record it with `priorwork audit {name} --by \"<model>\"`", name=survey.name)))
+
     # 8. 原稿の下書きで引用する論文は、深さによらず本文で確かめる
     if survey.manuscript:
         from .export import cited_papers, draft_section   # export が check を読むので、ここで読む
@@ -256,6 +292,146 @@ def check_survey(survey: Survey, client: Optional[Any] = None) -> List[Finding]:
             findings.append((WARN, t("The draft of the manuscript cites {n|# paper|# papers} not checked against the "
                                      "full text: {numbers}", n=len(shallow), numbers=_numbers(shallow))))
     return findings
+
+
+def _check_cards(survey: Survey, included: List[dict], cards: Dict[str, str]) -> List[Finding]:
+    """カードがサーベイの言語で書かれているか、「本文確認済」のカードに本文の根拠があるか。"""
+    findings: List[Finding] = []
+    other_lang, no_text, no_page = [], [], []
+    for e in included:
+        fields = parse_card_fields(cards.get(e["key"], ""))
+        values = [fields[k] for k in _CONTENT_FIELDS if fields.get(k)]
+        if values and _wrong_language(values, survey.lang):
+            other_lang.append(e)
+        if evidence_key(fields.get("evidence", "")) != EVIDENCE_FULLTEXT:
+            continue
+        if not e.get("fulltext"):
+            no_text.append(e)
+        evidence = [fields[k] for k in _EVIDENCE_FIELDS if fields.get(k)]
+        if evidence and not any(_PAGE_RE.search(v) or _PAGE_UNCHECKED_RE.search(v) for v in evidence):
+            no_page.append(e)
+        text = _fulltext(survey, e)
+        if text is None:
+            continue
+        label = f"#{e['number']}"
+        written = "\n".join(values)
+        in_text = _text_numbers(text)
+        missing = sorted((n for n in _card_numbers(written) if _plain_number(n) not in in_text), key=written.find)
+        if missing:
+            findings.append((WARN, t("{label}: {values} in the card {n|is|are} not in the full text. Check against the "
+                                     "full text, or remove {n|it|them}", label=label, n=len(missing),
+                                     values=", ".join(missing[:5]) + (" …" if len(missing) > 5 else ""))))
+        bad_pages = sorted(_bad_pages(written, e, text))
+        if bad_pages:
+            findings.append((WARN, t("{label}: the card cites {pages}, which {n|is|are} not in the paper",
+                                     label=label, n=len(bad_pages), pages=", ".join(f"p. {p}" for p in bad_pages))))
+    fulltext = evidence_label(EVIDENCE_FULLTEXT, survey.lang)
+    if other_lang:
+        findings.append((WARN, t("{n|# card is|# cards are} not written in the language of the report ({language}). "
+                                 "Write the cards in it, keeping terms in the original in brackets: {numbers}",
+                                 n=len(other_lang), language=t("Japanese") if survey.lang == "ja" else t("English"),
+                                 numbers=_numbers(other_lang))))
+    if no_text:
+        findings.append((WARN, t("{n|# card is|# cards are} \"{fulltext}\", but no full text was fetched for "
+                                 "{n|it|them} (`priorwork fulltext`). Read the full text, or set the level to what "
+                                 "was actually read: {numbers}", n=len(no_text), fulltext=fulltext,
+                                 numbers=_numbers(no_text))))
+    if no_page:
+        findings.append((WARN, t("{n|# card is|# cards are} \"{fulltext}\", but the data, identification and findings "
+                                 "give no page. Add (p. N), or \"{unchecked}\" when the full text has no page breaks: "
+                                 "{numbers}", n=len(no_page), fulltext=fulltext,
+                                 unchecked=tl(survey.lang, "(page not checked)"), numbers=_numbers(no_page))))
+    return findings
+
+
+def _wrong_language(values: List[str], lang: str) -> bool:
+    """欄の過半がサーベイの言語でない（日本語のレポートに英語だけの欄、英語のレポートに日本語の欄）。"""
+    def japanese(v: str) -> bool:
+        return bool(_CJK_RE.search(v))
+    texts = [v for v in values if re.search(r"[A-Za-z]{3}", v) or japanese(v)]
+    if not texts:
+        return False
+    wrong = [v for v in texts if japanese(v) != (lang == "ja")]
+    return len(wrong) * 2 > len(texts)
+
+
+def _fulltext(survey: Survey, entry: dict) -> Optional[str]:
+    """取得した本文テキスト（キャッシュが無いマシンでは None）。"""
+    path = (entry.get("fulltext") or {}).get("path")
+    if not path:
+        return None
+    p = survey.root / path if not path.startswith("/") else Path(path)
+    try:
+        return p.read_text(encoding="utf-8")
+    except OSError:
+        return None
+
+
+def _plain_number(token: str) -> str:
+    return token.replace(",", "")
+
+
+def _card_numbers(text: str) -> Set[str]:
+    """カードに書いた数値のうち、本文と突き合わせるもの（ページ・年・1 桁の整数は除く）。"""
+    text = _PAGE_RE.sub(" ", unicodedata.normalize("NFKC", text))
+    out = set()
+    for token in _NUMBER_RE.findall(text):
+        token = token.rstrip(",")
+        n = _plain_number(token)
+        if "." not in n and (len(n) < 2 or (len(n) == 4 and 1800 <= int(n) <= 2099)):
+            continue
+        out.add(token)
+    return out
+
+
+def _text_numbers(text: str) -> Set[str]:
+    """本文に現れる数値（カンマを外した形。.35 は 0.35 としても引ける）。"""
+    text = unicodedata.normalize("NFKC", text)
+    text = re.sub(r"(?<=\d),\s?(?=\d{3}\b)", "", text)            # 1,234 / 1, 234（抽出の空白）→ 1234
+    found = set(re.findall(r"\d+(?:\.\d+)?|\.\d+", text))
+    return found | {"0" + m for m in found if m.startswith(".")}
+
+
+def _bad_pages(text: str, entry: dict, fulltext: str) -> Set[int]:
+    """カードが引くページのうち、論文に無いもの。PDF のページ（1〜N）か、掲載誌のページ範囲なら有効。"""
+    info = entry.get("fulltext") or {}
+    if not info.get("page_markers"):
+        return set()
+    n_pages = info.get("pages") or len(re.findall(r"^=== page \d+ ===$", fulltext, re.M))
+    span = re.match(r"^\s*(\d+)\s*[-–]+\s*(\d+)", entry["record"].get("pages") or "")
+    first, last = (int(span.group(1)), int(span.group(2))) if span else (None, None)
+    bad = set()
+    for m in _PAGE_RE.finditer(unicodedata.normalize("NFKC", text)):
+        for g in m.groups():
+            if not g:
+                continue
+            page = int(g)
+            if 1 <= page <= n_pages or (first is not None and first <= page <= last):
+                continue
+            if first is None and page > n_pages:
+                continue   # 掲載誌のページ範囲が分からない（印刷ページかもしれない）
+            bad.add(page)
+    return bad
+
+
+def _check_synthesis(md: str) -> List[Finding]:
+    """テンプレートで先行研究のまとめとした節（SYNTHESIS_MARK）が、書かれているのに論文を引いていないか。"""
+    findings: List[Finding] = []
+    for m in re.finditer(re.escape(SYNTHESIS_MARK), md):
+        heading = md.rfind("\n## ", 0, m.start())
+        title = md[heading + 4:md.find("\n", heading + 1)].strip() if heading >= 0 else ""
+        end = md.find("\n## ", m.end())
+        body = re.sub(r"<!--.*?-->", "", md[m.end():end if end >= 0 else len(md)], flags=re.S)
+        written = [ln for ln in body.splitlines() if ln.strip() and not _LABEL_ONLY.match(ln)]
+        if written and not find_citations("\n".join(written)):
+            findings.append((WARN, t("The section \"{section}\" cites no paper. Base it on the included papers and "
+                                     "cite them as Author (year)", section=title)))
+    return findings
+
+
+def _written_counts(prose: str) -> Set[int]:
+    prose = unicodedata.normalize("NFKC", prose)
+    return {int(m.group(1)) for rx in _COUNT_RES for m in rx.finditer(prose)}
 
 
 def _numbers(entries: List[dict], limit: int = 10) -> str:

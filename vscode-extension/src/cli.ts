@@ -26,6 +26,8 @@ export interface SurveySummary {
     name: string;
     topic: string;
     created: string;
+    /** やり直しの版（0.1.6 から。名前の日付の直後の v2 など。古い CLI には無い） */
+    version?: number;
     depth: string;
     lang: string;
     report: string;
@@ -76,8 +78,20 @@ export interface SurveyDetail extends SurveySummary {
     scope: Scope;
     unfilled: number[];
     zotero_missing: number[];
+    /** サーベイを書いたモデル（0.1.6 から） */
+    written_by?: string[];
+    /** 書いたのと別のモデルによる監査（0.1.6 から） */
+    audits?: Audit[];
     sync: string | null;
     next: NextStep[];
+}
+
+/** `priorwork audit SURVEY --by MODEL` の記録。 */
+export interface Audit {
+    at: string;
+    by: string;
+    note: string;
+    included: number;
 }
 
 /** サーベイに結び付けた Zotero のコレクション。 */

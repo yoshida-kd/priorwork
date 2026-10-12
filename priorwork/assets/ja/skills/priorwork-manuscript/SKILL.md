@@ -26,7 +26,7 @@ description: >-
 - 範囲: リサーチクエスチョンは原稿のもの。期間・分野・基準は原稿の分野に合わせて決める
 
 ```bash
-./priorwork new "<テーマ>" --slug <slug> --manuscript manuscripts/<論文名> --depth full --question "..." --fields "..." --inclusion "..." --exclusion "..."
+./priorwork new "<テーマ>" --slug <slug> --by "<自分のモデル名>" --manuscript manuscripts/<論文名> --depth full --question "..." --fields "..." --inclusion "..." --exclusion "..."
 ```
 
 レポートの 1 章「原稿の要約」を、原稿に書かれていることだけで埋める（RQ・Y・X・データ・識別戦略・主な結果・予想と違った結果）。推定値を写すときは、原稿の表の値そのままにする。

@@ -160,11 +160,14 @@ SSCI に収録されているかは、Clarivate の [Master Journal List](https:
 | `priorwork-snowball` | 採用論文の参考文献・被引用から見落としを探す |
 | `priorwork-extract` | 本文を取得し、論文カード（RQ・識別戦略など）を記入する |
 | `priorwork-check` | 検査して問題を直し、レポートを書き出す |
+| `priorwork-audit` | 別のモデルが書いたサーベイを監査する: カードを本文と突き合わせ、引用の向き・先行研究と仮説の混同・機械的な除外・SSCI を確かめて直し、`./priorwork audit` で記録する |
 | `priorwork-manuscript` | 分析まで済んだ原稿を読み、それを支える・食い違う文献を集めて、原稿の 1〜3 章（イントロ・先行研究・理論と仮説）を下書きする |
 
 ### 分析まで済んだ原稿から
 
 「データと方法」「分析」まで書いた原稿があれば、ワークスペースの `manuscripts/<論文名>/` に原稿と結果の表を入れ、「manuscripts/<論文名> の原稿のイントロ・先行研究・仮説を書いて」と頼みます（サイドバーの **新しいサーベイ → 原稿から始める** でも依頼文を作れます）。エージェントは原稿から文献で支える主張（重要性・研究の流れ・メカニズム・方法の先例）を洗い出し、結果と食い違う知見も含めて主張ごとに探し、各論文カードに「原稿での役割」を記入して、1〜3 章を原稿の言語で下書きします（`./priorwork new … --manuscript manuscripts/<論文名>`）。下書きは `./priorwork export SURVEY --draft` で `reports/<名前>.draft.md`（引用した論文の参考文献つき）に書き出されます。結果を見てから仮説を立てることにならないよう、仮説ごとの根拠と、探索的に扱う結果の案を、レポートに別に記録します。原稿そのものは書き換えません。
+
+サーベイは、**書いたモデルと別のモデルが監査して初めて完成**とします。書くエージェントは `--by` で自分のモデル名を残し、書き終えたら別のモデル（例: Gemini が書いたなら Claude）のチャットで「サーベイ <名前> を監査して」と頼むよう伝えます。監査は `./priorwork audit SURVEY --by "<モデル名>"` で記録され（書いたモデルの名前では記録できません）、それまで `./priorwork check` が知らせます。
 
 既定では、エージェントが自分で判断して進めます。範囲と採否を自分で決めたいときは「相談しながら進めて」と頼むか、`AGENTS.local.md` にそう書きます。会話を再開したときは「続きをやろう」と言えば、エージェントが `./priorwork status` で進捗と次の作業を確認します。
 
@@ -185,12 +188,13 @@ SSCI に収録されているかは、Clarivate の [Master Journal List](https:
 
 | ファイル | 中身 | 編集 |
 | :--- | :--- | :--- |
-| `reports/YYYYMMDD_<slug>.md` | 作業用のレポート本体 | 文章と論文カードの記入欄は手で書く。`<!-- BEGIN priorwork:… -->` 〜 `<!-- END priorwork:… -->` の範囲は `priorwork` が再生成 |
+| `reports/YYYYMMDD_<slug>.md` | 作業用のレポート本体（やり直した版は `YYYYMMDD_v2_<slug>.md`。同じ slug で `new` すると版が振られる） | 文章と論文カードの記入欄は手で書く。`<!-- BEGIN priorwork:… -->` 〜 `<!-- END priorwork:… -->` の範囲は `priorwork` が再生成 |
 | `.priorwork/surveys/YYYYMMDD_<slug>.json` | 論文候補・採否と理由（変更の履歴つき）・検索履歴・調査範囲・深さ・レポートの言語 | `priorwork` コマンド（と VS Code の拡張機能）だけで変更する |
 
 - **読むための版**は `./priorwork export <survey>` で作ります（`reports/YYYYMMDD_<slug>.html`。ブラウザで開くか、印刷して PDF にできます）。管理ブロックのコメント、未記入の記入欄、テンプレートの説明文を除き、要旨も省きます（`--with-abstracts` で載せる）。`--format docx`（pandoc が必要）、`--format md` も選べます。未記入・未確認の論文カード・`check` の ERROR が残っていると、冒頭に「下書き」と表示されます。出力は Git 管理外です
-- **比較マトリクス**（2 章）は、各論文カード（3 章）の記入欄から自動で作られます。カードを書き換えたら `./priorwork render`
-- **参照文献**（8 章）は採用論文から DOI つきで自動生成されます（引用キーは作りません。Zotero へは手作業で登録）。本文で同じ「著者 (年)」になる採用論文が複数あると、タイトル順に 2001a / 2001b と区別します（カード・比較マトリクスも同じ表記）
+- **レポートの構成**は、まとめが先で個々の論文が後です: 背景（1 章）、先行研究の理論・手法・論争・空白（2〜5 章。主張ごとに採用論文を引く）、本研究の仮説と示唆（6 章。先行研究と分けて書く）、比較マトリクス（7 章）、各論文の詳細（8 章）、参照文献（9 章）、付録。各節の下に「書く内容」の指示があります（0.1.5 までに作ったレポートは、以前の並びのまま動きます）
+- **比較マトリクス**（7 章）は、各論文カード（8 章）の記入欄から自動で作られます。カードを書き換えたら `./priorwork render`。Markdown に書いた Mermaid の図（```` ```mermaid ````）は、HTML では図として表示されます
+- **参照文献**（9 章）は採用論文から DOI つきで自動生成されます（引用キーは作りません。Zotero へは手作業で登録）。本文で同じ「著者 (年)」になる採用論文が複数あると、タイトル順に 2001a / 2001b と区別します（カード・比較マトリクスも同じ表記）
 - **文献探索の記録**（付録）には、実行した検索・件数・除外理由と、採否を見直した論文の件数が自動で残ります。採否の経緯（例: 保留 → 除外（理論のみ） → 採用）は `./priorwork list` に表示されます
 - 採用を取り消した論文のカードは、記入内容ごと JSON に退避され、再び採用すると復元されます
 
@@ -206,8 +210,8 @@ SSCI に収録されているかは、Clarivate の [Master Journal List](https:
 
 # サーベイの管理
 ./priorwork status [SURVEY]                                    # 一覧 / 進捗と次にやること
-./priorwork new "<テーマ>" --slug <slug> [--depth quick|full] [--question ... --years ... --fields ... --inclusion ... --exclusion ...]
-./priorwork scope SURVEY --question "..." [--depth quick|full]  # 範囲の変更
+./priorwork new "<テーマ>" --slug <slug> [--by "<モデル名>"] [--depth quick|full] [--question ... --years ... --fields ... --inclusion ... --exclusion ...]
+./priorwork scope SURVEY --question "..." [--depth quick|full] [--by "<モデル名>"]  # 範囲の変更
 ./priorwork archive SURVEY [--undo]                          # 一覧から隠す（ファイルは残る）
 ./priorwork list SURVEY [--status candidate maybe] [--abstract]
 ./priorwork include SURVEY 2 5 7
@@ -217,6 +221,7 @@ SSCI に収録されているかは、Clarivate の [Master Journal List](https:
 ./priorwork card SURVEY 3 [--set rq="..." evidence=abstract]   # 論文カードを表示・記入
 ./priorwork render SURVEY
 ./priorwork check SURVEY [--offline]
+./priorwork audit SURVEY [--by "<モデル名>" --note "..."]       # 別のモデルによる監査を記録 / 記録を見る
 ./priorwork export SURVEY [--format html|docx|md] [-o PATH] [--with-abstracts]   # 読むための版を書き出す
 ./priorwork fulltext SURVEY <番号> [--pdf <パス>]
 ./priorwork zotero [SURVEY] [--refresh]                         # Zotero 接続確認 / 採用論文の登録状況
@@ -230,7 +235,7 @@ SSCI に収録されているかは、Clarivate の [Master Journal List](https:
 ./priorwork journal "<誌名 or ISSN>"
 ```
 
-`SURVEY` はファイル名（拡張子なし）か slug で指定します。多くのコマンドは `--json` で JSON を出力します（VS Code の拡張機能・スクリプト向け）。
+`SURVEY` はファイル名（拡張子なし）か slug で指定します（やり直した版は `v2_<slug>` のように版を付けて）。多くのコマンドは `--json` で JSON を出力します（VS Code の拡張機能・スクリプト向け）。
 
 ---
 

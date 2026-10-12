@@ -3,6 +3,44 @@
 Priorwork's command-line tool (`priorwork` on PyPI) and this extension are
 released together, under one version number.
 
+## 0.1.6
+
+- **An audit by another model.** A survey now counts as done only once a
+  model other than the one that wrote it has audited it: the writer records
+  itself (`priorwork new … --by "<model>"`), and the auditor records its
+  audit (`priorwork audit SURVEY --by "<model>"`, refused for the model that
+  wrote it). The new skill `priorwork-audit` checks every card against the
+  full text, the direction of each citation, hypotheses passed off as the
+  literature, and mechanical exclusions. *Ask your agent… → Audit as another
+  model* copies the request, and the next steps offer it once the cards are
+  filled in.
+- **`priorwork check` looks harder at the cards and the text.** It warns
+  about numbers on a card that are not in the full text, pages that are not
+  in the paper, "full text checked" cards with no page or no full text
+  fetched, cards not written in the report's language, synthesis sections
+  that cite no paper, and a number of included papers written by hand that
+  disagrees with the survey. Included papers not in Zotero are now a WARN.
+- **A new report layout** for new surveys: the synthesis comes first
+  (background, theories, methods, debates, gaps), then a separate section for
+  the hypotheses of this study, then the matrix, the paper cards and the
+  references. Each section says what to write. Existing reports keep their
+  layout and still work.
+- **Mermaid diagrams** (```` ```mermaid ````) are drawn in the exported HTML
+  and in the report viewer, instead of showing as code.
+- **The SSCI check no longer trusts a title alone.** When a journal's ISSN
+  is known and differs from the listed one, a journal with the same title is
+  "not in SSCI" (e.g. the two journals called *Public Policy and
+  Administration*). Existing surveys are re-checked when rendered.
+- **Redone surveys get a version right after the date**:
+  `priorwork new … --slug make_or_buy` for an existing `make_or_buy` makes
+  `20261012_v2_make_or_buy`, and the sidebar shows "v2". Surveys named the
+  old way (`…_make_or_buy_v2`) count as versions too.
+- The agent instructions now say that every included paper goes into Zotero
+  (also those whose full text the agent found itself), that the list to add
+  is the output of `priorwork zotero --dois` as it is, that cards are written
+  in the report's language with pages, and that screening never excludes
+  many papers with one recycled reason.
+
 ## 0.1.5
 
 - **The sidebar no longer sticks at "priorwork status failed".** The cause

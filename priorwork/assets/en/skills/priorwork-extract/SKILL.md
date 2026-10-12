@@ -16,7 +16,7 @@ Follow the rules in [AGENTS.md](../../../AGENTS.md).
   - You need not read the full text from start to end. Focus on the data and sample, the identification, the main results (tables) and the limitations, and fill in the card's fields.
 - `quick`: filling in from the abstracts is fine (evidence level "abstract only").
 
-Either way, write only what the abstract or full text says, and always update the evidence level.
+Either way, write only what the abstract or full text says, and always update the evidence level. **Set "full text checked" only when you filled in the card from the full text you fetched with `./priorwork fulltext` and read.** A card written from the abstract is "abstract only", even if the full text is in the cache.
 
 In a survey made from a manuscript (`priorwork-manuscript`), the papers the draft cites must be "full text checked" at any depth (`check` gives a WARN otherwise).
 
@@ -39,18 +39,22 @@ In a survey made from a manuscript (`priorwork-manuscript`), the papers the draf
 
    If the source is "Zotero's index text (no page breaks)", do not give page numbers; write "(page not checked)".
 
-3. In section 3 of the survey Markdown, rewrite only the fields of that paper's card (under `<!-- paper: ... -->`), or use `./priorwork card <survey> <number> --set rq=... evidence=fulltext`.
+3. In the section "The papers" of the survey Markdown, rewrite only the fields of that paper's card (under `<!-- paper: ... -->`), or use `./priorwork card <survey> <number> --set rq=... evidence=fulltext`.
+   - **Write in the language of the report.** Summarise in your own words rather than copying the abstract; keep terms in the original in brackets.
    - The heading, the `Source` line and the `⚠️` lines are generated; do not touch them.
    - On the line itself (`**RQ**: ` and so on), write a short summary (one sentence) for the matrix. Add details as `  - ` bullet points right below it.
-   - Write only what the text says. Give $N$, estimates and periods as written, with the page, like `(p. 12)`.
+   - Write only what the text says. Give $N$, estimates and periods as written, with the page, like `(p. 12)`. On a card checked against the full text, the data, identification and main findings always carry a page (or "(page not checked)" when the full text has no page breaks).
+   - For the identification, write the method the paper actually uses (never DID for a paper that does not use it). If unclear, "not reported".
+   - For the main findings, keep the direction of the result (rises / falls, does / does not) exactly as the paper states it.
    - If something is not there, write "not reported". Never fill it in by guessing.
    - Update `**Evidence**` to "full text checked" or "abstract only".
    - If the full text shows that a paper is out of scope, do not fill in its card; exclude it with `./priorwork exclude` and a reason.
 
-4. Every few papers, update the matrix.
+4. Every few papers, update the matrix and check. `check` gives a WARN for numbers not in the full text, pages not in the paper, cards without pages and cards not in the report's language. Fix them against the full text.
 
    ```bash
    ./priorwork render <survey>
+   ./priorwork check <survey> --offline
    ```
 
 Only in consultation mode, report the key points (identification strategy, main findings) every 2–3 papers and check whether to go on.

@@ -234,3 +234,27 @@ def test_card_restores_a_deleted_field_and_rejects_bad_input(s, s2_record):
     s.upsert(s2_record(doi="10.1/other", title="Other"), "search")
     with pytest.raises(SurveyError):
         s.card(2)
+
+
+def test_redo_gets_a_version_after_the_date():
+    from datetime import date
+    from priorwork.survey import Survey, SurveyError, name_parts
+    first = Survey.create("需要ショック", "make_or_buy", {}, today=date(2026, 10, 9))
+    # 以前の付け方（slug の末尾の _v2）で作られたサーベイも版として読む
+    old_style = Survey.create("需要ショック", "tmp", {}, today=date(2026, 10, 9))
+    for p in (old_style.md_path, old_style.json_path):
+        p.rename(p.with_name(p.name.replace("tmp", "make_or_buy_v2")))
+    old_style = Survey.load("20261009_make_or_buy_v2")
+    assert first.name == "20261009_make_or_buy" and old_style.version == 2
+    third = Survey.create("需要ショック", "make_or_buy", {}, today=date(2026, 10, 12))
+    assert third.name == "20261012_v3_make_or_buy" and third.version == 3
+    # エージェントが末尾に _v4 を付けても、版はエンジンが振る
+    assert Survey.create("需要ショック", "make_or_buy_v4", {}, today=date(2026, 10, 12)).name == "20261012_v4_make_or_buy"
+    assert name_parts("20261012_v3_make_or_buy") == ("20261012", 3, "make_or_buy")
+    assert name_parts("20261012_mw") == ("20261012", 1, "mw")
+    # 版の付いた名前で引ける。slug だけでは版を取り違えるので止まる
+    assert Survey.load("v3_make_or_buy").name == "20261012_v3_make_or_buy"
+    assert Survey.load("20261009_make_or_buy").name == "20261009_make_or_buy"
+    with pytest.raises(SurveyError, match="20261012_v3_make_or_buy"):
+        Survey.load("make_or_buy")
+    assert Survey.create("別", "other", {}).version == 1

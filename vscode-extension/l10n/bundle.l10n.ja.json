@@ -130,14 +130,12 @@
   "Save the card": "カードを保存",
   "Discard the changes": "変更を取り消す",
   "the unfilled ones": "未記入のもの",
-  "Write the text of the report of the survey \"{0}\" ({1}): the background (section 1) and sections 4 to 7, based on the paper cards. Cite only papers registered in the survey, and run ./priorwork check at the end.": "サーベイ「{0}」（{1}）のレポートの文章（1章の背景と4〜7章）を、論文カードに基づいて書いてください。サーベイに登録された論文だけを引用し、最後に ./priorwork check を実行してください。",
   "Fill in the paper cards": "論文カードを記入する",
   "Chase citations": "引用をたどる",
   "Write the text of the report": "レポートの文章を書く",
   "Write the draft of the manuscript": "原稿の下書きを書く",
   "introduction, literature review, hypotheses": "イントロ・先行研究・仮説",
   "Write the draft of the introduction, literature review and theory and hypotheses of my manuscript ({0}) from the survey \"{1}\" ({2}), in the language of the manuscript. Cite only papers included in the survey, show where the literature disagrees with my results, run ./priorwork check and export the draft with ./priorwork export {2} --draft.": "サーベイ「{1}」（{2}）をもとに、私の原稿（{0}）のイントロ・先行研究・理論と仮説の下書きを、原稿の言語で書いてください。サーベイに採用した論文だけを引用し、私の結果と食い違う先行研究も示し、./priorwork check を実行してから ./priorwork export {2} --draft で書き出してください。",
-  "sections 1 and 4–7": "1章と4〜7章",
   "Check and fix": "検査して直す",
   "What should your agent do?": "エージェントに何を頼みますか？",
   "Copies a request to paste into your agent's chat": "エージェントのチャットに貼る依頼文をコピーします",
@@ -259,5 +257,10 @@
   "Copy It into manuscripts/": "manuscripts/ に写す",
   "The manuscript is outside the workspace. The agent reads it from manuscripts/ in the workspace (the original stays where it is).": "原稿がワークスペースの外にあります。エージェントはワークスペースの manuscripts/ から読みます（元のファイルはそのまま残ります）。",
   "manuscripts/{0} already exists. Rename or remove it first.": "manuscripts/{0} はもうあります。先に名前を変えるか、取り除いてください。",
-  "The analysis of my manuscript in {0} is done. With Priorwork, make a survey from it, gather the literature that supports and conflicts with it, and draft its introduction, literature review and theory and hypotheses in the language of the manuscript, without stopping. Do not rewrite the manuscript. Report at the end.": "{0} にある原稿は分析まで済んでいます。Priorwork で、この原稿からサーベイを作り、原稿を支える文献と食い違う文献を集めて、イントロ・先行研究・理論と仮説を原稿の言語で、止まらずに下書きしてください。原稿は書き換えないでください。最後に報告してください。"
+  "The analysis of my manuscript in {0} is done. With Priorwork, make a survey from it, gather the literature that supports and conflicts with it, and draft its introduction, literature review and theory and hypotheses in the language of the manuscript, without stopping. Do not rewrite the manuscript. Report at the end.": "{0} にある原稿は分析まで済んでいます。Priorwork で、この原稿からサーベイを作り、原稿を支える文献と食い違う文献を集めて、イントロ・先行研究・理論と仮説を原稿の言語で、止まらずに下書きしてください。原稿は書き換えないでください。最後に報告してください。",
+  "Write the text of the report of the survey \"{0}\" ({1}) from the paper cards: the background, the sections on the literature (theories, methods, debates, gaps), citing included papers for each claim, and the hypotheses of this study kept apart from the literature. Run ./priorwork check at the end.": "サーベイ「{0}」（{1}）のレポートの文章を、論文カードに基づいて書いてください。背景、先行研究の節（理論・手法・論争・空白。主張ごとに採用論文を引く）、先行研究と分けた本研究の仮説です。最後に ./priorwork check を実行してください。",
+  "background, literature, hypotheses": "背景・先行研究・仮説",
+  "Audit as another model": "別のモデルとして監査する",
+  "paste into a model other than the one that wrote it": "書いたのと別のモデルに貼る",
+  "Audit the survey \"{0}\" ({1}) with Priorwork, written by another model: check every paper card against the full text, the direction of each citation in the text, that my hypotheses are not presented as the literature, and the excluded papers. Fix what is wrong and record the audit with ./priorwork audit.": "別のモデルが書いたサーベイ「{0}」（{1}）を Priorwork で監査してください。論文カードをすべて本文と突き合わせ、本文の引用の向き、私の仮説が先行研究のように書かれていないか、除外された論文を確かめてください。誤りを直し、./priorwork audit で監査を記録してください。"
 }

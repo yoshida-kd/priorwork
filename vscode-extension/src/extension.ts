@@ -22,7 +22,7 @@ import { Setup } from './setup';
 import { Node, SurveyTree } from './tree';
 
 /** エージェントに頼める仕事（文面は askAgent）。 */
-type AgentTask = 'survey' | 'search' | 'screen' | 'snowball' | 'fill' | 'write' | 'check';
+type AgentTask = 'survey' | 'search' | 'screen' | 'snowball' | 'fill' | 'write' | 'check' | 'audit';
 
 /** エージェントのチャットを開くコマンド（入っているものだけ出す）。 */
 const AGENT_CHATS: { command: string; label: string }[] = [
@@ -148,8 +148,9 @@ export function activate(context: vscode.ExtensionContext): void {
             fill: L.t('Fill in the paper cards of the survey "{0}" ({1}) with Priorwork: {2}. Write only what the abstract or the full text says, and update the evidence level.', s.topic, s.name, which),
             write: s.manuscript
                 ? L.t('Write the draft of the introduction, literature review and theory and hypotheses of my manuscript ({0}) from the survey "{1}" ({2}), in the language of the manuscript. Cite only papers included in the survey, show where the literature disagrees with my results, run ./priorwork check and export the draft with ./priorwork export {2} --draft.', s.manuscript, s.topic, s.name)
-                : L.t('Write the text of the report of the survey "{0}" ({1}): the background (section 1) and sections 4 to 7, based on the paper cards. Cite only papers registered in the survey, and run ./priorwork check at the end.', s.topic, s.name),
+                : L.t('Write the text of the report of the survey "{0}" ({1}) from the paper cards: the background, the sections on the literature (theories, methods, debates, gaps), citing included papers for each claim, and the hypotheses of this study kept apart from the literature. Run ./priorwork check at the end.', s.topic, s.name),
             check: L.t('Check the survey "{0}" ({1}) with Priorwork, fix what it finds and export the report.', s.topic, s.name),
+            audit: L.t('Audit the survey "{0}" ({1}) with Priorwork, written by another model: check every paper card against the full text, the direction of each citation in the text, that my hypotheses are not presented as the literature, and the excluded papers. Fix what is wrong and record the audit with ./priorwork audit.', s.topic, s.name),
         }[task];
         await copyForAgent(text);
     }
@@ -385,17 +386,28 @@ export function activate(context: vscode.ExtensionContext): void {
     let exporting = false;   // 自分で書き出している間は、HTML の変更を通知しない
 
     /**
+     * 書き出した HTML に CSP を足す。動かしてよいスクリプトは Mermaid の図を描くもの
+     * （priorwork/export.py の MERMAID_JS）だけで、レポートに紛れ込んだスクリプトは動かさない。
+     */
+    function reportHtml(file: string): string {
+        const csp = '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; '
+            + 'style-src \'unsafe-inline\'; img-src https: data:; font-src https: data:; '
+            + 'script-src https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js;">';
+        return fs.readFileSync(file, 'utf-8').replace(/<head>/i, `<head>\n${csp}`);
+    }
+
+    /**
      * 読むための版（HTML）をエディターの中で見せる。SSH でつないだサーバーでも見られる
      * （Live Preview などはサーバーの上のファイルをブラウザに出せないことがある）。
      */
     function showHtml(file: string, title: string): void {
         if (!reportPanel) {
             reportPanel = vscode.window.createWebviewPanel('priorwork.report', title, vscode.ViewColumn.Active,
-                                                           { enableScripts: false });
+                                                           { enableScripts: true });
             reportPanel.onDidDispose(() => { reportPanel = undefined; reportFile = undefined; });
         }
         reportPanel.title = title;
-        reportPanel.webview.html = fs.readFileSync(file, 'utf-8');
+        reportPanel.webview.html = reportHtml(file);
         reportFile = file;
         reportPanel.reveal();
     }
@@ -420,7 +432,7 @@ export function activate(context: vscode.ExtensionContext): void {
                 return;
             }
             if (reportPanel && reportFile === uri.fsPath) {
-                reportPanel.webview.html = fs.readFileSync(uri.fsPath, 'utf-8');
+                reportPanel.webview.html = reportHtml(uri.fsPath);
                 return;
             }
             const view = vscode.l10n.t('View');
@@ -468,8 +480,9 @@ export function activate(context: vscode.ExtensionContext): void {
                     { label: L.t('Fill in the paper cards'), description: L.t('from the abstracts or full texts'), task: 'fill' },
                     s.manuscript
                         ? { label: L.t('Write the draft of the manuscript'), description: L.t('introduction, literature review, hypotheses'), task: 'write' }
-                        : { label: L.t('Write the text of the report'), description: L.t('sections 1 and 4–7'), task: 'write' },
+                        : { label: L.t('Write the text of the report'), description: L.t('background, literature, hypotheses'), task: 'write' },
                     { label: L.t('Check and fix'), description: L.t('then export the report'), task: 'check' },
+                    { label: L.t('Audit as another model'), description: L.t('paste into a model other than the one that wrote it'), task: 'audit' },
                 ];
                 task = (await vscode.window.showQuickPick(items, { placeHolder: L.t('What should your agent do?') }))?.task;
                 if (!task) {
@@ -990,6 +1003,8 @@ export function activate(context: vscode.ExtensionContext): void {
                 case 'draft':
                     return vscode.commands.executeCommand('priorwork.askAgent', { name: s.name, task: 'write' });
                 case 'zotero': return zoteroMissing(s);
+                case 'audit':
+                    return vscode.commands.executeCommand('priorwork.askAgent', { name: s.name, task: 'audit' });
                 default:   // 拡張機能がまだ知らない工程（CLI のほうが新しいとき）。ターミナルは開かず、出力パネルに出す
                     try {
                         log(await busy(step.text, (o) => runText(model.root, step.args, o)));

@@ -28,9 +28,9 @@ DRAFT_ANCHOR = "<!-- priorwork:draft -->"
 
 # テンプレート（assets/<lang>/templates/*.md）にある、執筆者向けの説明文。両方の言語
 _HINTS = [
-    re.compile(r"^[34]章のカードの記入内容から自動で作られます。\s*$"),
+    re.compile(r"^\d+章のカードの記入内容から自動で作られます。\s*$"),
     re.compile(r"^引用キーは Zotero で管理する（ここではキーを作らない）。\s*$"),
-    re.compile(r"^Built automatically from the paper cards in section [34]\.\s*$"),
+    re.compile(r"^Built automatically from the paper cards in section \d+\.\s*$"),
     re.compile(r"^Citation keys are managed in Zotero \(none are made here\)\.\s*$"),
 ]
 _RULES_HEADING = re.compile(r"^(?:記入のルール|How to fill in a card):\s*$")
@@ -205,17 +205,27 @@ th, td { border:1px solid var(--line); padding:.4rem .6rem; vertical-align:top; 
 th { background:var(--soft); text-align:left; }
 details { margin:.5rem 0; color:var(--muted); }
 code { background:var(--soft); padding:.1em .3em; border-radius:3px; }
+pre.mermaid { background:#fff; color:#1d2733; padding:1rem; border:1px solid var(--line); border-radius:6px; overflow-x:auto; text-align:center; }
 @media print { main { max-width:none; padding:0; } body { font-size:10.5pt; } h2 { break-after:avoid; } h3, tr { break-inside:avoid; } }
 """
+
+
+# Mermaid の図（```mermaid）はブラウザで描く。図があるときだけ読み込む（読めなければコードのまま見える）。
+# VS Code の拡張機能のビューワーは、このスクリプトだけを許可する（vscode-extension/src/extension.ts）
+MERMAID_JS = "https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js"
+_MERMAID_RE = re.compile(r'<pre><code class="language-mermaid">(.*?)</code></pre>', re.S)
 
 
 def to_html(md: str, title: str, lang: str = "ja") -> str:
     from markdown_it import MarkdownIt
     body = MarkdownIt("commonmark", {"html": True}).enable("table").render(md)
     body = body.replace("<table>", '<div class="table-wrap"><table>').replace("</table>", "</table></div>")
+    body, diagrams = _MERMAID_RE.subn(r'<pre class="mermaid">\1</pre>', body)
+    script = f'<script src="{MERMAID_JS}"></script>\n' if diagrams else ""
     return (f"<!DOCTYPE html>\n<html lang=\"{lang}\">\n<head>\n<meta charset=\"utf-8\">\n"
             "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n"
-            f"<title>{html.escape(title)}</title>\n<style>{_CSS}</style>\n</head>\n<body>\n<main>\n{body}</main>\n</body>\n</html>\n")
+            f"<title>{html.escape(title)}</title>\n<style>{_CSS}</style>\n</head>\n<body>\n<main>\n{body}</main>\n"
+            f"{script}</body>\n</html>\n")
 
 
 def draft_section(md: str) -> str:

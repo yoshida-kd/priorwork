@@ -143,10 +143,35 @@ def md_cell(text: Any) -> str:
     return re.sub(r"\s+", " ", str(text)).replace("|", "\\|").strip()
 
 
+def _model_key(model: str) -> str:
+    """モデル名の照合用（大文字小文字・空白・記号を無視）。"""
+    return re.sub(r"[^a-z0-9]+", "", model.lower())
+
+
 def sanitize_slug(name: str) -> str:
     name = re.sub(r"[^\w\s-]", "", ascii_fold(name))
     name = re.sub(r"[\s_-]+", "_", name)
     return name.strip("_").lower()[:60]
+
+
+_NAME_RE = re.compile(r"^(\d{8})_(?:v(\d+)_)?(.+?)$")
+_OLD_VERSION_RE = re.compile(r"^(.+)_v(\d+)$")
+
+
+def name_parts(name: str) -> Tuple[str, int, str]:
+    """サーベイの名前（ファイル名）を (日付, 版, slug) に分ける。
+    `20261012_v2_make_or_buy` → ("20261012", 2, "make_or_buy")。版の無いものは 1。
+    以前の付け方（slug の末尾の `_v2`）も版として読む。"""
+    m = _NAME_RE.match(name)
+    if not m:
+        return "", 1, name
+    day, version, slug = m.group(1), m.group(2), m.group(3)
+    if version is None:
+        old = _OLD_VERSION_RE.match(slug)
+        if old:
+            return day, int(old.group(2)), old.group(1)
+        return day, 1, slug
+    return day, int(version), slug
 
 
 # ---------------- State ----------------
@@ -224,7 +249,12 @@ class Survey:
         state_dir = state_dir or STATE_DIR
         template = template or template_path(lang, manuscript=bool(manuscript))
         slug = sanitize_slug(slug) or "survey"
-        md_path = reports_dir / f"{today.strftime('%Y%m%d')}_{slug}.md"
+        # やり直し（同じ slug がある）なら版を振る: 20261012_v2_<slug>。日付の直後に置き、一覧で版が見えるようにする
+        slug = name_parts(f"00000000_{slug}")[2]   # エージェントが付けた末尾の _v2 は外して数え直す
+        taken = [name_parts(p.stem) for p in state_dir.glob("*.json")]
+        version = max((v for _, v, sl in taken if sl == slug), default=0) + 1
+        prefix = today.strftime('%Y%m%d') + (f"_v{version}" if version > 1 else "")
+        md_path = reports_dir / f"{prefix}_{slug}.md"
         json_path = state_dir / f"{md_path.stem}.json"
         if md_path.exists() or json_path.exists():
             raise SurveyError(t("{name} already exists", name=md_path.name))
@@ -263,8 +293,11 @@ class Survey:
         if path.suffix in (".md", ".json"):
             stems = [name]
         else:
-            stems = sorted(p.stem for p in state_dir.glob("*.json")
-                           if p.stem == name or p.stem.split("_", 1)[-1] == name)
+            # ファイル名そのもの・日付を除いた名前（v2_<slug>）・slug のどれでも引ける。
+            # slug に複数の版があれば、取り違えないよう候補を示して止める
+            all_stems = sorted(p.stem for p in state_dir.glob("*.json"))
+            stems = [st for st in all_stems if st == name] or \
+                [st for st in all_stems if st.split("_", 1)[-1] == name or name_parts(st)[2] == name]
         if not stems:
             raise SurveyError(t("No survey matches {ref} (see the list with `priorwork status`)", ref=ref))
         if len(stems) > 1:
@@ -289,6 +322,11 @@ class Survey:
     @property
     def name(self) -> str:
         return self.md_path.stem
+
+    @property
+    def version(self) -> int:
+        """やり直しの版（1 から）。"""
+        return name_parts(self.name)[1]
 
     @property
     def lang(self) -> str:
@@ -428,6 +466,33 @@ class Survey:
         else:
             self.data.pop("archived", None)
 
+    # ---- writers and audits ----
+    # 書いたモデルと別のモデルが監査して、初めて 1 回分とする（同じモデルは自分の誤読に気付きにくい）
+
+    @property
+    def written_by(self) -> List[str]:
+        return list(self.data.get("written_by", []))
+
+    def add_writer(self, model: str):
+        model = model.strip()
+        if model and _model_key(model) not in {_model_key(m) for m in self.written_by}:
+            self.data.setdefault("written_by", []).append(model)
+
+    @property
+    def audits(self) -> List[Dict[str, Any]]:
+        return list(self.data.get("audits", []))
+
+    def add_audit(self, model: str, note: str = "") -> Dict[str, Any]:
+        model = model.strip()
+        if not model:
+            raise SurveyError(t("Give the model that audited the survey with --by"))
+        if _model_key(model) in {_model_key(m) for m in self.written_by}:
+            raise SurveyError(t("{model} wrote this survey, so it cannot audit it. Ask another model (written by: "
+                                "{writers})", model=model, writers=", ".join(self.written_by)))
+        audit = {"at": now_iso(), "by": model, "note": note.strip(), "included": len(self.by_status(INCLUDED))}
+        self.data.setdefault("audits", []).append(audit)
+        return audit
+
     def update_scope(self, **scope: Optional[str]):
         for k, v in scope.items():
             if v is not None:
@@ -485,9 +550,24 @@ class Survey:
 
     # ---- rendering ----
 
+    def reclassify(self) -> bool:
+        """SSCI の判定を今の収録リストで付け直す（照合の規則やリストが変わったとき）。変わったら True。
+        収録リストが無いときは、前にリストで照合した判定を消さないよう何もしない。"""
+        if not ssci.get_ssci_list().loaded:
+            return False
+        changed = False
+        for e in self.papers:
+            new = ssci.classify_paper(e["record"])
+            if new != e["record"].get("ssci"):
+                e["record"]["ssci"] = new
+                changed = True
+        return changed
+
     def render(self) -> bool:
         """管理ブロックを再生成して Markdown を書き戻す。変更があれば True。"""
         md = self.md_path.read_text(encoding="utf-8")
+        if self.reclassify():
+            self.save()
         new_md = self.rendered_markdown(md)
         if new_md != md:
             self.md_path.write_text(new_md, encoding="utf-8")
@@ -851,6 +931,10 @@ def render_log(data: Dict[str, Any], papers: List[Dict[str, Any]], lang: str) ->
         lines.append(f"- **{tl(lang, 'Reasons for exclusion')}**: "
                      + sep.join(tl(lang, "{reason} ({n})", reason=k, n=v)
                                 for k, v in sorted(reasons.items(), key=lambda x: -x[1])))
+    if data.get("written_by"):
+        lines.append(f"- **{tl(lang, 'Written by')}**: " + sep.join(data["written_by"]))
+    for a in data.get("audits", []):
+        lines.append(f"- **{tl(lang, 'Audit')}**: {a['at'][:10]} {a['by']}" + (f" — {md_cell(a['note'])}" if a.get("note") else ""))
     if data["searches"]:
         lines += ["", "| " + " | ".join(tl(lang, h) for h in LOG_HEADS) + " |",
                   "| :--- | :--- | :--- | :--- | ---: | ---: |"]

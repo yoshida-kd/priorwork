@@ -19,7 +19,7 @@ Follow the rules in [AGENTS.md](../../../AGENTS.md).
    ./priorwork list <survey> --status candidate --abstract
    ```
 
-2. Judge each paper against the inclusion and exclusion criteria and record the decision with a reason. You may record several at once.
+2. **Read each abstract** and judge the paper against the inclusion and exclusion criteria and the research question, recording the decision with a reason. Papers with the same decision may be recorded in one command.
 
    ```bash
    ./priorwork include <survey> 2 5 7 --reason "Empirical study of contracting out and municipal staffing"
@@ -27,7 +27,8 @@ Follow the rules in [AGENTS.md](../../../AGENTS.md).
    ./priorwork maybe <survey> 9 --reason "Identification unclear from the abstract; check the full text"
    ```
 
-   - Write the reason in one line so that it shows which criterion applied. Record papers excluded for the same reason in one command.
+   - Write the reason in one line, about that paper, so that it shows which criterion applied.
+   - **Never exclude many papers with one recycled reason.** Except for reasons the bibliographic data settles (working paper, preprint, outside the period, book review), an "off topic" exclusion needs the abstract read: say what the paper is about and why it does not bear on the question. Work near the question (similar subjects, institutions or methods; the same phenomenon from another angle) is maybe or included, not excluded. Core papers have been dropped mechanically before.
    - When the abstract is not enough, use maybe and say in the reason what is unclear. Before filling in the cards, settle each maybe as included or excluded from the full text or `./priorwork get`.
    - When in doubt, lean towards including for full (you can still exclude later) and towards excluding for quick.
    - Working papers, preprints, book reviews and comments are excluded (AGENTS.md, rule 1). For ⚠️ papers, see below.

@@ -39,7 +39,7 @@ export function statusIcon(status: Status): vscode.ThemeIcon {
 
 const STEP_ICON: Record<string, string> = {
     scope: 'settings', search: 'search', screen: 'checklist', snowball: 'references', zotero: 'library',
-    fill: 'edit', draft: 'book', check: 'pass', export: 'open-preview',
+    fill: 'edit', draft: 'book', check: 'pass', export: 'open-preview', audit: 'verified',
 };
 
 /** 'Card & Krueger (1994)' の形。 */
@@ -64,6 +64,11 @@ export function surveyDescription(s: SurveySummary): string {
 /** 同じテーマのサーベイを見分ける部分（日付を除いた名前。例: make_or_buy_v2）。 */
 export function surveyTag(s: SurveySummary): string {
     return s.name.replace(/^\d{8}_/, '');
+}
+
+/** やり直しの版（v2 以降だけ。1 版目は何も付けない） */
+function versionTag(s: SurveySummary): string {
+    return (s.version ?? 1) > 1 ? `v${s.version} · ` : '';
 }
 
 export class SurveyTree implements vscode.TreeDataProvider<Node>, vscode.Disposable {
@@ -176,7 +181,8 @@ export class SurveyTree implements vscode.TreeDataProvider<Node>, vscode.Disposa
                 const it = new vscode.TreeItem(node.survey.topic, C.Expanded);
                 it.id = `survey:${node.survey.name}`;
                 // 同じテーマが並ぶとき（やり直したときなど）は、名前で見分けられるようにする
-                it.description = (node.dup ? `${surveyTag(node.survey)} · ${node.survey.created} · ` : '')
+                it.description = versionTag(node.survey)
+                    + (node.dup ? `${surveyTag(node.survey)} · ${node.survey.created} · ` : '')
                     + surveyDescription(node.survey);
                 it.iconPath = new vscode.ThemeIcon('book');
                 it.contextValue = 'priorwork.survey';

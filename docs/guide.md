@@ -181,6 +181,7 @@ The agent follows the workspace's `AGENTS.md` and skills, in this order, without
 
 ```
 ① scope → ② search → ③ screen → ④ chase citations → ⑤ fill in the cards → ⑥ write → ⑦ check and export
+                                                                          → ⑧ audit (by another model)
 ```
 
 1. **Scope**: decides the research question, period, fields, inclusion and exclusion criteria and
@@ -193,13 +194,21 @@ The agent follows the workspace's `AGENTS.md` and skills, in this order, without
    of the included ones, and screens them.
 5. **Cards**: fills in the cards of the included papers from the full text (a PDF in Zotero or an
    open-access version) or the abstract.
-6. **Text**: writes the background, theoretical traditions, empirical methods, consensus and debates,
-   and conclusions from the cards.
-7. **Check and export**: checks citations, DOIs and empty fields, fixes them, and exports the version
-   for reading (HTML).
+6. **Text**: writes the background, the literature's theories, methods, debates and gaps (citing the
+   included papers for each claim), and, kept apart from them, the hypotheses and implications for your
+   study, from the cards.
+7. **Check and export**: checks citations, DOIs, empty fields and whether the cards match the full
+   texts, fixes them, and exports the version for reading (HTML).
+8. **Audit**: not by the same agent. A survey is done only once **a model other than the one that wrote
+   it** has audited it (a model rarely catches its own misreadings). The writer records its model name,
+   and at the end asks you to paste "audit the survey <name>" into another model's chat (e.g. Claude if
+   Gemini wrote it; **Ask Your Agent… → Audit as another model** copies the request). The auditor
+   compares every card with the full text, checks the direction of each citation, hypotheses passed off
+   as the literature and the excluded papers, fixes them and records the audit
+   (`./priorwork audit SURVEY --by "<model>"`, refused for the model that wrote it).
 
 At the end it reports the numbers searched and included, the parts of the scope it decided itself, what
-is left to look at, and how to view the report. Since this takes a while, it may tell you where it is in
+is left to look at, how many included papers are not in Zotero yet, and how to view the report. Since this takes a while, it may tell you where it is in
 one line along the way (without waiting for an answer).
 
 ### 4.3 Depth
@@ -249,13 +258,14 @@ works from there.
 
 - **More**: ask in the chat — "carry on", "search more", "fill in the cards". **Ask Your Agent…**
   (right-click the survey) also copies requests for the common jobs: carry on to the end, search more,
-  screen, chase citations, fill in the cards, write the text, check and fix.
+  screen, chase citations, fill in the cards, write the text, check and fix, and audit as another model.
 - **Together**: ask it to "go through it with me" or "show me the candidates one by one", and the agent
   only recommends the scope and decisions and waits for your answers. To make this the rule, write
   "Ask the user before deciding the scope and each paper" in the workspace's `AGENTS.local.md`.
 
-- **Redo**: ask "redo this survey" and the agent makes a new one (e.g. `…_v2`). When surveys share a
-  topic, the sidebar shows their names and dates side by side. Once you no longer need the old one,
+- **Redo**: ask "redo this survey" and the agent makes a new one with the same slug; Priorwork numbers
+  it right after the date (`20261012_v2_<slug>`) and the sidebar shows **v2**. When surveys share a
+  topic, the sidebar also shows their names and dates side by side. Once you no longer need the old one,
   right-click it → **Archive the Survey…** (or ask the agent). It leaves the list for the **Archived**
   group at the bottom; nothing is deleted, and the button on it brings it back
   (`./priorwork archive SURVEY [--undo]`).
@@ -392,15 +402,19 @@ or more included papers, only those linked to at least two are taken by default.
 
 ### 5.5 Fill in the paper cards
 
-Each included paper gets a card in section 3 of the report. Write it on the paper's page and press
+Each included paper gets a card in the section "The papers" of the report. Write it on the paper's page and press
 **Ctrl+S** to save. **Get the Full Text** brings in the full text ([6.3](#63-full-texts)). To hand only
 the cards to the agent, use **Ask Your Agent… → Fill in the paper cards**. Section
 [6](#6-paper-cards) describes the cards.
 
 ### 5.6 Write the text
 
-Section 1 (the background) and sections 4 to 7 (theoretical traditions, empirical methods, consensus
-and debates, conclusions) are text written from the cards. Open the report with **Open the Working
+The report puts the synthesis first: the background (section 1); the literature's theoretical
+traditions, methods, consensus and debates, and gaps (sections 2–5, each claim citing included papers);
+and the hypotheses and implications for your study (section 6, kept apart from the literature). The
+comparison matrix, the paper cards and the references follow. These sections are text written from the
+cards, and each says under its heading what to write (reports made up to 0.1.5 keep their older order).
+Mermaid diagrams (```` ```mermaid ````) are drawn in the HTML. Open the report with **Open the Working
 Report (Markdown)** on the survey and write it, or ask the agent with **Ask Your Agent… → Write the
 text of the report**.
 
@@ -431,9 +445,12 @@ text of the report**.
 
 - The heading and the source line are generated. You (or the agent) write from the evidence level to
   the notes.
-- The **first line** of each field goes into the comparison matrix (section 2), so keep it short;
+- The **first line** of each field goes into the comparison matrix, so keep it to one short sentence;
   details go on the lines below it, which become bullet points.
 - Write only what the abstract or the full text says. If it says nothing, write "not reported".
+- Write the cards in the language of the report, keeping terms in the original in brackets.
+- On a card checked against the full text, give the page (`(p. 12)`) for the data, the identification
+  and the main findings, or "(page not checked)" when the full text has no page breaks.
 
 ### 6.2 The evidence level
 
@@ -441,7 +458,7 @@ text of the report**.
 | :--- | :--- |
 | unchecked | not checked yet (before filling in, or partly guessed) |
 | abstract only | checked against the abstract |
-| full text checked | checked against the full text |
+| full text checked | checked against the full text fetched with **Get the Full Text** (`fulltext`) |
 
 Unchecked cards are flagged by the checks, and the export is marked *Draft*. In a full survey, every
 included paper is checked in the full text; a card may stay "abstract only" only when no full text
@@ -480,8 +497,13 @@ again.
 | DOIs in the text are registered | ERROR |
 | ⚠️ on included papers; the DOI and title agree in OpenAlex | ERROR |
 | The evidence level of each card, and empty fields | WARN |
+| Cards marked "full text checked": numbers not in the full text, pages not in the paper, no page given, no full text fetched | WARN |
+| Cards not written in the language of the report | WARN |
+| Synthesis sections (theories, methods, debates, gaps) that cite no paper; a number of included papers in the text that disagrees with the survey | WARN |
+| Included papers missing from Zotero | WARN |
+| Not audited by another model yet (full; INFO for quick) | WARN |
 | The report matches the state file | WARN |
-| Unscreened candidates, non-SSCI included papers, included papers missing from Zotero, citations taken for organisations or table numbers | INFO |
+| Unscreened candidates, non-SSCI included papers, citations taken for organisations or table numbers | INFO |
 
 Citations are found with regular expressions, so not every style is caught. `Acemoglu et al. (2001,
 2005)`, `Dell (2010, p. 5)` and `(e.g., Dell 2010; Acemoglu et al., 2001a)` are. Organisations such as
@@ -595,10 +617,10 @@ my-surveys/
 
 | File | Contents | Editing |
 | :--- | :--- | :--- |
-| `reports/YYYYMMDD_<slug>.md` | the working report | the text and the card fields are written by hand (or by the agent); everything between `<!-- BEGIN priorwork:… -->` and `<!-- END priorwork:… -->` is regenerated |
+| `reports/YYYYMMDD_<slug>.md` | the working report (a redone survey is `YYYYMMDD_v2_<slug>.md`) | the text and the card fields are written by hand (or by the agent); everything between `<!-- BEGIN priorwork:… -->` and `<!-- END priorwork:… -->` is regenerated |
 | `.priorwork/surveys/YYYYMMDD_<slug>.json` | candidates, decisions and reasons (with their history), the search log, the scope, the depth, the Zotero collection | changed only by Priorwork |
 
-The references (section 8) are generated from the included papers, with DOIs, and the appendix records
+The references are generated from the included papers, with DOIs, and the appendix records
 the searches, the counts, the reasons for exclusion and the decisions that were revised.
 
 ---
