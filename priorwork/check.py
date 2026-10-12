@@ -42,7 +42,8 @@ _IGNORE_RE = re.compile(r"<!--\s*priorwork:ignore-citation\s+(.+?)\s*\(?\s*(\d{4
 SYNTHESIS_MARK = "<!-- priorwork:synthesis -->"
 _LABEL_ONLY = re.compile(r"^\s*(?:[-*]|\d+\.)\s+\S.*[:：]\s*$")
 # カードの根拠: ページ（p. 12 / pp. 12-13）、または本文にページ区切りが無いときの「（ページ未確認）」
-_PAGE_RE = re.compile(r"\bpp?\.\s*(\d+)(?:\s*[-–]\s*(\d+))?", re.IGNORECASE)
+# 「p. 177, 184-190」のように続くページも一つの参照として読む（後ろのページを数値と取り違えない）
+_PAGE_RE = re.compile(r"\bpp?\.\s*\d+(?:\s*[-–]\s*\d+)?(?:\s*[,，]\s*\d+(?:\s*[-–]\s*\d+)?)*", re.IGNORECASE)
 _PAGE_UNCHECKED_RE = re.compile(r"ページ未確認|page not checked", re.IGNORECASE)
 _NUMBER_RE = re.compile(r"(?<![\w.])\d[\d,]*(?:\.\d+)?")
 _CJK_RE = re.compile(r"[\u3040-\u30ff\u4e00-\u9fff]")
@@ -402,9 +403,7 @@ def _bad_pages(text: str, entry: dict, fulltext: str) -> Set[int]:
     first, last = (int(span.group(1)), int(span.group(2))) if span else (None, None)
     bad = set()
     for m in _PAGE_RE.finditer(unicodedata.normalize("NFKC", text)):
-        for g in m.groups():
-            if not g:
-                continue
+        for g in re.findall(r"\d+", m.group(0)):
             page = int(g)
             if 1 <= page <= n_pages or (first is not None and first <= page <= last):
                 continue

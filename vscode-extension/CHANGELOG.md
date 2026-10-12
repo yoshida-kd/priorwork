@@ -3,6 +3,11 @@
 Priorwork's command-line tool (`priorwork` on PyPI) and this extension are
 released together, under one version number.
 
+## 0.1.7
+
+- `priorwork check` no longer takes the later pages of a page list on a card
+  (`(p. 177, 184-190)`) for numbers missing from the full text.
+
 ## 0.1.6
 
 - **An audit by another model.** A survey now counts as done only once a

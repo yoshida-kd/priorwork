@@ -77,3 +77,10 @@ def test_audit_is_asked_for_once_the_cards_are_filled(s2_record, tmp_path):
     s.render()
     assert not any("監査" in m for m in messages(s))
     assert "**監査**: " in s.md_path.read_text(encoding="utf-8")
+
+
+def test_a_list_of_pages_is_not_taken_for_numbers(s2_record, tmp_path):
+    s = survey_with_card(s2_record, tmp_path, {**GOOD, "findings": "係数は 0.35（p. 1, 2-3）"})
+    assert not any("本文に見つかりません" in m for m in messages(s)), messages(s)
+    s.set_card(1, {**GOOD, "findings": "係数は 0.35（p. 2, 70-72）"})
+    assert any("p. 70" in m and "論文にありません" in m for m in messages(s)), messages(s)
