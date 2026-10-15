@@ -262,5 +262,8 @@
   "background, literature, hypotheses": "背景・先行研究・仮説",
   "Audit as another model": "別のモデルとして監査する",
   "paste into a model other than the one that wrote it": "書いたのと別のモデルに貼る",
-  "Audit the survey \"{0}\" ({1}) with Priorwork, written by another model: check every paper card against the full text, the direction of each citation in the text, that my hypotheses are not presented as the literature, and the excluded papers. Fix what is wrong and record the audit with ./priorwork audit.": "別のモデルが書いたサーベイ「{0}」（{1}）を Priorwork で監査してください。論文カードをすべて本文と突き合わせ、本文の引用の向き、私の仮説が先行研究のように書かれていないか、除外された論文を確かめてください。誤りを直し、./priorwork audit で監査を記録してください。"
+  "Audit the survey \"{0}\" ({1}) with Priorwork, written by another model: check every paper card against the full text, the direction of each citation in the text, that my hypotheses are not presented as the literature, and the excluded papers. Fix what is wrong and record the audit with ./priorwork audit.": "別のモデルが書いたサーベイ「{0}」（{1}）を Priorwork で監査してください。論文カードをすべて本文と突き合わせ、本文の引用の向き、私の仮説が先行研究のように書かれていないか、除外された論文を確かめてください。誤りを直し、./priorwork audit で監査を記録してください。",
+  "On the branch {0}": "ブランチ {0} を表示中",
+  "Switch branches": "ブランチを切り替える",
+  "{0} more on other branches (waiting to be merged)": "ほかのブランチのサーベイ {0} 件（マージ待ち）"
 }

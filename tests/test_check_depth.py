@@ -36,7 +36,7 @@ def test_full_survey_tells_untried_fetched_and_unavailable_full_texts_apart(s2_r
     s.save()
     assert [level for level, m in full_text_findings(s)] == [INFO]     # 取れなかった → Zotero に PDF を
     del e["fulltext_failed"]
-    e["fulltext"] = {"path": "x.txt", "source": "oa:x", "pages": 3, "chars": 900, "page_markers": True}
+    e["fulltext"] = {"path": "x.txt", "source": "oa:x", "pages": 20, "chars": 900, "page_markers": True}
     s.save()
     found = full_text_findings(s)
     assert [level for level, _ in found] == [WARN] and "取得したのに" in found[0][1]

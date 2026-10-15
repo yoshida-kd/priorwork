@@ -37,7 +37,7 @@ Priorwork（prior work ＝ 先行研究）は、社会科学（経済学・社�
 1. VS Code の拡張機能で **Priorwork** を入れます。始めるのにほかに入れるものはありません。Python 3.10 以上があればそれを使い、無ければ [uv](https://docs.astral.sh/uv/) を入れて Python を取ってきます（ホームフォルダーに入り、管理者権限は要りません）。VS Code で動く AI エージェント（Claude Code・Antigravity など）と、ワークスペースを GitHub に置くための **git** を用意してください
 2. アクティビティバーの Priorwork から **ワークスペースを作る** を選び、空のフォルダとレポートの言語（日本語・英語）を選びます。拡張機能がそのフォルダに `.venv` を作り、PyPI から `priorwork` を入れてワークスペースを用意します
 3. サイドバーの歯車の **設定** を開き、Semantic Scholar の無料 API キー（推奨）と、あれば Zotero・SSCI リストを設定します。**保存して接続を確かめる** で動くかを確かめられます
-4. サイドバーに出る行から、**GitHub の非公開リポジトリ**として公開します。エージェントは、頼まれない限り Git を操作しません（コミットや push は頼んだときだけ）
+4. サイドバーに出る行から、**GitHub の非公開リポジトリ**として公開します。エージェントはサーベイ名のブランチでコミット・push し、PR を作ります。マージはあなたがします
 5. **新しいサーベイ** → **エージェントに任せる** でテーマを入れ、コピーされた依頼文をエージェントのチャットに貼ります（チャットで直接頼んでも同じです）。エージェントが書き出しまで進めます
 6. レポートを読みます（**レポートを書き出して見る**、または `reports/*.html` を右クリック → **Priorwork でレポートを見る**。SSH でつないだサーバーでも見られます）。論文ごとのページで採否とカードを確かめ、違うところを直します
 7. 続きは、サーベイの **エージェントに頼む…** か、チャットで（「もっと検索して」「続けて」）
@@ -211,13 +211,14 @@ SSCI に収録されているかは、Clarivate の [Master Journal List](https:
 # サーベイの管理
 ./priorwork status [SURVEY]                                    # 一覧 / 進捗と次にやること
 ./priorwork new "<テーマ>" --slug <slug> [--by "<モデル名>"] [--depth quick|full] [--question ... --years ... --fields ... --inclusion ... --exclusion ...]
-./priorwork scope SURVEY --question "..." [--depth quick|full] [--by "<モデル名>"]  # 範囲の変更
+./priorwork scope SURVEY --question "..." [--depth quick|full] [--search-field social|all] [--by "<モデル名>"]  # 範囲の変更
 ./priorwork archive SURVEY [--undo]                          # 一覧から隠す（ファイルは残る）
 ./priorwork list SURVEY [--status candidate maybe] [--abstract]
 ./priorwork include SURVEY 2 5 7
 ./priorwork exclude SURVEY 3 --reason "理論モデルのみ"          # 除外には理由が必須
 ./priorwork maybe SURVEY 9          ./priorwork reset SURVEY 9 # 保留 / 候補に戻す
 ./priorwork add SURVEY <DOI>... [--candidate]                  # DOI を指定して登録（既定で採用）
+./priorwork fix SURVEY 3 [--id <DOI>] [--authors ...] [--confirm "..."] # 書誌を直す（掲載版の DOI・著者・年）・確かめた警告を解除
 ./priorwork card SURVEY 3 [--set rq="..." evidence=abstract]   # 論文カードを表示・記入
 ./priorwork render SURVEY
 ./priorwork check SURVEY [--offline]
@@ -228,7 +229,7 @@ SSCI に収録されているかは、Clarivate の [Master Journal List](https:
 ./priorwork zotero --collections | SURVEY --collection 名前 | SURVEY --import | SURVEY --dois  # コレクション
 
 # 文献の探索
-./priorwork search "<English query>" [--into SURVEY] [--bulk] [--sort citations|relevance|recent|cpy] [--year 2010-2024] [--ssci-only] [--limit N]
+./priorwork search "<English query>" [--into SURVEY] [--bulk] [--sort citations|relevance|recent|cpy] [--year 2010-2024] [--ssci-only] [--field social|all] [--limit N]
 ./priorwork snowball SURVEY [--direction both|references|citations] [--limit N] [--min-links N]
 ./priorwork get <DOI>
 ./priorwork citations <DOI> [--sort cited]      ./priorwork references <DOI> [--sort cited]
@@ -279,7 +280,7 @@ PDF はワークスペースに置きません。次の順で PDF を探し、�
 2. このマシンの Zotero の添付 PDF（`zotero.sqlite` を読み取り専用で開き、DOI で照合）
 3. Zotero Web API で見つけた添付 PDF（WebDAV の `<キー>.zip`、または Zotero File Storage から取得）
 4. Zotero が索引化した本文テキスト（ページ区切りが無いため、PDF が取れないときの予備）
-5. オープンアクセス版の PDF
+5. オープンアクセス版の PDF（OpenAlex が知っている所在をすべて試す。機関リポジトリなどのランディングページは、その中の PDF のリンクをたどる）
 
 出版社のサイトは自動ダウンロードを拒否することが多いため、非 OA の論文は Zotero に PDF を添付してから実行してください。
 

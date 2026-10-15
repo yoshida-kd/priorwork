@@ -34,7 +34,7 @@
 - **状態は `./priorwork` が管理する。** JSON（`.priorwork/surveys/`）を直接編集しない。
 - **Markdown は部分的に自動生成される。** `<!-- BEGIN priorwork:… -->` 〜 `<!-- END priorwork:… -->` の範囲は `./priorwork` が再生成する。手で書くのは、各論文カードの記入欄と、ブロック外の文章（背景・学説・論争点など）だけ。
 - **`./priorwork status` が「スキルが古い」と警告したら、`./priorwork sync` を実行してから続ける。**
-- **Git を操作しない。** ワークスペースは Git で管理し、GitHub（非公開リポジトリ）に置くが、コミット・push・ブランチの作成や切り替え・リセットなど Git の操作は、ユーザーが頼んだとき（または `AGENTS.local.md` で許可されているとき）だけ行う。頼まれていなければ、終わったときに「変更をコミットしてよいか」を報告で聞くだけにする。履歴を見る（`git log` / `git diff`）のはよい。`.env`（API キー）はコミットしない。
+- **Git は作業ブランチの中だけで使う。** サーベイ名のブランチでコミット・push し、PR を作るところまでをする。マージはユーザーがする（下の「Git」）。
 - **やり直しを頼まれたら、元と同じ slug で新しいサーベイを作る**（`./priorwork new ... --slug <元の slug>`）。版はエンジンが日付の直後に振る（`20261012_v2_<slug>`）ので、slug に `_v2` を付けない。同じ slug に版が複数あると slug だけでは引けないので、以後は `./priorwork new` が出した名前（`20261012_v2_<slug>` か `v2_<slug>`）で指定する。古いほうはユーザーが要らないと言ったら `./priorwork archive <古いサーベイ>` でアーカイブする（一覧から隠れるだけで、何も消えない。`--undo` で戻る）。アーカイブしたサーベイは、頼まれない限り続けない。
 - **会話を再開したら、まず状態を見る。** `./priorwork status`（一覧）→ `./priorwork status <survey>`（進捗と次にやること）。
 - **ユーザーは VS Code の Priorwork のサイドバーからも操作する**（採否の記録・論文カードの直し・書き出しなど）。
@@ -86,6 +86,19 @@
 - **自分が書いた（`--by` に自分がある）サーベイを監査しない。** 書き終えたら、報告で「別のモデル（例: 書いたのが Gemini なら Claude）のチャットで『サーベイ <名前> を監査して』と頼んでください」と伝える。
 - 監査を頼まれたら、スキル `priorwork-audit` の手順で行い、最後に `./priorwork audit <survey> --by "<自分のモデル名>" --note "<確かめたこと>"` で記録する。
 
+## Git（作業ブランチと PR）
+
+ワークスペースは GitHub の非公開リポジトリに置く。エージェントは、ユーザーに聞かずに PR を作るところまで Git を操作してよい（`AGENTS.local.md` で別に決めていれば、そちらに従う）。**マージはユーザーがする。**
+
+- **ブランチ名はサーベイ名そのもの**（`./priorwork new` が出した名前。例: `20261015_statutory_text_analysis`、やり直しなら `20261015_v2_<slug>`）。ブランチ名を自分で考えない。サーベイに結び付かない作業（`AGENTS.local.md` の直しなど）は、ブランチ名をユーザーに聞く。
+- **始めるとき**: `git status` を見る。このサーベイのものでない未コミットの変更があれば、ブランチを切り替えずに報告で聞く。
+  - 新しいサーベイ: main を最新にし（`git switch main` → リモートがあれば `git pull --ff-only`）、`./priorwork new` のあとに `git switch -c <サーベイ名>`。
+  - 続き・監査: `git switch <サーベイ名>`（無ければ main から作る）。リモートにあれば `git pull --ff-only`。
+- **コミット**: 工程の区切り（検索・選別・カード・検査・書き出し・監査）ごとに。足すのはこのサーベイのファイルだけ（`git add reports/<サーベイ名>.* .priorwork/surveys/<サーベイ名>.json`）。`git add -A` は使わない。メッセージはレポートの言語で 1 行（例: 「候補の選別（採用 42 本）」）。
+- **push**: 作業ブランチだけ（`git push -u origin <サーベイ名>`）。リモートが無ければ push せず、報告で伝える。
+- **PR**: 書き出しまで済んだら `gh pr create --base main --head <サーベイ名> --title "<テーマ>" --body "<報告の要約>"`。PR が既にあれば作らない（push で更新される）。`gh` が無い・ログインしていなければ PR は作らず、報告で伝える。報告に PR の URL を書く。
+- **しないこと**: マージ（`git merge`・`gh pr merge`）、main へのコミット・push、force push、`git reset --hard`・`git rebase`・`git clean`、ブランチの削除。`.env`（API キー）はコミットしない。
+
 ## Zotero
 
 Zotero への書き込みはユーザーが手作業で行う。エージェントは Zotero に書き込まない。
@@ -113,7 +126,7 @@ Zotero への書き込みはユーザーが手作業で行う。エージェン�
    - **先行研究の知見と、本研究（ユーザー）の枠組み・仮説を混ぜない。** ユーザーが示した分類や仮説は「本研究の仮説と示唆」の節にだけ書き、先行研究の合意のように書かない。
    - 採用論文の本数などの件数を、文章に手で書かない（付録の記録に自動で出る。食い違うと `check` が WARN にする）。
 3. **⚠️ を無視しない**
-   - 「DOI が別タイトルを指している」「DOI は WP / プレプリント版」「書評・コメントの可能性」などの警告がある論文は、`priorwork-screen` の手順で掲載版に置き換えるか、置き換えられなければ保留にして報告で伝える。
+   - 「DOI が別タイトルを指している」「DOI は WP / プレプリント版」「書評・コメントの可能性」などの警告がある論文は、`priorwork-screen` の手順で掲載版に置き換える（`fix --id`）か、置き換えられなければ保留にして報告で伝える。警告を `fix --confirm` で解除するのは、書誌が正しいことを確かめたときだけ。
 4. **SSCI 判定を偽らない**
    - 🟡（誌名推定）を「SSCI 収録」と断定しない。雑誌単体の判定は `./priorwork journal "<誌名 or ISSN>"`。
 5. **BibTeX の引用キーを作らない**（ユーザーが Zotero で管理する）。参照文献は `./priorwork` が DOI つきで生成する。
@@ -127,12 +140,13 @@ Zotero への書き込みはユーザーが手作業で行う。エージェン�
 ```bash
 ./priorwork status [SURVEY]          # 一覧 / 進捗と次にやること
 ./priorwork new "<テーマ>" --slug <slug> --by "<モデル名>" [--depth quick|full] [--manuscript PATH] [--question ... --years ... --fields ... --inclusion ... --exclusion ...]
-./priorwork scope SURVEY [--question ...] [--depth quick|full] [--manuscript PATH] [--by "<モデル名>"]
+./priorwork scope SURVEY [--question ...] [--depth quick|full] [--search-field social|all] [--manuscript PATH] [--by "<モデル名>"]
 ./priorwork archive SURVEY [--undo]  # 一覧から隠す（ファイルは残る）。アーカイブの一覧は status --archived
-./priorwork search "<English query>" [--into SURVEY] [--bulk] [--sort citations|relevance|recent|cpy] [--year 2010-2024] [--ssci-only] [--limit N]
+./priorwork search "<English query>" [--into SURVEY] [--bulk] [--sort citations|relevance|recent|cpy] [--year 2010-2024] [--ssci-only] [--field social|all] [--limit N]
 ./priorwork list SURVEY [--status candidate maybe included excluded] [--abstract]
 ./priorwork include SURVEY N... --reason "..."   ./priorwork exclude SURVEY N... --reason "..."   ./priorwork maybe SURVEY N... --reason "..."   ./priorwork reset SURVEY N...
 ./priorwork add SURVEY <DOI>... [--candidate]
+./priorwork fix SURVEY N [--id <掲載版の DOI>] [--authors "A; B"] [--year Y] [--confirm "<確かめたこと>"]
 ./priorwork snowball SURVEY [--direction both|references|citations] [--limit N] [--min-links N]
 ./priorwork fulltext SURVEY N [--pdf PATH]
 ./priorwork card SURVEY N [--set KEY=VALUE ...]

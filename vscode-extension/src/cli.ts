@@ -44,6 +44,10 @@ export interface SurveySummary {
 export interface GitInfo {
     repo: boolean;
     remote: boolean;
+    /** 今のブランチ（0.1.8 から） */
+    branch?: string;
+    /** 今のブランチに無いサーベイのブランチ（PR を待つもの。0.1.8 から） */
+    other_surveys?: string[];
 }
 
 export interface WorkspaceStatus {
@@ -154,6 +158,8 @@ export interface FulltextInfo {
     source: string;
     pages: number | null;
     chars: number;
+    /** OpenAlex の版（publishedVersion / acceptedVersion / submittedVersion。分からなければ空。0.1.8 から） */
+    version?: string;
 }
 
 export interface Entry {

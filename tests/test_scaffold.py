@@ -153,18 +153,22 @@ def test_sync_lets_claude_code_run_priorwork_and_keeps_other_settings(tmp_path):
     root = tmp_path / "ws"
     scaffold.init(root)
     path = root / ".claude" / "settings.json"
-    assert json.loads(path.read_text())["permissions"]["allow"] == ["Bash(./priorwork:*)"]
+    perms = json.loads(path.read_text())["permissions"]
+    assert perms["allow"][0] == "Bash(./priorwork:*)" and "Bash(git commit:*)" in perms["allow"]
+    assert "Bash(gh pr merge:*)" in perms["deny"] and "Bash(git push origin main:*)" in perms["deny"]
 
     path.write_text(json.dumps({"model": "x", "permissions": {"allow": ["Bash(ls:*)"], "deny": ["Bash(rm:*)"]}}))
     assert ".claude/settings.json" in scaffold.sync(root).written
     settings = json.loads(path.read_text())
-    assert settings["model"] == "x" and settings["permissions"]["deny"] == ["Bash(rm:*)"]
-    assert settings["permissions"]["allow"] == ["Bash(ls:*)", "Bash(./priorwork:*)"]
+    assert settings["model"] == "x" and settings["permissions"]["deny"][0] == "Bash(rm:*)"
+    assert settings["permissions"]["allow"][:2] == ["Bash(ls:*)", "Bash(./priorwork:*)"]
     assert ".claude/settings.json" not in scaffold.sync(root).written    # 二度は足さない
 
-    path.write_text(json.dumps({"permissions": {"deny": ["Bash(./priorwork:*)"]}}))
+    # ユーザーが逆の側に書いた規則は足さない（deny で ./priorwork を断る・allow でマージを許す）
+    path.write_text(json.dumps({"permissions": {"deny": ["Bash(./priorwork:*)"], "allow": ["Bash(gh pr merge:*)"]}}))
     scaffold.sync(root)
-    assert "allow" not in json.loads(path.read_text())["permissions"]      # deny で断ったら足さない
+    perms = json.loads(path.read_text())["permissions"]
+    assert "Bash(./priorwork:*)" not in perms["allow"] and "Bash(gh pr merge:*)" not in perms["deny"]
 
     path.write_text("{ not json")
     again = scaffold.sync(root)

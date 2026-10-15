@@ -34,6 +34,11 @@ SCHEMA_VERSION = 3
 DEPTHS = {"quick": "Quick (a narrow topic; get an overview fast)",
           "full": "Full (a broad topic; aim for coverage)"}
 DEFAULT_DEPTH = "full"
+# 検索で残す分野。social: S2 の分野が社会科学に無い論文（医学・計算機科学など）を落とす。
+# 分野の付いていない論文は残す。search_field を持たない既存サーベイは all
+SEARCH_FIELDS = {"social": "social sciences only (papers with no field are kept)", "all": "all fields"}
+SOCIAL_FIELDS = {"Economics", "Political Science", "Sociology", "Business", "Psychology", "Law", "Geography",
+                 "History", "Education", "Linguistics", "Philosophy", "Environmental Science"}
 BLOCKS = ("scope", "matrix", "papers", "references", "log")
 MARKER = "priorwork"
 
@@ -106,6 +111,22 @@ def paper_key(record: Dict[str, Any]) -> str:
     if record.get("openalex_id"):
         return "openalex:" + record["openalex_id"]
     return "s2:" + record.get("id", "")
+
+
+def better_record(new: Dict[str, Any], old: Dict[str, Any]) -> bool:
+    """同じ論文の新しい書誌情報が、登録済みのものより確かか（掲載版・DOI 照合済み）。"""
+    new_tier, old_tier = new["ssci"]["tier"], old["ssci"]["tier"]
+    if new_tier != old_tier:
+        return new_tier > old_tier
+    # 同じ雑誌として判定されていても、登録済みの DOI が WP 版などで照合できていなければ、照合できた方にする
+    return (new.get("verified") and not new.get("warnings") and bool(new.get("doi"))
+            and (not old.get("verified") or bool(old.get("warnings"))))
+
+
+def off_field(record: Dict[str, Any]) -> bool:
+    """S2 が付けた分野があり、そのどれも社会科学でない（医学・計算機科学だけなど）。"""
+    fields = set(record.get("fields") or [])
+    return record.get("source") == "SemanticScholar" and bool(fields) and not fields & SOCIAL_FIELDS
 
 
 def ascii_fold(text: str) -> str:
@@ -264,6 +285,7 @@ class Survey:
             "created": today.isoformat(),
             "lang": lang,
             "depth": depth,
+            "search_field": "social",
             "scope": {k: scope.get(k, "") for k in ("question", "years", "fields", "inclusion", "exclusion")},
             "next_number": 1,
             "papers": {},
@@ -358,7 +380,7 @@ class Survey:
         title = ssci.normalize_title(record.get("title", ""))
         for e in self.data["papers"].values():
             # "Comment" のような短い汎用タイトル同士を同一視しないよう、ある程度の長さを要求する
-            if len(title) > 20 and ssci.normalize_title(e["record"]["title"]) == title:
+            if len(title) > 20 and ssci.same_title(e["record"]["title"], title):
                 return e
             if record.get("openalex_id") and e["record"].get("openalex_id") == record["openalex_id"]:
                 return e
@@ -372,14 +394,8 @@ class Survey:
             if found_by not in existing["found_by"]:
                 existing["found_by"].append(found_by)
             # WP 版で登録済みのところに掲載版が見つかったら、書誌情報を掲載版に差し替える
-            if record["ssci"]["tier"] > existing["record"]["ssci"]["tier"]:
-                old_key = existing["key"]
-                existing["record"] = record
-                existing["key"] = paper_key(record)
-                if existing["key"] != old_key:
-                    existing.setdefault("previous_keys", []).append(old_key)
-                self.data["papers"].pop(old_key)
-                self.data["papers"][existing["key"]] = existing
+            if better_record(record, existing["record"]):
+                self.replace_record(existing, record)
             return existing, False
         entry = {
             "number": self.data["next_number"],
@@ -396,6 +412,39 @@ class Survey:
         self.data["papers"][entry["key"]] = entry
         return entry, True
 
+    def replace_record(self, entry: Dict[str, Any], record: Dict[str, Any]):
+        """書誌情報を差し替える（掲載版の DOI など）。キーが変われば、カードは previous_keys で新しいキーに付け替わる。
+        手で直した項目（fix_record）と、確かめて解除した警告は引き継ぐ。"""
+        old_key = entry["key"]
+        record = dict(record, **entry.get("fixed", {}))
+        confirmed = (entry.get("confirmed") or {}).get("warnings", [])
+        record["warnings"] = [w for w in record.get("warnings", []) if w not in confirmed]
+        entry["record"] = record
+        entry["key"] = paper_key(record)
+        entry["updated"] = now_iso()
+        if entry["key"] != old_key:
+            if entry["key"] in self.data["papers"]:
+                raise SurveyError(t("{key} is already registered as #{number}", key=entry["key"],
+                                    number=self.data["papers"][entry["key"]]["number"]))
+            entry.setdefault("previous_keys", []).append(old_key)
+            self.data["papers"].pop(old_key)
+            self.data["papers"][entry["key"]] = entry
+
+    def fix_record(self, number: int, confirm: str = "", **fields: Any) -> Dict[str, Any]:
+        """書誌情報を手で直す（authors・year・title）。confirm に理由を渡すと、今の警告を確かめたものとして解除する。"""
+        e = self.get(number)
+        fields = {k: v for k, v in fields.items() if v not in (None, "", [])}
+        if fields:
+            e.setdefault("fixed", {}).update(fields)
+            e["record"].update(fields)
+        if confirm:
+            old = (e.get("confirmed") or {}).get("warnings", [])
+            e["confirmed"] = {"at": now_iso(), "reason": confirm,
+                              "warnings": list(dict.fromkeys(old + e["record"].get("warnings", [])))}
+            e["record"]["warnings"] = []
+        e["updated"] = now_iso()
+        return e
+
     def set_status(self, numbers: Iterable[int], status: str, reason: str = "") -> List[Dict[str, Any]]:
         entries = [self.get(n) for n in numbers]
         for e in entries:
@@ -410,6 +459,16 @@ class Survey:
         self.data["searches"].append({"at": now_iso(), "kind": kind, "query": query,
                                       "params": {k: v for k, v in params.items() if v not in (None, False, "")},
                                       "hits": hits, "new": new})
+
+    @property
+    def search_field(self) -> str:
+        return self.data.get("search_field", "all")
+
+    def set_search_field(self, field: str):
+        if field not in SEARCH_FIELDS:
+            raise SurveyError(t("the search field is one of {choices}: {field}", choices=" / ".join(SEARCH_FIELDS),
+                                field=field))
+        self.data["search_field"] = field
 
     @property
     def depth(self) -> str:
@@ -838,6 +897,8 @@ def render_scope(data: Dict[str, Any], lang: str) -> str:
         lines.append(f"- **{tl(lang, 'Manuscript')}**: `{data['manuscript']}`")
     depth = data.get("depth", DEFAULT_DEPTH)
     lines.append(f"- **{tl(lang, 'Depth')}**: {depth} — {tl(lang, DEPTHS[depth])}")
+    field = data.get("search_field", "all")
+    lines.append(f"- **{tl(lang, 'Fields searched')}**: {field} — {tl(lang, SEARCH_FIELDS[field])}")
     lines.append(f"- **{tl(lang, 'Basis of the SSCI status')}**: {ssci_text}")
     return "\n".join(lines)
 

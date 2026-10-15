@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, List, NamedTuple, Optional, Set, Tuple
 
 from . import ssci
+from .fulltext import incomplete_fulltext, journal_pages
 from .i18n import t, tl
 from .survey import (
     CANDIDATE, EVIDENCE_ABSTRACT, EVIDENCE_FULLTEXT, EVIDENCE_KEYS, EVIDENCE_UNCHECKED, INCLUDED, MAYBE, Survey,
@@ -45,7 +46,7 @@ _LABEL_ONLY = re.compile(r"^\s*(?:[-*]|\d+\.)\s+\S.*[:：]\s*$")
 # 「p. 177, 184-190」のように続くページも一つの参照として読む（後ろのページを数値と取り違えない）
 _PAGE_RE = re.compile(r"\bpp?\.\s*\d+(?:\s*[-–]\s*\d+)?(?:\s*[,，]\s*\d+(?:\s*[-–]\s*\d+)?)*", re.IGNORECASE)
 _PAGE_UNCHECKED_RE = re.compile(r"ページ未確認|page not checked", re.IGNORECASE)
-_NUMBER_RE = re.compile(r"(?<![\w.])\d[\d,]*(?:\.\d+)?")
+_NUMBER_RE = re.compile(r"(?<![0-9A-Za-z_.])\d[\d,]*(?:\.\d+)?")
 _CJK_RE = re.compile(r"[\u3040-\u30ff\u4e00-\u9fff]")
 # 本文に手で書いた採用論文の数（「採用した57本」「66 included papers」）。数は付録の記録が正しい
 _COUNT_RES = [
@@ -136,6 +137,11 @@ def check_survey(survey: Survey, client: Optional[Any] = None) -> List[Finding]:
         r, label = e["record"], f"#{e['number']} {e['record']['title'][:50]}"
         for w in r.get("warnings", []):
             findings.append((ERROR, f"{label}: ⚠️ {w}"))
+        if r.get("warnings"):
+            findings.append((INFO, t("{label}: if you have checked the details and they are right, record why with "
+                                     "`priorwork fix {name} {number} --confirm \"<reason>\"` (a working-paper DOI: add "
+                                     "the published version with `priorwork add`, which replaces it)",
+                                     label=label, name=survey.name, number=e["number"])))
         fields = parse_card_fields(cards.get(e["key"], ""))
         evidence = fields.get("evidence", "")
         level = evidence_key(evidence) if "evidence" in fields else None
@@ -178,7 +184,9 @@ def check_survey(survey: Survey, client: Optional[Any] = None) -> List[Finding]:
                 non_authors.append(c.text)
             else:
                 findings.append((ERROR, t("The citation \"{cite}\" in the text has no registered paper "
-                                          "(check that it exists with `priorwork get`, then register it with `priorwork add`)",
+                                          "(check that it exists with `priorwork get`, then register it with `priorwork add`). "
+                                          "If it is not a paper for this survey (e.g. a data source named in a card), "
+                                          "write `<!-- priorwork:ignore-citation {cite} -->` next to it",
                                           cite=c.text)))
             continue
         adopted = [e for e in entries if e["status"] == INCLUDED]
@@ -217,16 +225,17 @@ def check_survey(survey: Survey, client: Optional[Any] = None) -> List[Finding]:
         for w in client.openalex_works(dois=[e["record"]["doi"] for e in with_doi], select="doi,title"):
             works[(w.get("doi") or "").lower().replace("https://doi.org/", "")] = w
         for e in with_doi:
-            if e["record"].get("warnings"):
-                continue  # 検索時の照合で既に警告済み（上で ERROR として報告している）
+            if e["record"].get("warnings") or e.get("confirmed"):
+                continue  # 検索時の照合で既に警告済み（上で ERROR として報告している）か、確かめて解除した（fix --confirm）
             w = works.get(e["record"]["doi"].lower())
             label = f"#{e['number']} {e['record']['title'][:50]}"
             if not w:
                 findings.append((ERROR, t("{label}: OpenAlex does not know the DOI {doi}", label=label,
                                           doi=e["record"]["doi"])))
-            elif ssci.normalize_title(w.get("title") or "") != ssci.normalize_title(e["record"]["title"]):
-                findings.append((ERROR, t("{label}: the DOI points to another title: \"{title}\"", label=label,
-                                          title=w.get("title"))))
+            elif not ssci.same_title(w.get("title") or "", e["record"]["title"]):
+                findings.append((ERROR, t("{label}: the DOI points to another title: \"{title}\". If the DOI is right, "
+                                          "record why with `priorwork fix {name} {number} --confirm \"<reason>\"`",
+                                          label=label, title=w.get("title"), name=survey.name, number=e["number"])))
 
     # 4b. カードの書き方: サーベイの言語・本文の根拠
     findings += _check_cards(survey, included, cards)
@@ -298,8 +307,10 @@ def check_survey(survey: Survey, client: Optional[Any] = None) -> List[Finding]:
 def _check_cards(survey: Survey, included: List[dict], cards: Dict[str, str]) -> List[Finding]:
     """カードがサーベイの言語で書かれているか、「本文確認済」のカードに本文の根拠があるか。"""
     findings: List[Finding] = []
-    other_lang, no_text, no_page = [], [], []
+    other_lang, no_text, no_page, short = [], [], [], []
     for e in included:
+        if incomplete_fulltext(e):
+            short.append(e)
         fields = parse_card_fields(cards.get(e["key"], ""))
         values = [fields[k] for k in _CONTENT_FIELDS if fields.get(k)]
         if values and _wrong_language(values, survey.lang):
@@ -337,6 +348,12 @@ def _check_cards(survey: Survey, included: List[dict], cards: Dict[str, str]) ->
                                  "{n|it|them} (`priorwork fulltext`). Read the full text, or set the level to what "
                                  "was actually read: {numbers}", n=len(no_text), fulltext=fulltext,
                                  numbers=_numbers(no_text))))
+    if short:
+        findings.append((WARN, t("The full text of {numbers} has far fewer pages than the journal pages (perhaps only the "
+                                 "publisher's preview). Get the whole PDF and run `priorwork fulltext` again; until then, "
+                                 "do not fill the card from it", numbers=", ".join(
+                                     f"#{e['number']} ({e['fulltext']['pages']}/{incomplete_fulltext(e)} pp.)"
+                                     for e in short))))
     if no_page:
         findings.append((WARN, t("{n|# card is|# cards are} \"{fulltext}\", but the data, identification and findings "
                                  "give no page. Add (p. N), or \"{unchecked}\" when the full text has no page breaks: "
@@ -399,8 +416,10 @@ def _bad_pages(text: str, entry: dict, fulltext: str) -> Set[int]:
     if not info.get("page_markers"):
         return set()
     n_pages = info.get("pages") or len(re.findall(r"^=== page \d+ ===$", fulltext, re.M))
-    span = re.match(r"^\s*(\d+)\s*[-–]+\s*(\d+)", entry["record"].get("pages") or "")
-    first, last = (int(span.group(1)), int(span.group(2))) if span else (None, None)
+    first, last = journal_pages(entry["record"])
+    if first is not None:
+        # データベースの範囲が誤っている（"330-330"）こともあるので、PDF のページ数の分は掲載誌のページとして認める
+        last = max(last or first, first + n_pages - 1)
     bad = set()
     for m in _PAGE_RE.finditer(unicodedata.normalize("NFKC", text)):
         for g in re.findall(r"\d+", m.group(0)):

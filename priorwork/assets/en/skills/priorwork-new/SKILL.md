@@ -42,6 +42,8 @@ For each subtopic, write 2–4 English queries and use both plain and `--bulk` s
 - The `--bulk` operators are `+` (AND), `|` (OR), `-` (NOT) and `"phrases"`. `AND`/`OR` are turned into them, but too many terms find nothing.
 - Rerun a query that found nothing or almost nothing with fewer terms, synonyms, or without `--bulk`.
 - Ideas for terms: the concept in English and its synonyms, the names of the main theories (`"transaction cost"`, …), identification strategies (`"difference-in-differences"`), countries and regions.
+- Searches into a new survey leave out papers outside the social sciences (medicine or computer science only, say), judged by the S2 fields; papers with no field are kept. If the topic reaches into the natural sciences or engineering, set `./priorwork scope <survey> --search-field all`.
+- Abstracts missing from the databases are filled in from Crossref. Do not exclude a paper still without one on its title and journal alone: set it to maybe and check the full text.
 - If you know a well-known paper, you may register it directly with `./priorwork add <survey> <DOI>` (after checking it with `get`).
 
 While `./priorwork status <survey>` says "Search more", add searches from angles you have not tried yet.

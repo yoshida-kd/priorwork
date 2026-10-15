@@ -39,6 +39,9 @@ In a survey made from a manuscript (`priorwork-manuscript`), the papers the draf
 
    If the source is "Zotero's index text (no page breaks)", do not give page numbers; write "(page not checked)".
 
+   - If it says "The PDF has only N pages", the full text is incomplete (perhaps the publisher's preview). Do not fill the card from it; set it to abstract only, and ask in your report for the whole PDF in Zotero.
+   - Give pages as the journal prints them on each page of the PDF. For a text without journal pages (an author's accepted manuscript or a working-paper version), give the PDF page (the N of `=== page N ===`) and write in the memo "pages are those of the accepted-manuscript PDF".
+
 3. In the section "The papers" of the survey Markdown, rewrite only the fields of that paper's card (under `<!-- paper: ... -->`), or use `./priorwork card <survey> <number> --set rq=... evidence=fulltext`.
    - **Write in the language of the report.** Summarise in your own words rather than copying the abstract; keep terms in the original in brackets.
    - The heading, the `Source` line and the `⚠️` lines are generated; do not touch them.
@@ -47,6 +50,7 @@ In a survey made from a manuscript (`priorwork-manuscript`), the papers the draf
    - For the identification, write the method the paper actually uses (never DID for a paper that does not use it). If unclear, "not reported".
    - For the main findings, keep the direction of the result (rises / falls, does / does not) exactly as the paper states it.
    - If something is not there, write "not reported". Never fill it in by guessing.
+   - Do not name another paper or a data source on a card in the form Author (year) (`check` takes it for an unregistered citation and gives an ERROR). Write "Franchino's 2004 data" instead.
    - Update `**Evidence**` to "full text checked" or "abstract only".
    - If the full text shows that a paper is out of scope, do not fill in its card; exclude it with `./priorwork exclude` and a reason.
 

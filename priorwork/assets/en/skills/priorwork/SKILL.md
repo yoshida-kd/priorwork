@@ -75,4 +75,4 @@ After `priorwork-check` and the export, say briefly:
 - how to view the report (AGENTS.md, "Showing the report")
 - that decisions and cards corrected in the sidebar will be followed in the next round
 
-Do not operate Git (AGENTS.md, "Principles"). Unless the user asked you to commit or push, end the report by asking whether to commit the changes.
+Use Git as in AGENTS.md, "Git": commit and push on the branch named after the survey at each step, and once the report is exported, open a pull request (or update the open one by pushing). Give its URL in your report. The user merges.

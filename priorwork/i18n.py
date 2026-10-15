@@ -80,7 +80,7 @@ def catalog(lang: Optional[str] = None) -> Dict[str, str]:
     return MESSAGES
 
 
-def fill(text: str, **kw) -> str:
+def fill(text: str, /, **kw) -> str:
     """訳さずに差し込みだけ行う（レポートの文言など、言語を呼び出し側が決めるもの）。"""
     if not kw:
         return text
@@ -88,11 +88,11 @@ def fill(text: str, **kw) -> str:
     return _SLOT.sub(lambda m: str(kw[m.group(1)]) if m.group(1) in kw else m.group(0), text)
 
 
-def t(s: str, **kw) -> str:
+def t(s: str, /, **kw) -> str:
     """表示用の文字列。訳が無ければ英語のまま返す。"""
     return fill(catalog().get(s, s), **kw)
 
 
-def tl(lang: str, s: str, **kw) -> str:
+def tl(lang: str, s: str, /, **kw) -> str:
     """言語を指定して訳す（レポートに書く文言。言語はサーベイが決める）。対訳表は t() と共通。"""
     return fill(catalog(normalize(lang)).get(s, s), **kw)

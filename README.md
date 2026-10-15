@@ -63,7 +63,7 @@ code, so updates never conflict.
    (recommended), and Zotero and the SSCI list if you have them. **Save and Check the Connections**
    tells you whether they work.
 4. **Publish it to GitHub** from the row in the sidebar, as a **private** repository. The agent
-   does not touch Git unless you ask (it commits or pushes only when asked).
+   commits and pushes on a branch named after the survey and opens a pull request; you merge it.
 5. **New Survey** → **Ask your agent to do it**: give the topic and paste the copied request into
    the agent's chat (or just ask in the chat). The agent works through to the exported report.
 6. Read the report (**Export and View the Report**, or right-click `reports/*.html` → **View the
@@ -304,13 +304,14 @@ The numbers are guides, not limits. The rules and `priorwork check` are the same
 # Surveys
 ./priorwork status [SURVEY]                                    # the list / progress and next steps
 ./priorwork new "<topic>" --slug <slug> [--by "<model>"] [--depth quick|full] [--question ... --years ... --fields ... --inclusion ... --exclusion ...]
-./priorwork scope SURVEY --question "..." [--depth quick|full] [--by "<model>"]  # change the scope
+./priorwork scope SURVEY --question "..." [--depth quick|full] [--search-field social|all] [--by "<model>"]  # change the scope
 ./priorwork archive SURVEY [--undo]                          # hide it from the list (the files stay)
 ./priorwork list SURVEY [--status candidate maybe] [--abstract]
 ./priorwork include SURVEY 2 5 7
 ./priorwork exclude SURVEY 3 --reason "theory only"            # an exclusion needs a reason
 ./priorwork maybe SURVEY 9          ./priorwork reset SURVEY 9 # maybe / back to candidate
 ./priorwork add SURVEY <DOI>... [--candidate]                  # register by DOI (included by default)
+./priorwork fix SURVEY 3 [--id <DOI>] [--authors ...] [--confirm "..."] # correct the details (published DOI, authors, year) / clear a checked warning
 ./priorwork card SURVEY 3 [--set rq="..." evidence=abstract]   # show or fill in a card
 ./priorwork render SURVEY
 ./priorwork check SURVEY [--offline]
@@ -321,7 +322,7 @@ The numbers are guides, not limits. The rules and `priorwork check` are the same
 ./priorwork zotero --collections | SURVEY --collection NAME | SURVEY --import | SURVEY --dois
 
 # Finding literature
-./priorwork search "<English query>" [--into SURVEY] [--bulk] [--sort citations|relevance|recent|cpy] [--year 2010-2024] [--ssci-only] [--limit N]
+./priorwork search "<English query>" [--into SURVEY] [--bulk] [--sort citations|relevance|recent|cpy] [--year 2010-2024] [--ssci-only] [--field social|all] [--limit N]
 ./priorwork snowball SURVEY [--direction both|references|citations] [--limit N] [--min-links N]
 ./priorwork get <DOI>
 ./priorwork citations <DOI> [--sort cited]      ./priorwork references <DOI> [--sort cited]
@@ -380,7 +381,7 @@ extracted text, in `.priorwork/cache/fulltext/` (outside Git):
 2. a PDF attached in the local Zotero (`zotero.sqlite`, opened read only, matched by DOI)
 3. a PDF attached in Zotero found through the Web API (from WebDAV's `<key>.zip` or Zotero File Storage)
 4. the text Zotero indexed (no page breaks; a fallback)
-5. an open-access PDF
+5. an open-access PDF (every location OpenAlex knows; on a landing page, such as an institutional repository's, the PDF link it gives)
 
 Publishers usually refuse automated downloads, so for papers that are not open access, attach the
 PDF in Zotero first.

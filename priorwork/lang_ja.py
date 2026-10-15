@@ -19,6 +19,18 @@ MESSAGES = {
     "Maybe": "保留",
     "Quick (a narrow topic; get an overview fast)": "簡易（狭いテーマ・短時間で概観をつかむ）",
     "Full (a broad topic; aim for coverage)": "本格（広範なテーマ・網羅性を重視）",
+    "social sciences only (papers with no field are kept)": "社会科学だけ（分野の付いていない論文は残す）",
+    "all fields": "すべての分野",
+    "Fields searched": "検索の分野",
+    "the search field is one of {choices}: {field}": "検索の分野は {choices} のいずれかです: {field}",
+    "Left out {n|# paper|# papers} outside the social sciences (e.g. {example}). To keep them, add --field all":
+        "社会科学の外の論文 {n} 件を除きました（{example} など）。残すなら --field all を付けてください",
+    "social: leave out papers outside the social sciences / all (default: the survey's setting; all without --into)":
+        "social: 社会科学の外の論文を除く / all（既定: サーベイの設定。--into が無ければ all）",
+    "the fields that searches into the survey keep (social: leave out papers outside the social sciences, "
+    "the default for new surveys; all: keep everything)":
+        "サーベイへの検索で残す分野（social: 社会科学の外の論文を除く。新しいサーベイの既定 / all: すべて残す）",
+    "{error} → abstracts are not filled in from Crossref": "{error} → Crossref から要旨を補いません",
     "unchecked": "未確認",
     "abstract only": "要旨のみ",
     "full text checked": "本文確認済",
@@ -158,8 +170,12 @@ MESSAGES = {
     "{label}: some fields are empty ({fields})": "{label}: 未記入の欄があります（{fields}）",
     "{label}: not an SSCI journal ({badge})": "{label}: SSCI 収録誌ではありません（{badge}）",
     "The citation \"{cite}\" in the text has no registered paper "
-    "(check that it exists with `priorwork get`, then register it with `priorwork add`)":
-        "本文中の引用「{cite}」に対応する論文が登録されていません（`priorwork get` で実在を確認し、`priorwork add` で登録）",
+    "(check that it exists with `priorwork get`, then register it with `priorwork add`). "
+    "If it is not a paper for this survey (e.g. a data source named in a card), "
+    "write `<!-- priorwork:ignore-citation {cite} -->` next to it":
+        "本文中の引用「{cite}」に対応する論文が登録されていません（`priorwork get` で実在を確認し、`priorwork add` で登録）。"
+        "このサーベイの論文でないもの（カードに書いたデータの出典など）なら、そばに "
+        "`<!-- priorwork:ignore-citation {cite} -->` と書いてください",
     "The citation \"{cite}\" in the text is {numbers}, which is not included ({statuses})":
         "本文中の引用「{cite}」は {numbers} ですが、採用になっていません（{statuses}）",
     "No included paper is \"{year}\" in the citation \"{cite}\"": "本文中の引用「{cite}」の「{year}」に当たる採用論文がありません",
@@ -176,7 +192,20 @@ MESSAGES = {
     "`priorwork scope {name} --manuscript <path>`":
         "原稿 {path} が見つかりません。動かしたなら `priorwork scope {name} --manuscript <パス>` で設定し直してください",
     "{label}: OpenAlex does not know the DOI {doi}": "{label}: DOI {doi} が OpenAlex に見つかりません",
-    "{label}: the DOI points to another title: \"{title}\"": "{label}: DOI が別タイトルを指しています: \"{title}\"",
+    "{label}: the DOI points to another title: \"{title}\". If the DOI is right, "
+    "record why with `priorwork fix {name} {number} --confirm \"<reason>\"`":
+        "{label}: DOI が別タイトルを指しています: \"{title}\"。DOI が正しければ、"
+        "`priorwork fix {name} {number} --confirm \"<理由>\"` で理由を記録してください",
+    "{label}: if you have checked the details and they are right, record why with "
+    "`priorwork fix {name} {number} --confirm \"<reason>\"` (a working-paper DOI: add "
+    "the published version with `priorwork add`, which replaces it)":
+        "{label}: 書誌を確かめて正しければ、`priorwork fix {name} {number} --confirm \"<理由>\"` で理由を記録してください"
+        "（WP 版の DOI なら、掲載版を `priorwork add` すると置き換わります）",
+    "The full text of {numbers} has far fewer pages than the journal pages (perhaps only the "
+    "publisher's preview). Get the whole PDF and run `priorwork fulltext` again; until then, "
+    "do not fill the card from it":
+        "{numbers} の本文は、掲載誌のページ数よりずっと少ない（出版社のプレビューだけかもしれません）。"
+        "PDF の全体を用意して `priorwork fulltext` をやり直してください。それまでは、この本文でカードを書かないでください",
     "{n|# candidate is|# candidates are} not screened yet (`priorwork list {name} --status candidate maybe`)":
         "未選別の候補が {n} 件あります（`priorwork list {name} --status candidate maybe`）",
     "No paper is included yet": "採用した論文がまだありません",
@@ -403,6 +432,32 @@ MESSAGES = {
     "An exclusion needs a reason (--reason \"...\")": "除外には理由が必要です（--reason \"...\"）",
     "new": "新規",
     "already registered": "登録済",
+    "* This is the author's manuscript ({version}), not the published version. Its pages are not the "
+    "journal's: give the PDF page (the N of `=== page N ===`) and say so in the memo":
+        "※ 掲載版ではなく著者の原稿（{version}）です。ページは掲載誌のものではないので、PDF のページ"
+        "（`=== page N ===` の N）で書き、メモにそう書いてください",
+    "On other branches (not merged into this one yet): {names}. To continue one, `git switch <name>`":
+        "ほかのブランチにあるサーベイ（このブランチにまだマージされていない）: {names}。続けるなら `git switch <名前>`",
+    "It is on the branch {branch}: switch to it with `git switch {branch}`":
+        "ブランチ {branch} にあります。`git switch {branch}` で切り替えてください",
+    "already registered; replaced {key} with this one": "登録済。{key} をこちらに置き換えました",
+    "#{number}: replaced {old} with {new}": "#{number}: {old} を {new} に置き換えました",
+    "Checked by hand: {reason}": "確認済み（手で確認）: {reason}",
+    "{key} is already registered as #{number}": "{key} は #{number} として登録済みです",
+    "* The PDF has only {pages} pages, but the paper has {expected} journal pages. It may be only the "
+    "publisher's preview: get the whole PDF (attach it in Zotero, or give it with `--pdf`)":
+        "※ PDF は {pages} ページしかありませんが、掲載誌では {expected} ページあります。出版社のプレビューだけかもしれません。"
+        "PDF の全体を用意してください（Zotero に添付するか、`--pdf` で渡す）",
+    "correct the details of a registered paper (published-version DOI, authors, year, title) "
+    "or clear a warning you have checked":
+        "登録した論文の書誌を直す（掲載版の DOI・著者・年・タイトル）、または確かめた警告を解除する",
+    "replace the details with those of this DOI / ID (e.g. the published version of a working paper)":
+        "この DOI / ID の書誌に置き換える（WP 版を掲載版にするときなど）",
+    "the authors, separated by \";\" (e.g. \"Yuen Yuen Ang\")": "著者（「;」で区切る。例: \"Yuen Yuen Ang\"）",
+    "the year": "年",
+    "the title": "タイトル",
+    "clear the warnings after checking that the details are right, recording why":
+        "書誌が正しいことを確かめたうえで、理由を記録して警告を解除する",
     "updated": "更新しました",
     "{n|# included paper is|# included papers are} not in Zotero: {numbers} (`priorwork zotero {name}`)":
         "Zotero 未登録の採用論文 {n} 件: {numbers}（`priorwork zotero {name}`）",

@@ -99,6 +99,9 @@ def test_cli_interactive_flow(monkeypatch, capsys):
         def __init__(self, use_cache=True):
             pass
 
+        def complete_abstracts(self, records):
+            return records
+
         def search(self, query, limit=20, year=None, bulk=False):
             return [from_openalex(openalex_work(title=f"Paper number {i} on minimum wages", doi=f"10.1/{i}",
                                                 wid=f"W{i}", citations=100 - i)) for i in range(3)]
@@ -144,3 +147,32 @@ def test_a_failed_fulltext_is_recorded_and_a_success_clears_it(included_survey, 
                                                                  "chars": 900, "page_markers": True})
     cli.main(["fulltext", "check", str(e["number"])])
     assert "fulltext_failed" not in Survey.load("check").get(e["number"])
+
+
+def test_all_openalex_locations_and_landing_pages_are_tried(monkeypatch):
+    from priorwork import fulltext
+
+    class Client:
+        def openalex_works(self, dois=(), openalex_ids=(), select=""):
+            return [{"doi": "https://doi.org/10.1/a", "open_access": {"oa_url": None},
+                     "best_oa_location": None,
+                     "primary_location": {"is_oa": False, "pdf_url": "https://publisher/a.pdf", "landing_page_url": "https://publisher/a"},
+                     "locations": [{"is_oa": False, "pdf_url": "https://publisher/a.pdf"},
+                                   {"is_oa": True, "pdf_url": None, "landing_page_url": "https://tspace.example/handle/1",
+                                    "version": "acceptedVersion"}]}]
+
+    urls = fulltext.oa_pdf_urls({"doi": "10.1/a", "oa_pdf": ""}, Client())
+    assert urls == [("https://publisher/a.pdf", ""), ("https://tspace.example/handle/1", "acceptedVersion")]
+
+    class Resp:
+        def __init__(self, url, body):
+            self.url, self.body, self.ok, self.status_code = url, body, True, 200
+
+        def iter_content(self, n):
+            yield self.body
+
+    pages = {"https://tspace.example/handle/1":
+             b'<html><head><meta name="citation_pdf_url" content="/bitstream/1/paper.pdf"></head></html>',
+             "https://tspace.example/bitstream/1/paper.pdf": b"%PDF-1.4 ..."}
+    monkeypatch.setattr(fulltext.requests, "get", lambda url, **k: Resp(url, pages[url]))
+    assert fulltext.download_pdf("https://tspace.example/handle/1") == b"%PDF-1.4 ..."

@@ -9,6 +9,7 @@ TEXT = ("=== page 1 ===\n\nWe use 1,234 municipalities from 2001 to 2010.\n\n"
 def survey_with_card(s2_record, tmp_path, card, depth="full", lang="ja"):
     s = Survey.create("外部委託", "mob", {"question": "q"}, depth=depth, lang=lang)
     s.upsert(s2_record(doi="10.1/a", title="Outsourcing study"), "search", status=INCLUDED)
+    s.get(1)["record"]["pages"] = "101-102"
     (tmp_path / "ft.txt").write_text(TEXT, encoding="utf-8")
     s.get(1)["fulltext"] = {"path": "ft.txt", "source": "oa:x", "pages": 2, "chars": 900, "page_markers": True}
     s.save()
@@ -84,3 +85,18 @@ def test_a_list_of_pages_is_not_taken_for_numbers(s2_record, tmp_path):
     assert not any("本文に見つかりません" in m for m in messages(s)), messages(s)
     s.set_card(1, {**GOOD, "findings": "係数は 0.35（p. 2, 70-72）"})
     assert any("p. 70" in m and "論文にありません" in m for m in messages(s)), messages(s)
+
+
+def test_numbers_after_japanese_text_and_wrong_journal_pages(s2_record, tmp_path):
+    s = survey_with_card(s2_record, tmp_path, {**GOOD, "data": "約1,234 自治体、2001–2010 年（p. 101）"})
+    assert not any("本文に見つかりません" in m or "論文にありません" in m for m in messages(s)), messages(s)
+    s.get(1)["record"]["pages"] = "101-101"   # データベースの誤った範囲（"330-330"）
+    s.save()
+    assert not any("論文にありません" in m for m in messages(s)), messages(s)
+
+
+def test_a_preview_pdf_is_flagged_as_incomplete(s2_record, tmp_path):
+    s = survey_with_card(s2_record, tmp_path, GOOD)
+    s.get(1)["record"]["pages"] = "605-623"
+    s.save()
+    assert any("#1 (2/19 pp.)" in m for m in messages(s)), messages(s)

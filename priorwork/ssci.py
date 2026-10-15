@@ -120,6 +120,24 @@ def normalize_title(name: str) -> str:
     return s.strip()
 
 
+def same_title(a: str, b: str) -> bool:
+    """同じ論文のタイトルか。記号・大文字小文字の違いのほか、S2 が副題を繰り返して付けたもの
+    （"RegData: A numerical database …, 1997-2012: RegData: US federal regulation data"）も同じとみなす。
+    "…: Reply" "…: A Comment" のような別の論文は同じとしない。"""
+    a, b = normalize_title(a), normalize_title(b)
+    if a == b:
+        return True
+    short, long = sorted((a, b), key=len)
+    if len(short.split()) < 5 or not long.startswith(short + " "):
+        return False
+    extra = long[len(short):].split()
+    return extra[0] in short.split() and not _REPLY_WORDS & set(extra)
+
+
+_REPLY_WORDS = {"reply", "comment", "comments", "rejoinder", "response", "erratum", "corrigendum", "correction",
+                "retraction", "addendum"}
+
+
 def normalize_issn(issn: str) -> str:
     s = re.sub(r"[^0-9Xx]", "", issn or "").upper()
     return f"{s[:4]}-{s[4:]}" if len(s) == 8 else ""

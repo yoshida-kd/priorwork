@@ -3,10 +3,10 @@
 import pytest
 
 from priorwork import cli, zotero
-from priorwork.api import bulk_query, from_openalex
+from priorwork.api import bulk_query, from_openalex, from_s2
 from priorwork.zotero import ZoteroClient, ZoteroError
 
-from .conftest import openalex_work
+from .conftest import openalex_work, s2_paper
 from .test_cli_json import ws  # noqa: F401  （フィクスチャ）
 
 
@@ -24,6 +24,9 @@ class ManyClient:
 
     def __init__(self, use_cache=True):
         pass
+
+    def complete_abstracts(self, records):
+        return records
 
     def search(self, query, limit=20, year=None, bulk=False):
         ManyClient.calls.append(limit)
@@ -81,6 +84,9 @@ def test_link_a_collection_import_and_list_dois(ws, tmp_path, monkeypatch, capsy
     monkeypatch.setattr(cli.ZoteroClient, "from_env", classmethod(lambda cls: z))
 
     class Client(ManyClient):
+        def complete_abstracts(self, records):
+            return records
+
         def search(self, query, limit=20, year=None, bulk=False):
             return [from_openalex(openalex_work(title=f"Paper number {i} on minimum wages", doi=f"10.1/{i}",
                                                 wid=f"W{i}", citations=100 - i)) for i in range(3)]
@@ -136,3 +142,27 @@ def test_the_zotero_cache_survives_concurrent_writers(tmp_path):
         th.join()
     assert not errors and z._load_index()["version"] in range(4)
     assert not list((tmp_path / "zotero").glob("*.tmp"))
+
+
+class FieldClient(ManyClient):
+    """S2 の分野付きで返す検索（医学だけ・分野なし・政治学）。"""
+
+    def search(self, query, limit=20, year=None, bulk=False):
+        out = []
+        for i, fields in enumerate([["Medicine"], [], ["Political Science", "Computer Science"]]):
+            rec = from_s2(s2_paper(title=f"Statutory text paper number {i}", doi=f"10.1/f{i}"))
+            rec["fields"] = fields
+            out.append(rec)
+        return out
+
+
+def test_a_new_survey_leaves_out_papers_outside_the_social_sciences(ws, monkeypatch, capsys):  # noqa: F811
+    monkeypatch.setattr(cli, "LiteratureClient", FieldClient)
+    ws("new", "t", "--slug", "soc", "--json")
+    capsys.readouterr()
+    cli.main(["search", "statutes", "--into", "soc", "--json"])
+    out = capsys.readouterr()
+    assert "Medicine" in out.err
+    assert sorted(e["record"]["title"][-1] for e in ws("list", "soc", "--json")) == ["1", "2"]
+    ws("scope", "soc", "--search-field", "all", "--json")
+    assert len(ws("search", "statutes", "--into", "soc", "--json")["added"]) == 3

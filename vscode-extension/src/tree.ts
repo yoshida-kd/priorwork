@@ -15,7 +15,7 @@ export type Node =
     | { kind: 'step'; survey: SurveySummary; step: NextStep }
     | { kind: 'group'; survey: SurveySummary; status: Status; count: number }
     | { kind: 'paper'; survey: SurveySummary; entry: Entry }
-    | { kind: 'message'; label: string; icon?: string; command?: vscode.Command };
+    | { kind: 'message'; label: string; icon?: string; command?: vscode.Command; tooltip?: string };
 
 const GROUP_ORDER: Status[] = ['candidate', 'maybe', 'included', 'excluded'];
 
@@ -120,6 +120,17 @@ export class SurveyTree implements vscode.TreeDataProvider<Node>, vscode.Disposa
                 topics.set(s.topic.trim(), (topics.get(s.topic.trim()) ?? 0) + 1);
             }
             rows.push(...ws.surveys.map((s): Node => ({ kind: 'survey', survey: s, dup: (topics.get(s.topic.trim()) ?? 0) > 1 })));
+            // サーベイはそれぞれのブランチで進み、PR のマージで main に入る。見ているブランチと、ほかのブランチのサーベイを示す
+            const checkout: vscode.Command = { command: 'git.checkout', title: '' };
+            if (ws.git?.branch && ws.git.other_surveys !== undefined && !['main', 'master'].includes(ws.git.branch)) {
+                rows.push({ kind: 'message', label: vscode.l10n.t('On the branch {0}', ws.git.branch), icon: 'git-branch',
+                            command: checkout, tooltip: vscode.l10n.t('Switch branches') });
+            }
+            if (ws.git?.other_surveys?.length) {
+                rows.push({ kind: 'message', icon: 'git-pull-request', command: checkout,
+                            label: vscode.l10n.t('{0} more on other branches (waiting to be merged)', ws.git.other_surveys.length),
+                            tooltip: ws.git.other_surveys.join('\n') + '\n\n' + vscode.l10n.t('Switch branches') });
+            }
             if (ws.archived?.length) {
                 rows.push({ kind: 'archive', surveys: ws.archived });
             }
@@ -265,7 +276,7 @@ export class SurveyTree implements vscode.TreeDataProvider<Node>, vscode.Disposa
                 const it = new vscode.TreeItem(node.label, C.None);
                 it.iconPath = node.icon ? new vscode.ThemeIcon(node.icon) : undefined;
                 it.command = node.command;
-                it.tooltip = node.label;
+                it.tooltip = node.tooltip ?? node.label;
                 return it;
             }
         }

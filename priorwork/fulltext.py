@@ -8,7 +8,7 @@ Git 管理外の `.priorwork/cache/fulltext/` に保存する。
 2. このマシンの Zotero データフォルダ（`ZOTERO_DATA_DIR`、既定は ~/Zotero）の添付 PDF
 3. Zotero Web API で見つけた添付 PDF（WebDAV / Zotero File Storage から取得）
 4. Zotero が索引化した本文テキスト（ページ区切りなし）
-5. オープンアクセス版の PDF（Semantic Scholar / OpenAlex が示す URL）
+5. オープンアクセス版の PDF（Semantic Scholar / OpenAlex が示す全所在。ランディングページなら、その中の PDF のリンク）
 
 PDF から抽出したテキストは `=== page N ===` でページが区切られる。4 だけはページ番号が付かない。
 """
@@ -33,6 +33,26 @@ MAX_PDF_BYTES = 50 * 1024 * 1024
 
 class FulltextError(RuntimeError):
     pass
+
+
+def journal_pages(record: Dict[str, Any]) -> Tuple[Optional[int], Optional[int]]:
+    """掲載誌のページ範囲（"330-345" → (330, 345)）。最後のページが無い・最初より前なら (最初, None)。"""
+    m = re.match(r"^\s*(\d+)\s*(?:[-–]+\s*(\d+))?", record.get("pages") or "")
+    if not m:
+        return None, None
+    first, last = int(m.group(1)), int(m.group(2)) if m.group(2) else None
+    return first, last if last is not None and last > first else None
+
+
+def incomplete_fulltext(entry: Dict[str, Any]) -> Optional[int]:
+    """取得した本文の PDF のページ数が掲載誌のページ数の半分に満たない（出版社のプレビューなど）とき、
+    掲載誌のページ数を返す。"""
+    info = entry.get("fulltext") or {}
+    first, last = journal_pages(entry["record"])
+    if not info.get("page_markers") or not info.get("pages") or last is None:
+        return None
+    expected = last - first + 1
+    return expected if info["pages"] * 2 < expected else None
 
 
 def zotero_data_dir() -> Path:
@@ -74,7 +94,13 @@ def find_zotero_pdf(doi: str, data_dir: Optional[Path] = None) -> Optional[Path]
     return None
 
 
-def download_pdf(url: str) -> bytes:
+_PDF_META_RE = re.compile(r"<meta[^>]+name=[\"']citation_pdf_url[\"'][^>]*>", re.IGNORECASE)
+_CONTENT_RE = re.compile(r"content=[\"']([^\"']+)[\"']", re.IGNORECASE)
+
+
+def download_pdf(url: str, follow_landing: bool = True) -> bytes:
+    """PDF を取得する。ランディングページ（HTML）が返ったら、その `citation_pdf_url`（機関リポジトリ・出版社の
+    多くが載せる PDF のリンク）を一度だけたどる。"""
     resp = requests.get(url, headers={"User-Agent": "priorwork/0.1"}, timeout=60, stream=True,
                         allow_redirects=True)
     if not resp.ok:
@@ -87,8 +113,21 @@ def download_pdf(url: str) -> bytes:
         chunks.append(chunk)
     data = b"".join(chunks)
     if not data.startswith(b"%PDF"):
+        pdf_url = landing_pdf_url(data.decode("utf-8", "replace"), resp.url or url) if follow_landing else None
+        if pdf_url and pdf_url != url:
+            return download_pdf(pdf_url, follow_landing=False)
         raise FulltextError(t("Not a PDF (probably the publisher's landing page): {url}", url=url))
     return data
+
+
+def landing_pdf_url(html: str, base: str) -> Optional[str]:
+    """ランディングページの `<meta name="citation_pdf_url" content="…">`。"""
+    from urllib.parse import urljoin
+    for tag in _PDF_META_RE.findall(html):
+        m = _CONTENT_RE.search(tag)
+        if m:
+            return urljoin(base, m.group(1).replace("&amp;", "&"))
+    return None
 
 
 def extract_text(pdf: bytes) -> Tuple[str, int]:
@@ -102,16 +141,29 @@ def extract_text(pdf: bytes) -> Tuple[str, int]:
     return "".join(pages).strip(), len(reader.pages)
 
 
-def oa_pdf_urls(record: Dict[str, Any], client: Any) -> List[str]:
-    urls = [record["oa_pdf"]] if record.get("oa_pdf") else []
+def oa_pdf_urls(record: Dict[str, Any], client: Any) -> List[Tuple[str, str]]:
+    """試す (URL, 版) の順: 記録した OA の PDF → OpenAlex の全所在の PDF（OA のものから）→ OA の所在のランディングページ
+    （機関リポジトリなど。`download_pdf` がページ内の PDF のリンクをたどる）。版は OpenAlex の version
+    （publishedVersion / acceptedVersion / submittedVersion。分からなければ空）。"""
+    urls: List[Tuple[str, str]] = [(record["oa_pdf"], "")] if record.get("oa_pdf") else []
+    landing: List[Tuple[str, str]] = []
     if record.get("doi"):
-        for w in client.openalex_works(dois=[record["doi"]], select="doi,open_access,best_oa_location,primary_location"):
-            for loc in (w.get("best_oa_location") or {}, w.get("primary_location") or {}):
+        for w in client.openalex_works(dois=[record["doi"]],
+                                       select="doi,open_access,best_oa_location,primary_location,locations"):
+            locations = [w.get("best_oa_location") or {}, w.get("primary_location") or {}, *(w.get("locations") or [])]
+            locations.sort(key=lambda loc: not loc.get("is_oa"))      # OA の所在を先に（sort は安定）
+            for loc in locations:
                 if loc.get("pdf_url"):
-                    urls.append(loc["pdf_url"])
+                    urls.append((loc["pdf_url"], loc.get("version") or ""))
             if (w.get("open_access") or {}).get("oa_url"):
-                urls.append(w["open_access"]["oa_url"])
-    return list(dict.fromkeys(urls))
+                urls.append((w["open_access"]["oa_url"], ""))
+            landing += [(loc["landing_page_url"], loc.get("version") or "") for loc in locations
+                        if loc.get("is_oa") and loc.get("landing_page_url")]
+    # 同じ URL は、版の分かっているものを残して 1 つにする
+    best: Dict[str, str] = {}
+    for url, version in urls + landing:
+        best[url] = best.get(url) or version
+    return list(best.items())
 
 
 def fetch_fulltext(entry: Dict[str, Any], client: Any, pdf_path: Optional[str] = None,
@@ -121,7 +173,7 @@ def fetch_fulltext(entry: Dict[str, Any], client: Any, pdf_path: Optional[str] =
     out_dir = out_dir or FULLTEXT_DIR
     record = entry["record"]
     attempts = []
-    pdf, source, text, n_pages = None, "", None, None
+    pdf, source, text, n_pages, version = None, "", None, None, ""
 
     if pdf_path:
         path = Path(pdf_path).expanduser()
@@ -166,9 +218,9 @@ def fetch_fulltext(entry: Dict[str, Any], client: Any, pdf_path: Optional[str] =
         urls = oa_pdf_urls(record, client)
         if not urls:
             attempts.append(t("No open-access PDF"))
-        for url in urls:
+        for url, url_version in urls:
             try:
-                pdf, source = download_pdf(url), f"oa:{url}"
+                pdf, source, version = download_pdf(url), f"oa:{url}", url_version
                 break
             except (FulltextError, requests.RequestException) as e:
                 attempts.append(str(e))
@@ -185,4 +237,5 @@ def fetch_fulltext(entry: Dict[str, Any], client: Any, pdf_path: Optional[str] =
     out = out_dir / f"{entry['number']:03d}_{safe_key}.txt"
     out.write_text(text, encoding="utf-8")
     return {"path": str(out.relative_to(ROOT) if out.is_relative_to(ROOT) else out),
-            "source": source, "pages": n_pages, "chars": len(text), "page_markers": pdf is not None}
+            "source": source, "pages": n_pages, "chars": len(text), "page_markers": pdf is not None,
+            "version": version}

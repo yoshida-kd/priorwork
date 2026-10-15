@@ -50,13 +50,14 @@ When the user wants to go through it together (or `AGENTS.local.md` says so), wa
 
 ## Papers with a ⚠️ about the DOI
 
-For papers where "the DOI points to another title" or "the DOI is a working paper / preprint version", find the published version and register that instead.
+For papers where "the DOI points to another title", "the DOI is a working paper / preprint version" or "OpenAlex does not know the DOI", find the published version and replace the details with it. The number, status and card stay.
 
 ```bash
 ./priorwork search "<title of the paper>" --limit 5
 ./priorwork get "<DOI of the published version>"   # check that the title, journal and year match
-./priorwork add <survey> "<DOI of the published version>"
-./priorwork exclude <survey> <old number> --reason "Wrong DOI; replaced by #<new number>"
+./priorwork fix <survey> <number> --id "<DOI of the published version>"
 ```
 
-If you cannot confirm the published version, do not include the paper: set it to maybe and mention it in your report.
+- If you cannot confirm the published version, do not include the paper: set it to maybe and mention it in your report.
+- If the DOI is right and the warning is wrong (the titles differ only in a subtitle or punctuation, say), check it on the publisher's page, then clear it with `./priorwork fix <survey> <number> --confirm "<what you checked>"`. The reason is kept in the state file. Do not clear a warning you have not checked.
+- If the authors or the year are wrong in the databases (a surname taken for a given name, say), correct them as the paper gives them: `./priorwork fix <survey> <number> --authors "Yuen Yuen Ang; ..." --year 2023`. The references and the Author (year) citations follow this.

@@ -27,7 +27,9 @@ Follow the rules in [AGENTS.md](../../../AGENTS.md).
    | A citation matches several included papers / no paper matches 2001a | Make the citation in the text match the 2001a / 2001b labels in the references section |
    | A citation taken for an organisation or a figure number and not checked (INFO) | If it is a paper, register it as above. Reports, statistics and the like can stay |
    | Text that is not a citation is taken for one | Write `<!-- priorwork:ignore-citation Author (year) -->` near it. Never use this to hide a citation of a real paper |
-   | ⚠️ The DOI points to another title / is a working paper | Replace it as in "Papers with a ⚠️ about the DOI" in `priorwork-screen` |
+   | ⚠️ The DOI points to another title / is a working paper / is not found | Replace it as in "Papers with a ⚠️ about the DOI" in `priorwork-screen` (`fix --id`). If you have checked that the DOI is right, `fix --confirm "<reason>"` |
+   | Text in a card is taken for an unregistered Author (year) citation | Do not write sources that are not papers of the survey (a data source, say) as Author (year) ("Franchino's 2004 data" instead). Register it if it is a paper for the survey |
+   | The full text has far fewer pages than the journal pages | The full text is incomplete (perhaps the publisher's preview). Do not fill the card from it; ask in your report for the whole PDF in Zotero (set the level to abstract only) |
    | Evidence level unchecked / empty fields | Fill them in as in `priorwork-extract` |
    | Citations not chased (full) | Do it as in `priorwork-snowball` |
    | A number on a card is not in the full text / a cited page is not in the paper | Compare with the full text (the text from `./priorwork fulltext`) and fix it; remove it if the paper does not say it. If only the form differs (units, rounding), write it as the paper does |

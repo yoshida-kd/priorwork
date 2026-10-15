@@ -19,12 +19,12 @@ from .api import ApiError, LiteratureClient
 from .check import ERROR, INFO, WARN, check_survey
 from .doctor import NG, OK, run_checks
 from .export import FORMATS, export, export_draft
-from .fulltext import FulltextError, fetch_fulltext
+from .fulltext import FulltextError, fetch_fulltext, incomplete_fulltext
 from .i18n import t, tl
 from .snowball import snowball
 from .survey import (
-    CANDIDATE, DEFAULT_DEPTH, DEPTHS, EVIDENCE_KEYS, EXCLUDED, INCLUDED, MAYBE, STATUSES, Survey,
-    SurveyError, author_short, evidence_key, evidence_label, now_iso, status_label, status_trail,
+    CANDIDATE, DEFAULT_DEPTH, DEPTHS, EVIDENCE_KEYS, EXCLUDED, INCLUDED, MAYBE, SEARCH_FIELDS, STATUSES, Survey,
+    SurveyError, author_short, off_field, evidence_key, evidence_label, now_iso, status_label, status_trail,
 )
 from .workspace import ROOT, meta_dir, workspace_lang
 from .zotero import ZoteroClient, ZoteroError
@@ -320,16 +320,26 @@ def next_steps(s: Survey, zotero_missing: List[Dict[str, Any]], zotero_pending: 
     return steps
 
 
+def git_info(surveys: List[Survey]) -> Dict[str, Any]:
+    """Git の状態。サーベイはそれぞれのブランチで進む（AGENTS.md「Git」）ので、今のブランチに無いサーベイの
+    ブランチも返す（main を見ていると、PR を待つサーベイが一覧に出ないため）。"""
+    if not scaffold.in_git_repo(ROOT):
+        return {"repo": False, "remote": False, "branch": "", "other_surveys": []}
+    here = {s.name for s in surveys}
+    branch = scaffold.git_branch(ROOT)
+    return {"repo": True, "remote": scaffold.has_remote(ROOT), "branch": branch,
+            "other_surveys": [b for b in scaffold.survey_branches(ROOT) if b not in here and b != branch]}
+
+
 def cmd_status(args, client):
     if not args.survey:
         everything = Survey.list_all()
         surveys = [s for s in everything if not s.archived]
         archived = [s for s in everything if s.archived]
+        git = git_info(everything)
         if args.json:
             return dump_json({"version": __version__, "root": str(ROOT), "workspace": meta_dir(ROOT).is_dir(),
-                              "lang": workspace_lang(ROOT),
-                              "git": {"repo": (repo := scaffold.in_git_repo(ROOT)),
-                                      "remote": repo and scaffold.has_remote(ROOT)}, "sync": scaffold.sync_status(ROOT),
+                              "lang": workspace_lang(ROOT), "git": git, "sync": scaffold.sync_status(ROOT),
                               "zotero": ZoteroClient.from_env() is not None,
                               "surveys": [survey_summary(s) for s in surveys],
                               "archived": [survey_summary(s) for s in archived]})
@@ -343,6 +353,9 @@ def cmd_status(args, client):
                                                        "excluded {excluded}", **c))
         if archived and not args.archived:
             print(t("({n|# archived survey|# archived surveys} not shown: `priorwork status --archived`)", n=len(archived)))
+        if git["other_surveys"]:
+            print(t("On other branches (not merged into this one yet): {names}. To continue one, "
+                    "`git switch <name>`", names=", ".join(git["other_surveys"])))
         return
 
     s = Survey.load(args.survey)
@@ -405,8 +418,11 @@ def cmd_new(args, client):
     scope = {k: getattr(args, k) or "" for k in ("question", "years", "fields", "inclusion", "exclusion")}
     s = Survey.create(args.topic, args.slug, scope, depth=args.depth or DEFAULT_DEPTH, lang=args.lang,
                       manuscript=args.manuscript)
-    if args.by:
-        s.add_writer(args.by)
+    if args.by or args.search_field:
+        if args.by:
+            s.add_writer(args.by)
+        if args.search_field:
+            s.set_search_field(args.search_field)
         s.save()
         s.render()
     others = same_topic(s, Survey.list_all())
@@ -426,6 +442,8 @@ def cmd_scope(args, client):
     s.update_scope(**{k: getattr(args, k) for k in ("question", "years", "fields", "inclusion", "exclusion")})
     if args.depth:
         s.set_depth(args.depth)
+    if args.search_field:
+        s.set_search_field(args.search_field)
     if args.manuscript:
         s.set_manuscript(args.manuscript)
     if args.by:
@@ -436,6 +454,7 @@ def cmd_scope(args, client):
     for k, v in s.data["scope"].items():
         print(f"{k}: {v}")
     print(f"depth: {s.depth}")
+    print(f"search field: {s.search_field}")
     if s.manuscript:
         print(f"manuscript: {s.manuscript}")
 
@@ -492,18 +511,45 @@ def cmd_add(args, client):
     added = []
     for pid in args.paper_ids:
         rec = client.get_paper(pid)
+        old = s.find(rec)
+        old_key = old and old["key"]
         entry, is_new = s.upsert(rec, "manual", status=status)
         if not is_new and status == INCLUDED:
             s.set_status([entry["number"]], INCLUDED)
         added.append((entry, is_new))
         if not args.json:
-            state = t("new") if is_new else t("already registered")
+            if is_new:
+                state = t("new")
+            elif entry["key"] != old_key:
+                state = t("already registered; replaced {key} with this one", key=old_key)
+            else:
+                state = t("already registered")
             print_paper(rec, f"#{entry['number']} [{state} → {status_label(entry['status'])}]")
     s.log_search("manual", ", ".join(args.paper_ids), {"status": status}, len(args.paper_ids),
                  sum(1 for _, n in added if n))
     render_and_report(s)
     if args.json:
         dump_json({"added": added_json(added)})
+
+
+def cmd_fix(args, client):
+    s = Survey.load(args.survey)
+    e = s.get(args.number)
+    if args.id:
+        rec = client.get_paper(args.id)
+        old_key = e["key"]
+        s.replace_record(e, rec)
+        if not args.json:
+            print(t("#{number}: replaced {old} with {new}", number=e["number"], old=old_key, new=e["key"]))
+    authors = [a.strip() for a in args.authors.split(";")] if args.authors else None
+    s.fix_record(args.number, confirm=args.confirm or "", authors=authors, year=args.year, title=args.title)
+    render_and_report(s)
+    if args.json:
+        return dump_json({"number": e["number"], "key": e["key"], "record": e["record"],
+                          "fixed": e.get("fixed", {}), "confirmed": e.get("confirmed")})
+    print_paper(e["record"], f"#{e['number']}")
+    if e.get("confirmed"):
+        print(t("Checked by hand: {reason}", reason=e["confirmed"]["reason"]))
 
 
 def card_json(s: Survey, number: int) -> Dict[str, Any]:
@@ -628,6 +674,15 @@ def cmd_fulltext(args, client):
     print(t("Full text: {path} ({pages} pages, {chars} characters)", path=info["path"], pages=info["pages"] or "?",
             chars=f"{info['chars']:,}"))
     print(t("Source: {source}", source=info["source"]))
+    if info.get("version") in ("acceptedVersion", "submittedVersion"):
+        print(t("* This is the author's manuscript ({version}), not the published version. Its pages are not the "
+                "journal's: give the PDF page (the N of `=== page N ===`) and say so in the memo",
+                version=info["version"]))
+    expected = incomplete_fulltext(entry)
+    if expected:
+        print(t("* The PDF has only {pages} pages, but the paper has {expected} journal pages. It may be only the "
+                "publisher's preview: get the whole PDF (attach it in Zotero, or give it with `--pdf`)",
+                pages=info["pages"], expected=expected))
     if not info["page_markers"]:
         print(t("* This is Zotero's index text, which has no page breaks. Check the PDF before giving page numbers."))
     print(t("* Extracted text can garble columns, tables and formulas. Check numbers against the page in the PDF too."))
@@ -781,7 +836,17 @@ def cmd_search(args, client):
     # 除外・重複統合で件数が減るので多めに取得する
     fetch_limit = min(max(limit * 4, 20), 100)
     papers = client.search(args.query, limit=fetch_limit, year=args.year, bulk=args.bulk)
+    field = args.field or (s.search_field if s else "all")
+    if field == "social":
+        dropped = [p for p in papers if off_field(p)]
+        papers = [p for p in papers if not off_field(p)]
+        if dropped:
+            print("[Notice] " + t("Left out {n|# paper|# papers} outside the social sciences (e.g. {example}). "
+                                  "To keep them, add --field all", n=len(dropped),
+                                  example=", ".join(sorted({f for p in dropped for f in p["fields"]})[:3])),
+                  file=sys.stderr)
     results = rank_and_filter(papers, args.include_preprints, args.ssci_only, args.sort)[:limit]
+    client.complete_abstracts(results)
     if not results:
         print("[Notice] " + (t("No hits. Bulk search takes + (AND), | (OR), - (NOT) and \"phrases\"; "
                                 "try fewer terms or synonyms") if args.bulk
@@ -798,7 +863,7 @@ def cmd_search(args, client):
     added = add_records(s, results, "search")
     new = sum(1 for _, is_new in added if is_new)
     s.log_search("bulk" if args.bulk else "search", args.query,
-                 {"year": args.year, "sort": args.sort, "ssci_only": args.ssci_only, "limit": limit},
+                 {"year": args.year, "sort": args.sort, "ssci_only": args.ssci_only, "limit": limit, "field": field},
                  len(results), new)
     render_and_report(s)
     if args.json:
@@ -817,6 +882,7 @@ def cmd_snowball(args, client):
         sys.exit(t("Error: {message}", message=t("No paper is included yet. Include some with `priorwork include` first")))
     limit = args.limit or DEFAULT_LIMIT["full" if s.depth == "full" else "quick"]
     records = rank_and_filter(records, args.include_preprints, args.ssci_only, "relevance")[:limit]
+    client.complete_abstracts(records)
     added = add_records(s, records, "snowball")
     new = sum(1 for _, is_new in added if is_new)
     s.log_search("snowball", t("citations of {n|# included paper|# included papers} ({direction})", n=stats["seeds"],
@@ -949,6 +1015,9 @@ def build_parser() -> argparse.ArgumentParser:
     scope_args.add_argument("--exclusion", help=t("exclusion criteria"))
     scope_args.add_argument("--depth", choices=list(DEPTHS),
                             help=t("the depth of the survey (quick or full; default full)"))
+    scope_args.add_argument("--search-field", choices=list(SEARCH_FIELDS),
+                            help=t("the fields that searches into the survey keep (social: leave out papers outside "
+                                   "the social sciences, the default for new surveys; all: keep everything)"))
     scope_args.add_argument("--by", metavar="MODEL",
                             help=t("the AI model writing the survey (e.g. \"Gemini 3.1 Pro\"); "
                                    "the audit must then be by another model"))
@@ -980,6 +1049,19 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("survey")
     p.add_argument("paper_ids", nargs="+", help="DOI / DOI URL / Semantic Scholar ID / OpenAlex ID")
     p.add_argument("--candidate", action="store_true", help=t("register as a candidate, not as included"))
+
+    p = sub.add_parser("fix", parents=[common, as_json],
+                       help=t("correct the details of a registered paper (published-version DOI, authors, year, title) "
+                              "or clear a warning you have checked"))
+    p.add_argument("survey")
+    p.add_argument("number", type=int, help=t("the paper number"))
+    p.add_argument("--id", metavar="DOI",
+                   help=t("replace the details with those of this DOI / ID (e.g. the published version of a working paper)"))
+    p.add_argument("--authors", help=t("the authors, separated by \";\" (e.g. \"Yuen Yuen Ang\")"))
+    p.add_argument("--year", type=int, help=t("the year"))
+    p.add_argument("--title", help=t("the title"))
+    p.add_argument("--confirm", metavar="REASON",
+                   help=t("clear the warnings after checking that the details are right, recording why"))
 
     p = sub.add_parser("card", parents=[common, as_json], help=t("show or fill in the card of an included paper"))
     p.add_argument("survey")
@@ -1035,6 +1117,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--bulk", action="store_true", help=t("bulk search (boolean operators, most cited first)"))
     p.add_argument("--sort", choices=SORTS, default="citations",
                    help=t("citations / relevance / recent (newest first) / cpy (citations per year)"))
+    p.add_argument("--field", choices=list(SEARCH_FIELDS),
+                   help=t("social: leave out papers outside the social sciences / all (default: the survey's setting; "
+                          "all without --into)"))
 
     p = sub.add_parser("snowball", parents=[common, filters, as_json],
                        help=t("register candidates from the citations of the included papers"))
@@ -1064,7 +1149,7 @@ HANDLERS = {
     "init": cmd_init, "sync": cmd_sync, "upgrade": cmd_upgrade, "doctor": cmd_doctor, "settings": cmd_settings,
     "status": cmd_status, "archive": cmd_archive, "new": cmd_new, "scope": cmd_scope, "list": cmd_list,
     "include": cmd_set_status, "exclude": cmd_set_status, "maybe": cmd_set_status, "reset": cmd_set_status,
-    "add": cmd_add, "card": cmd_card, "render": cmd_render, "check": cmd_check, "audit": cmd_audit, "export": cmd_export, "fulltext": cmd_fulltext, "zotero": cmd_zotero,
+    "add": cmd_add, "fix": cmd_fix, "card": cmd_card, "render": cmd_render, "check": cmd_check, "audit": cmd_audit, "export": cmd_export, "fulltext": cmd_fulltext, "zotero": cmd_zotero,
     "search": cmd_search, "snowball": cmd_snowball, "get": cmd_get,
     "citations": cmd_linked, "references": cmd_linked, "journal": cmd_journal,
 }
@@ -1075,7 +1160,13 @@ def main(argv: Optional[List[str]] = None):
     client = LiteratureClient(use_cache=not args.no_cache)
     try:
         HANDLERS[args.command](args, client)
-    except (ApiError, SurveyError, FulltextError, ZoteroError, scaffold.ScaffoldError, settings.SettingsError) as e:
+    except SurveyError as e:
+        ref = getattr(args, "survey", None) or getattr(args, "into", None)
+        branches = [b for b in scaffold.survey_branches(ROOT) if ref and ref in b] if ref else []
+        hint = ("\n" + t("It is on the branch {branch}: switch to it with `git switch {branch}`", branch=branches[0])
+                if len(branches) == 1 and scaffold.git_branch(ROOT) != branches[0] else "")
+        sys.exit(t("Error: {message}", message=e) + hint)
+    except (ApiError, FulltextError, ZoteroError, scaffold.ScaffoldError, settings.SettingsError) as e:
         sys.exit(t("Error: {message}", message=e))
     except KeyboardInterrupt:
         sys.exit(130)

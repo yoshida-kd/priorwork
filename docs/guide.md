@@ -149,7 +149,7 @@ The reports and state files contain abstracts, so keep the workspace in a **priv
 2. When VS Code asks, choose **Publish to GitHub private repository** and include all the files it
    suggests (`.env` is left out by `.gitignore`).
 
-The agent does not touch Git unless you ask: when it finishes, it asks whether to commit. Ask it to commit (and push) when you want, or allow it in `AGENTS.local.md`.
+The agent makes a branch named after the survey (e.g. `20261015_statutory_text_analysis`), commits and pushes at each step, and opens a pull request once the report is exported. **It never merges**: review the pull request and merge it on GitHub. In Claude Code, pushing to main, force-pushing and merging are also denied in `.claude/settings.json`. To keep the agent away from Git, say so in `AGENTS.local.md`.
 
 ### 3.4 Continue on another machine
 
@@ -474,7 +474,7 @@ sidebar (the agent gets them the same way). PDFs are never stored in the workspa
 2. a PDF attached in Zotero found through the Web API (WebDAV or Zotero's own file sync), preferring
    the collection linked to the survey
 3. the text Zotero indexed (no page breaks; a fallback)
-4. an open-access PDF
+4. an open-access PDF (every location OpenAlex knows; on a landing page, such as an institutional repository's, the PDF link it gives)
 
 Publishers usually refuse automated downloads, so for papers that are not open access, attach the PDF
 in Zotero first.
@@ -656,6 +656,7 @@ Everything the extension does is also a `./priorwork` command (the agent uses th
 ./priorwork exclude SURVEY 3 --reason "theory only"
 ./priorwork maybe SURVEY 9 / ./priorwork reset SURVEY 9
 ./priorwork add SURVEY <DOI>... [--candidate]
+./priorwork fix SURVEY N [--id <published DOI>] [--authors "A; B"] [--year Y] [--confirm "<what you checked>"]
 ./priorwork card SURVEY 3 [--set rq="..." evidence=abstract]
 ./priorwork render SURVEY
 ./priorwork check SURVEY [--offline]
@@ -670,7 +671,7 @@ Everything the extension does is also a `./priorwork` command (the agent uses th
 ./priorwork zotero SURVEY --dois                   # DOIs of included papers not in Zotero (for the magic wand)
 
 # Finding literature
-./priorwork search "<English query>" [--into SURVEY] [--bulk] [--sort citations|relevance|recent|cpy] [--year 2010-2024] [--ssci-only] [--limit N]
+./priorwork search "<English query>" [--into SURVEY] [--bulk] [--sort citations|relevance|recent|cpy] [--year 2010-2024] [--ssci-only] [--field social|all] [--limit N]
 ./priorwork snowball SURVEY [--direction both|references|citations] [--min-links N]
 ./priorwork get <DOI>
 ./priorwork citations <DOI> / ./priorwork references <DOI>

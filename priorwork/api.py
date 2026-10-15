@@ -59,11 +59,13 @@ OPENALEX_BASE_URL = "https://api.openalex.org"
 
 S2_PAPER_FIELDS = (
     "paperId,title,abstract,authors,year,venue,publicationVenue,journal,citationCount,referenceCount,"
-    "openAccessPdf,tldr,externalIds,url,fieldsOfStudy,publicationTypes"
+    "openAccessPdf,tldr,externalIds,url,fieldsOfStudy,s2FieldsOfStudy,publicationTypes"
 )
 # bulk 検索は tldr を返せない
 S2_BULK_FIELDS = S2_PAPER_FIELDS.replace(",tldr", "")
 S2_LINKED_FIELDS = "paperId,title,authors,year,venue,publicationVenue,journal,citationCount,externalIds,publicationTypes"
+CROSSREF_BASE_URL = "https://api.crossref.org"
+CROSSREF_BATCH = 20
 OPENALEX_SELECT = (
     "id,doi,title,display_name,publication_year,type,authorships,primary_location,biblio,"
     "cited_by_count,referenced_works_count,abstract_inverted_index,open_access,topics"
@@ -177,6 +179,21 @@ def _bare_doi(doi: Optional[str]) -> str:
     return re.sub(r"^https?://(dx\.)?doi\.org/", "", doi or "", flags=re.IGNORECASE)
 
 
+def author_name(name: str) -> str:
+    """すべて大文字の著者名（OpenAlex の "TODD L. ALLEE" など）を、参照文献で使える形（"Todd L. Allee"）にする。"""
+    name = re.sub(r"\s+", " ", name or "").strip()
+    if re.search(r"[A-Z]{2}", name) and name == name.upper():
+        return " ".join(w if w.rstrip(".") in ("II", "III", "IV") else w.title() for w in name.split())
+    return name
+
+
+def jats_text(abstract: str) -> str:
+    """Crossref の要旨（JATS の XML）を平文にする。先頭の「Abstract」の見出しは落とす。"""
+    text = re.sub(r"<(jats:)?title>.*?</(jats:)?title>", " ", abstract or "", flags=re.S)
+    text = html.unescape(re.sub(r"<[^>]+>", " ", text))
+    return re.sub(r"\s+", " ", text).strip()
+
+
 def _record(**kw) -> Dict[str, Any]:
     rec = {
         "id": "",
@@ -206,6 +223,7 @@ def _record(**kw) -> Dict[str, Any]:
     rec.update({k: v for k, v in kw.items() if v is not None})
     # 雑誌側の脚注記号（"...Jobs*" など）が Markdown の強調を壊すので落とす
     rec["title"] = re.sub(r"\s*[*†‡]+$", "", rec["title"])
+    rec["authors"] = [author_name(a) for a in rec["authors"] if author_name(a)]
     rec["warnings"] = list(rec["warnings"])
     if re.search(r",\s*(?:edited\s+)?by\s+[A-Z]", rec["title"]) or re.fullmatch(r"(\d+)\s*-+\s*\1", rec["pages"]):
         rec["warnings"].append(t("May be a book review or comment (guessed from the title or the page range)"))
@@ -237,7 +255,9 @@ def from_s2(p: Dict[str, Any]) -> Dict[str, Any]:
         abstract=(p.get("abstract") or "").strip(),
         tldr=((p.get("tldr") or {}).get("text") or "").strip(),
         oa_pdf=(p.get("openAccessPdf") or {}).get("url") or "",
-        fields=p.get("fieldsOfStudy") or [],
+        # fieldsOfStudy（外部の分類）は空のことが多いので、S2 の分類器による s2FieldsOfStudy も合わせる
+        fields=list(dict.fromkeys([*(p.get("fieldsOfStudy") or []),
+                                   *(f.get("category") for f in (p.get("s2FieldsOfStudy") or []) if f.get("category"))])),
     )
 
 
@@ -354,6 +374,29 @@ class LiteratureClient:
             secret_params={"api_key": self.openalex_api_key, "mailto": self.openalex_mailto},
         )
 
+    def _crossref(self, path: str, params: Dict[str, Any]) -> Any:
+        ua = "priorwork/0.1" + (f" (mailto:{self.openalex_mailto})" if self.openalex_mailto else "")
+        return self._get_json("Crossref", f"{CROSSREF_BASE_URL}{path}", params, {"User-Agent": ua},
+                              secret_params={"mailto": self.openalex_mailto})
+
+    def complete_abstracts(self, records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """S2 にも OpenAlex にも要旨が無い論文を、Crossref（出版社が登録した要旨）で補う。失敗しても止めない。"""
+        missing = [r for r in records if not r.get("abstract") and r.get("doi")]
+        try:
+            for i in range(0, len(missing), CROSSREF_BATCH):
+                chunk = missing[i:i + CROSSREF_BATCH]
+                data = self._crossref("/works", {"filter": ",".join(f"doi:{r['doi'].lower()}" for r in chunk),
+                                                 "rows": CROSSREF_BATCH, "select": "DOI,abstract"})
+                found = {(item.get("DOI") or "").lower(): item.get("abstract")
+                         for item in (data.get("message") or {}).get("items") or []}
+                for r in chunk:
+                    text = jats_text(found.get(r["doi"].lower()) or "")
+                    if text:
+                        r["abstract"] = text
+        except ApiError as e:
+            print("[Notice] " + t("{error} → abstracts are not filled in from Crossref", error=e), file=sys.stderr)
+        return records
+
     # ---- Semantic Scholar ----
 
     def _search_s2(self, query: str, limit: int, year: Optional[str], bulk: bool) -> List[Dict[str, Any]]:
@@ -420,12 +463,15 @@ class LiteratureClient:
                 r["warnings"].append(t("OpenAlex does not know the DOI (verify the DOI)"))
                 continue
             oa = from_openalex(w)
-            if ssci.normalize_title(oa["title"]) != ssci.normalize_title(r["title"]):
+            if not ssci.same_title(oa["title"], r["title"]):
                 r["warnings"].append(t("The DOI points to another title: \"{title}\" (verify the DOI)", title=oa["title"]))
             s2_journal, s2_status = r["journal_name"], r["ssci"]["status"]
             # Zotero 取り込み・SSCI 照合に使う書誌情報は、DOI の実体（OpenAlex）側で丸ごと置き換える
             for field in ("journal_name", "issns", "source_type", "publication_types", "volume", "issue", "pages"):
                 r[field] = oa[field]
+            # S2 は WP 版と掲載版を一つにまとめ、WP 版の年を返すことがある。年も DOI の実体（掲載版）に合わせる
+            if oa["year"]:
+                r["year"] = oa["year"]
             if not r["abstract"]:
                 r["abstract"] = oa["abstract"]
             r["verified"] = True
@@ -463,14 +509,14 @@ class LiteratureClient:
         ident = parse_identifier(identifier)
         if ident["s2_id"]:
             try:
-                return self._verify_with_openalex([self._get_paper_s2(ident["s2_id"])])[0]
+                return self.complete_abstracts(self._verify_with_openalex([self._get_paper_s2(ident["s2_id"])]))[0]
             except ApiError as e:
                 if e.status != 404:
                     raise
                 print("[Notice] " + t("Not in Semantic Scholar; fetching it from OpenAlex: {id}", id=ident["value"]),
                       file=sys.stderr)
         try:
-            return self._get_paper_openalex(ident)
+            return self.complete_abstracts([self._get_paper_openalex(ident)])[0]
         except ApiError as e:
             if e.status != 404:
                 raise

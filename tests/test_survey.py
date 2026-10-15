@@ -258,3 +258,26 @@ def test_redo_gets_a_version_after_the_date():
     with pytest.raises(SurveyError, match="20261012_v3_make_or_buy"):
         Survey.load("make_or_buy")
     assert Survey.create("別", "other", {}).version == 1
+
+
+def test_verified_published_doi_replaces_an_unverified_wp_doi_of_the_same_tier(s, s2_record):
+    wp = s2_record(doi="10.2139/ssrn.2559803", journal="Economic Policy", title="Is regulation to blame for the decline")
+    wp["warnings"] = ["OpenAlex does not know the DOI (verify the DOI)"]
+    e, _ = s.upsert(wp, "search", status=INCLUDED)
+    s.fix_record(e["number"], authors=["Nathan Goldschlag", "Alexander Tabarrok"])
+    published = s2_record(doi="10.1093/epolic/eix019", journal="Economic Policy",
+                          title="Is regulation to blame for the decline", year=2018)
+    published["verified"] = True
+    e2, is_new = s.upsert(published, "manual")
+    assert not is_new and e2 is e and e["key"] == "doi:10.1093/epolic/eix019" and not e["record"]["warnings"]
+    assert e["record"]["authors"] == ["Nathan Goldschlag", "Alexander Tabarrok"]   # 手で直した項目は残る
+
+
+def test_fix_record_confirms_warnings_with_a_reason(s, s2_record):
+    rec = s2_record(doi="10.1/a", title="RegData: a numerical database")
+    rec["warnings"] = ["The DOI points to another title"]
+    e, _ = s.upsert(rec, "search", status=INCLUDED)
+    s.fix_record(e["number"], confirm="Checked on the publisher's page", year=2017)
+    assert not e["record"]["warnings"] and e["record"]["year"] == 2017
+    assert e["confirmed"]["reason"] == "Checked on the publisher's page"
+    assert e["confirmed"]["warnings"] == ["The DOI points to another title"]

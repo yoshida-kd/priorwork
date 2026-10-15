@@ -97,3 +97,45 @@ def test_get_paper_does_not_fall_back_on_rate_limit():
 
     with pytest.raises(ApiError):
         Client(use_cache=False).get_paper("10.1/abc")
+
+
+def test_verify_accepts_a_repeated_subtitle_and_takes_the_published_year():
+    title = "RegData: A numerical database on industry-specific regulations for all United States industries, 1997–2012"
+    client = FakeOpenAlexClient([openalex_work(title=title, year=2017)])
+    [out] = client._verify_with_openalex([from_s2(s2_paper(title=title.replace("–", "-")
+                                                           + ": RegData: US federal regulation data", year=2015))])
+    assert not out["warnings"] and out["year"] == 2017
+
+
+def test_same_title_tells_a_reply_apart():
+    base = "Minimum Wages and Low-Wage Jobs in the United States"
+    assert ssci.same_title(base, base.upper())
+    assert not ssci.same_title(base, base + ": A Reply")
+    assert not ssci.same_title("Comment", "Comment on Minimum Wages")
+
+
+def test_all_capital_author_names_are_tidied():
+    rec = from_s2(s2_paper(authors=("TODD L. ALLEE", "Clint W Peinhardt", "JOHN SMITH III")))
+    assert rec["authors"] == ["Todd L. Allee", "Clint W Peinhardt", "John Smith III"]
+
+
+def test_s2_fields_include_the_classifier_fields():
+    rec = from_s2(s2_paper(fieldsOfStudy=None, s2FieldsOfStudy=[{"category": "Political Science", "source": "s2-fos-model"},
+                                                                {"category": "Law", "source": "s2-fos-model"}]))
+    assert rec["fields"] == ["Political Science", "Law"]
+
+
+def test_missing_abstracts_come_from_crossref():
+    calls = []
+
+    class Client(LiteratureClient):
+        def _crossref(self, path, params):
+            calls.append(params)
+            return {"message": {"items": [{"DOI": "10.1/ABC", "abstract": "<jats:title>Abstract</jats:title>"
+                                           "<jats:p>We study &amp; measure delegation.</jats:p>"}]}}
+
+    with_abstract, without = from_s2(s2_paper(doi="10.1/x")), from_s2(s2_paper(doi="10.1/abc"))
+    without["abstract"] = ""
+    Client(use_cache=False).complete_abstracts([with_abstract, without])
+    assert without["abstract"] == "We study & measure delegation."
+    assert calls == [{"filter": "doi:10.1/abc", "rows": 20, "select": "DOI,abstract"}]   # 要旨のあるものは問い合わせない

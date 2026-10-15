@@ -18,6 +18,8 @@ def isolated(tmp_path, monkeypatch):
     monkeypatch.setenv("PRIORWORK_NO_CACHE", "1")
     # 既存のテストは日本語の表示を見ている。英語は test_english.py などで言語を指定して確かめる
     monkeypatch.setenv("PRIORWORK_LANG", "ja")
+    # Crossref（要旨の補完）に接続しない。確かめるテストは _crossref を差し替える
+    monkeypatch.setattr(api.LiteratureClient, "_crossref", lambda self, path, params: {"message": {"items": []}})
     for var in ("ZOTERO_API_KEY", "ZOTERO_USER_ID", "ZOTERO_WEBDAV_URL"):  # 本物の Zotero に接続しない
         monkeypatch.delenv(var, raising=False)
     yield

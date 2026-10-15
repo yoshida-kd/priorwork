@@ -32,6 +32,14 @@ SKILLS_LINK = ".claude/skills"
 CLAUDE_SETTINGS = ".claude/settings.json"
 # Claude Code が `./priorwork` を毎回確かめずに実行してよいとする許可（ほかのコマンドは今までどおり確かめる）
 CLAUDE_ALLOW = "Bash(./priorwork:*)"
+# エージェントは作業ブランチのコミット・push・PR の作成までをする（AGENTS.md「Git」）。それに要る操作は許し、
+# マージ・main への push・履歴の書き換えは断る。ユーザーが逆の側に書いた規則は足さない（allow に書けば deny を外せる）
+CLAUDE_RULES = {
+    "allow": [CLAUDE_ALLOW, "Bash(git status:*)", "Bash(git switch:*)", "Bash(git add:*)", "Bash(git commit:*)",
+              "Bash(git push -u origin:*)", "Bash(gh pr create:*)", "Bash(gh pr view:*)"],
+    "deny": ["Bash(git merge:*)", "Bash(gh pr merge:*)", "Bash(git push origin main:*)", "Bash(git push -u origin main:*)",
+             "Bash(git push --force:*)", "Bash(git push -f:*)", "Bash(git reset --hard:*)", "Bash(git rebase:*)"],
+}
 WRAPPER_NAME = "priorwork"
 
 WRAPPER = """#!/bin/sh
@@ -279,19 +287,23 @@ def _drop_block(lines: List[str], begin: str, end: str) -> List[str]:
 
 
 def ensure_claude_allow(root: Path) -> Optional[bool]:
-    """`.claude/settings.json` の permissions.allow に `./priorwork` を足す（ほかの設定はそのまま）。
-    足したら True、もうある（または deny にある）なら None、読めない・形の違う JSON なら（壊さないよう）触らずに False。"""
+    """`.claude/settings.json` の permissions に CLAUDE_RULES を足す（ほかの設定はそのまま）。
+    足したら True、全部ある（または逆の側にある）なら None、読めない・形の違う JSON なら（壊さないよう）触らずに False。"""
     path = root / CLAUDE_SETTINGS
     try:
         settings = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
     except (OSError, ValueError):
         return False
     perms = settings.get("permissions", {}) if isinstance(settings, dict) else None
-    if not isinstance(perms, dict) or not isinstance(perms.get("allow", []), list):
+    if not isinstance(perms, dict) or not all(isinstance(perms.get(k, []), list) for k in CLAUDE_RULES):
         return False
-    if CLAUDE_ALLOW in perms.get("allow", []) or CLAUDE_ALLOW in (perms.get("deny") or []):
-        return None   # 許可済み、またはユーザーが deny で断っている
-    settings.setdefault("permissions", {}).setdefault("allow", []).append(CLAUDE_ALLOW)
+    written = set(perms.get("allow") or []) | set(perms.get("deny") or [])
+    missing = {k: [r for r in rules if r not in written] for k, rules in CLAUDE_RULES.items()}
+    if not any(missing.values()):
+        return None   # 足してある、またはユーザーが逆の側に書いている
+    for kind, rules in missing.items():
+        if rules:
+            settings.setdefault("permissions", {}).setdefault(kind, []).extend(rules)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(settings, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return True
@@ -308,6 +320,28 @@ def ensure_gitignore(root: Path) -> bool:
         return False
     path.write_text(text, encoding="utf-8")
     return True
+
+
+def _git(root: Path, *args: str) -> str:
+    try:
+        return subprocess.run(["git", *args], cwd=root, capture_output=True, text=True).stdout.strip()
+    except OSError:
+        return ""
+
+
+def git_branch(root: Path) -> str:
+    """今のブランチ（detached や Git でなければ空）。"""
+    return _git(root, "branch", "--show-current")
+
+
+_SURVEY_BRANCH = re.compile(r"^\d{8}_\w+$")
+
+
+def survey_branches(root: Path) -> List[str]:
+    """サーベイ名のブランチ（ローカルとリモート。AGENTS.md「Git」の運用でサーベイごとに作る）。"""
+    refs = _git(root, "for-each-ref", "--format=%(refname:short)", "refs/heads", "refs/remotes").splitlines()
+    names = {ref.split("/", 1)[1] if ref.startswith("origin/") else ref for ref in refs}
+    return sorted(n for n in names if _SURVEY_BRANCH.match(n))
 
 
 def in_git_repo(root: Path) -> bool:

@@ -18,6 +18,9 @@ class FakeClient:
     def __init__(self, use_cache=True):
         pass
 
+    def complete_abstracts(self, records):
+        return records
+
     def search(self, query, limit=20, year=None, bulk=False):
         return [from_openalex(openalex_work(title=f"Paper number {i} on minimum wages", doi=f"10.1/{i}",
                                             wid=f"W{i}", citations=100 - i)) for i in range(3)]
@@ -43,7 +46,7 @@ def ws(tmp_path, monkeypatch, capsys):
 
 def test_status_list_and_decisions(ws):
     top = ws("status", "--json")
-    assert top["workspace"] and top["git"] == {"repo": True, "remote": False} and top["surveys"] == [] and top["lang"] == "ja"
+    assert top["workspace"] and top["git"] == {"repo": True, "remote": False, "branch": top["git"]["branch"], "other_surveys": []} and top["surveys"] == [] and top["lang"] == "ja"
 
     made = ws("new", "最低賃金", "--slug", "mw", "--json")
     assert made["name"].endswith("_mw") and made["report"].endswith(".md") and made["lang"] == "ja"
@@ -107,7 +110,7 @@ def test_the_extension_reads_only_keys_the_cli_writes():
         declared[name] = set(re.findall(r"^\s+(\w+)\??:", body, re.M))
     expected = {
         "WorkspaceStatus": {"version", "root", "workspace", "lang", "git", "sync", "zotero", "surveys", "archived"},
-        "GitInfo": {"repo", "remote"},
+        "GitInfo": {"repo", "remote", "branch", "other_surveys"},
         "SurveySummary": {"name", "topic", "created", "version", "depth", "lang", "report", "manuscript", "zotero_collection",
                           "archived", "counts", "searches"},
         "SurveyDetail": {"scope", "unfilled", "zotero_missing", "written_by", "audits", "sync", "next"},
@@ -128,7 +131,7 @@ def test_the_extension_reads_only_keys_the_cli_writes():
         "Scope": {"question", "years", "fields", "inclusion", "exclusion"},
         "Ssci": {"status", "badge", "tier"},
         "HistoryItem": {"at", "status", "reason", "migrated"},
-        "FulltextInfo": {"path", "source", "pages", "chars", "page_markers"},
+        "FulltextInfo": {"path", "source", "pages", "chars", "page_markers", "version"},
         "Finding": {"level", "message"},
         "DoctorCheck": {"level", "name", "message"},
         "AddedPaper": {"number", "new", "status", "title"},
@@ -187,3 +190,29 @@ def test_audit_must_be_by_another_model(ws):
     detail = ws("status", name, "--json")
     assert detail["written_by"] == ["Gemini 3.8 Flash"] and detail["audits"][0]["note"] == "カードを本文と突き合わせた"
     assert ws("audit", name, "--json")["audits"][0]["by"] == "Claude Opus 5.5"
+
+
+def test_list_with_abstracts_and_fix(ws, capsys):
+    ws("new", "t", "--slug", "fx", "--json")
+    ws("search", "minimum wage", "--into", "fx", "--limit", "1", "--json")
+    capsys.readouterr()
+    cli.main(["list", "fx", "--abstract"])               # 差し込み口 {text} が t() の引数とぶつからない
+    assert "Paper number 0" in capsys.readouterr().out
+    fixed = ws("fix", "fx", "1", "--authors", "Yuen Yuen Ang", "--year", "2023", "--confirm", "出版社のページで確認", "--json")
+    assert fixed["record"]["authors"] == ["Yuen Yuen Ang"] and fixed["record"]["year"] == 2023
+    assert fixed["fixed"] == {"authors": ["Yuen Yuen Ang"], "year": 2023} and fixed["confirmed"]["reason"]
+    assert ws("list", "fx", "--json")[0]["record"]["authors"] == ["Yuen Yuen Ang"]
+
+
+def test_surveys_on_other_branches_are_shown(ws, tmp_path, capsys):
+    import subprocess
+
+    def git(*a):
+        subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@example.com", *a], cwd=tmp_path, check=True,
+                       capture_output=True)
+    git("commit", "--allow-empty", "-q", "-m", "init")
+    git("branch", "20261001_statutes")                   # 別のブランチで進んでいるサーベイ
+    top = ws("status", "--json")
+    assert top["git"]["other_surveys"] == ["20261001_statutes"] and top["git"]["branch"]
+    with pytest.raises(SystemExit, match="git switch 20261001_statutes"):
+        cli.main(["status", "statutes"])

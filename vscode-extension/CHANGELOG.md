@@ -3,6 +3,44 @@
 Priorwork's command-line tool (`priorwork` on PyPI) and this extension are
 released together, under one version number.
 
+## 0.1.8
+
+- **The agent works on a branch and opens a pull request.** It commits on a
+  branch named after the survey at each step, pushes it, and opens a pull
+  request once the report is exported; you merge it. It never merges, pushes
+  to main or rewrites history, and `priorwork sync` also denies those in
+  `.claude/settings.json` for Claude Code (along with allowing the Git
+  commands it needs).
+- Surveys on other branches, still waiting to be merged, are listed by
+  `priorwork status` and in the sidebar, which also shows the branch you are
+  on. A survey that is only on another branch tells you to `git switch` to it.
+- `priorwork fulltext` records whether an open-access PDF is the published
+  version or the author's manuscript, and says to give PDF pages for a
+  manuscript.
+- **`priorwork fix`** corrects a registered paper: `--id` replaces a
+  working-paper DOI with the published version (the number, status and card
+  stay), `--authors` / `--year` / `--title` fix details the databases got
+  wrong, and `--confirm "<reason>"` clears a warning you have checked,
+  keeping the reason. `priorwork add` of the published version now replaces
+  an unverified working-paper DOI by itself.
+- Titles that differ only by a subtitle Semantic Scholar repeated are no
+  longer "a DOI pointing to another title"; all-capital author names are
+  tidied ("TODD L. ALLEE" → "Todd L. Allee"); the year follows the published
+  version of the DOI.
+- `priorwork check` warns when the full text has far fewer pages than the
+  paper (the publisher's preview), no longer takes "約30,715" for 715, and
+  accepts journal pages when the database gives a wrong page range.
+- `priorwork list --abstract` no longer fails.
+- **Fewer off-topic candidates.** Searches into a new survey leave out papers
+  whose Semantic Scholar fields lie outside the social sciences (medicine or
+  computer science only, say; papers with no field are kept). Change it with
+  `priorwork scope SURVEY --search-field all`, or per search with `--field`.
+- **More full texts.** `priorwork fulltext` tries every location OpenAlex
+  knows, open ones first, and follows the PDF link on a landing page (an
+  institutional repository's, say).
+- **More abstracts.** Papers with no abstract in Semantic Scholar or OpenAlex
+  get the one the publisher registered with Crossref.
+
 ## 0.1.7
 
 - `priorwork check` no longer takes the later pages of a page list on a card

@@ -107,7 +107,7 @@ python3 -m venv .venv
 1. サイドバーの **まだ GitHub にありません — 非公開リポジトリとして公開する** を押します。
 2. VS Code に聞かれたら **Publish to GitHub private repository**（非公開）を選び、示されたファイルをすべて含めます（`.env` は `.gitignore` で除かれています）。
 
-エージェントは、頼まれない限り Git を操作しません。終わったときに「コミットしてよいか」を聞くので、コミット（と push）は頼んだときに行わせます。いつもコミットしてよいなら `AGENTS.local.md` にそう書きます。
+エージェントは、サーベイ名のブランチ（例: `20261015_statutory_text_analysis`）を作って工程ごとにコミット・push し、書き出しまで済んだら PR を作ります。**マージはしません。** PR を見て、よければ GitHub でマージしてください。main への push・force push・マージは、Claude Code では `.claude/settings.json` の deny でも止めています。Git を使わせたくなければ `AGENTS.local.md` にそう書きます。
 
 ### 3.4 別のマシンで続ける
 
@@ -337,7 +337,7 @@ manuscripts/
 1. このマシンの Zotero の添付 PDF（DOI で照合）
 2. Zotero Web API で見つけた添付 PDF（WebDAV、または Zotero のファイル同期）。サーベイに結び付けたコレクションのものを優先
 3. Zotero が索引化した本文テキスト（ページ区切りが無い予備）
-4. オープンアクセス版の PDF
+4. オープンアクセス版の PDF（OpenAlex が知っている所在をすべて試す。機関リポジトリなどのランディングページは、その中の PDF のリンクをたどる）
 
 出版社のサイトは自動のダウンロードを拒むことが多いので、オープンアクセスでない論文は Zotero に PDF を添付してから取得します。
 
@@ -491,6 +491,7 @@ my-surveys/
 ./priorwork exclude SURVEY 3 --reason "理論モデルのみ"
 ./priorwork maybe SURVEY 9 / ./priorwork reset SURVEY 9
 ./priorwork add SURVEY <DOI>... [--candidate]
+./priorwork fix SURVEY N [--id <掲載版の DOI>] [--authors "A; B"] [--year Y] [--confirm "<確かめたこと>"]
 ./priorwork card SURVEY 3 [--set rq="..." evidence=abstract]
 ./priorwork render SURVEY
 ./priorwork check SURVEY [--offline]
@@ -505,7 +506,7 @@ my-surveys/
 ./priorwork zotero SURVEY --dois                 # Zotero に無い採用論文の DOI（魔法の杖に貼る）
 
 # 文献の探索
-./priorwork search "<English query>" [--into SURVEY] [--bulk] [--sort citations|relevance|recent|cpy] [--year 2010-2024] [--ssci-only] [--limit N]
+./priorwork search "<English query>" [--into SURVEY] [--bulk] [--sort citations|relevance|recent|cpy] [--year 2010-2024] [--ssci-only] [--field social|all] [--limit N]
 ./priorwork snowball SURVEY [--direction both|references|citations] [--min-links N]
 ./priorwork get <DOI>
 ./priorwork citations <DOI> / ./priorwork references <DOI>
