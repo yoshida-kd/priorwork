@@ -38,7 +38,7 @@ Priorwork（prior work ＝ 先行研究）は、社会科学（経済学・社�
 2. アクティビティバーの Priorwork から **ワークスペースを作る** を選び、空のフォルダとレポートの言語（日本語・英語）を選びます。拡張機能がそのフォルダに `.venv` を作り、PyPI から `priorwork` を入れてワークスペースを用意します
 3. サイドバーの歯車の **設定** を開き、Semantic Scholar の無料 API キー（推奨）と、あれば Zotero・SSCI リストを設定します。**保存して接続を確かめる** で動くかを確かめられます
 4. サイドバーに出る行から、**GitHub の非公開リポジトリ**として公開します。エージェントはサーベイ名のブランチでコミット・push し、PR を作ります。マージはあなたがします
-5. **新しいサーベイ** → **エージェントに任せる** でテーマを入れ、コピーされた依頼文をエージェントのチャットに貼ります（チャットで直接頼んでも同じです）。エージェントが書き出しまで進めます
+5. **新しいサーベイ** → **エージェントに任せる** でテーマを入れ、コピーされた依頼文をエージェントのチャットに貼ります（チャットで直接頼んでも同じです）。エージェントが進めます。標準では、範囲を決めたところと、カードの記入の前（Zotero に論文を集めてもらうため）で止まって待ちます
 6. レポートを読みます（**レポートを書き出して見る**、または `reports/*.html` を右クリック → **Priorwork でレポートを見る**。SSH でつないだサーバーでも見られます）。論文ごとのページで採否とカードを確かめ、違うところを直します
 7. 続きは、サーベイの **エージェントに頼む…** か、チャットで（「もっと検索して」「続けて」）
 
@@ -150,26 +150,43 @@ SSCI に収録されているかは、Clarivate の [Master Journal List](https:
 
 ### エージェントと進める
 
-エージェントでワークスペースを開き、普通の言葉で頼みます（例:「最低賃金の雇用効果について先行研究を full でまとめて」）。エージェントは AGENTS.md とスキル（`.agent/skills/`。`.claude/skills/` からも見える）に従い、入口の `priorwork` スキルが状態を見て次の工程に進み、書き出しまで続けます。スキル名を打つ必要はありません（`/priorwork` と打っても構いません）。VS Code では、**新しいサーベイ → エージェントに任せる** と、サーベイの **エージェントに頼む…** が依頼文をコピーします。
+エージェントでワークスペースを開き、普通の言葉で頼みます（例:「最低賃金の雇用効果について先行研究を full でまとめて」）。エージェントは AGENTS.md とスキル（`.agent/skills/`。`.claude/skills/` からも見える）に従い、入口の `priorwork` スキルが状態を見て次の工程に進み、書き出しまで続けます（止まる場所は下の「進め方」）。スキル名を打つ必要はありません（`/priorwork` と打っても構いません）。VS Code では、**新しいサーベイ → エージェントに任せる** と、サーベイの **エージェントに頼む…** が依頼文をコピーします。
 
 | スキル | やること |
 | :--- | :--- |
 | `priorwork` | 入口。状態を見て、サーベイ全体を工程ごとに進める |
 | `priorwork-new` | 範囲を決めてサーベイを作成し、深さに見合う検索をする |
-| `priorwork-screen` | 候補を採否の基準に照らして、理由つきで判断する（相談モードでは推薦して答えを待つ） |
+| `priorwork-screen` | 候補を採否の基準に照らして、理由つきで判断する（手動の進め方では推薦して答えを待つ） |
 | `priorwork-snowball` | 採用論文の参考文献・被引用から見落としを探す |
 | `priorwork-extract` | 本文を取得し、論文カード（RQ・識別戦略など）を記入する |
 | `priorwork-check` | 検査して問題を直し、レポートを書き出す |
-| `priorwork-audit` | 別のモデルが書いたサーベイを監査する: カードを本文と突き合わせ、引用の向き・先行研究と仮説の混同・機械的な除外・SSCI を確かめて直し、`./priorwork audit` で記録する |
-| `priorwork-manuscript` | 分析まで済んだ原稿を読み、それを支える・食い違う文献を集めて、原稿の 1〜3 章（イントロ・先行研究・理論と仮説）を下書きする |
+| `priorwork-audit` | （頼まれたときだけ）別のモデルが書いたサーベイを監査する: カードを本文と突き合わせ、引用の向き・先行研究と仮説の混同・機械的な除外・SSCI を確かめて直し、`./priorwork audit` で記録する |
+| `priorwork-manuscript` | 原稿（形式は問わない）を読み、何を作るかを相談して決め、原稿の 1〜3 章（イントロ・先行研究・理論と仮説）の下書きや、原稿への助言（足りない先行研究・引用の向き・論の組み立て）を書く |
 
-### 分析まで済んだ原稿から
+### 進め方（どこで止まるか）
 
-「データと方法」「分析」まで書いた原稿があれば、ワークスペースの `manuscripts/<論文名>/` に原稿と結果の表を入れ、「manuscripts/<論文名> の原稿のイントロ・先行研究・仮説を書いて」と頼みます（サイドバーの **新しいサーベイ → 原稿から始める** でも依頼文を作れます）。エージェントは原稿から文献で支える主張（重要性・研究の流れ・メカニズム・方法の先例）を洗い出し、結果と食い違う知見も含めて主張ごとに探し、各論文カードに「原稿での役割」を記入して、1〜3 章を原稿の言語で下書きします（`./priorwork new … --manuscript manuscripts/<論文名>`）。下書きは `./priorwork export SURVEY --draft` で `reports/<名前>.draft.md`（引用した論文の参考文献つき）に書き出されます。結果を見てから仮説を立てることにならないよう、仮説ごとの根拠と、探索的に扱う結果の案を、レポートに別に記録します。原稿そのものは書き換えません。
+エージェントがどこで止まって待つかは 3 つから選べます。依頼の言葉（「全自動で」「相談しながら」など）か `AGENTS.local.md` で指定でき、何も言わなければ標準です。進め方はサーベイに記録され（`--mode`）、次の会話でも同じ進め方で続きます。
 
-サーベイは、**書いたモデルと別のモデルが監査して初めて完成**とします。書くエージェントは `--by` で自分のモデル名を残し、書き終えたら別のモデル（例: Gemini が書いたなら Claude）のチャットで「サーベイ <名前> を監査して」と頼むよう伝えます。監査は `./priorwork audit SURVEY --by "<モデル名>"` で記録され（書いたモデルの名前では記録できません）、それまで `./priorwork check` が知らせます。
+| 進め方 | 止まる場所 |
+| :--- | :--- |
+| **標準**（既定） | 範囲を決めたところと、カードの記入の前の 2 か所。カードの前では Zotero に入れる DOI の一覧を示して止まるので、論文と PDF を Zotero に集めてから「続きをやって」と言います。本文で確かめたカードが増え、結果として手間が減ります |
+| **全自動** | 止まらずに最後まで進める |
+| **手動** | 工程ごとに止まって確かめる（採否も推薦を示して答えを待つ） |
 
-既定では、エージェントが自分で判断して進めます。範囲と採否を自分で決めたいときは「相談しながら進めて」と頼むか、`AGENTS.local.md` にそう書きます。会話を再開したときは「続きをやろう」と言えば、エージェントが `./priorwork status` で進捗と次の作業を確認します。
+止まる場所以外では、エージェントが理由を残しながら自分で判断します。会話を再開したときは「続きをやろう」と言えば、エージェントが `./priorwork status` で進捗と次の作業を確認します。報告では、論文を `#232` のような番号ではなく「著者 (年)」で示します。
+
+### 原稿から
+
+自分の原稿があれば、ワークスペースの `manuscripts/<論文名>/` に原稿と結果の表を入れ、「manuscripts/<論文名> の原稿のイントロ・先行研究・仮説を書いて」「この原稿に足りない先行研究を指摘して」などと頼みます（サイドバーの **新しいサーベイ → 原稿から始める** でも依頼文を作れます）。原稿の形式は問いません（Markdown・Quarto・HTML・Word・PDF。`./priorwork read` がテキストにします）。エージェントは原稿を読み、何を作るか・原稿のどこを対象にするか・検索の範囲・何本作るかを提案し、相談しながら決めます。作れるレポートは 2 種類で、1 つの原稿から両方を別々に作れます（`./priorwork new … --manuscript manuscripts/<論文名> --purpose draft|advice`）。
+
+- **1〜3 章の下書き**（`draft`）: 分析まで済んだ原稿から、文献で支える主張（重要性・研究の流れ・メカニズム・方法の先例）を洗い出し、結果と食い違う知見も含めて主張ごとに探し、各論文カードに「原稿での役割」を記入して、1〜3 章を原稿の言語で下書きします。下書きは `./priorwork export SURVEY --draft` で `reports/<名前>.draft.md`（引用した論文の参考文献つき）に書き出されます。結果を見てから仮説を立てることにならないよう、仮説ごとの根拠と、探索的に扱う結果の案を、レポートに別に記録します。
+- **原稿への助言**（`advice`）: 出来上がった（または書きかけの）原稿について、引用の点検（引いた論文の結論の向き・言い過ぎ）、足りない先行研究、論の組み立てへのコメントを、優先度の高い順のまとめとともに書きます。
+
+原稿そのものは書き換えません。
+
+**Octavo の原稿。** [Octavo](https://github.com/yoshida-kd/octavo) のプロジェクト（別のリポジトリ）の原稿は、写さずにその場所のまま使えます（Octavo のサイドバーの **Priorwork で先行研究を頼む** が依頼文をコピーします）。つなぎ目は Zotero のコレクションで、Octavo が `.bib` を取るコレクション（設定の `zotero_collection`）にサーベイも結び付けます。エージェントは原稿が引いている文献を登録し（`./priorwork add SURVEY --cited`）、下書きを Octavo の形で書き出します（`./priorwork export SURVEY --draft --octavo`。引用は `.bib` のキーで `[@key]`、まだ `.bib` に無い論文は `[@PRIORWORK:…]` と DOI の一覧）。
+
+監査は任意です。別のモデルにも確かめさせたいときは、そのモデル（例: Gemini が書いたなら Claude）のチャットで「サーベイ <名前> を監査して」と頼みます（サイドバーの **エージェントに頼む… → 別のモデルとして監査する** でも依頼文を作れます）。書くエージェントは `--by` で自分のモデル名を残し、監査は `./priorwork audit SURVEY --by "<モデル名>"` で記録されます（書いたモデルの名前では記録できません）。
 
 ### 深さ（quick / full）
 
@@ -210,8 +227,11 @@ SSCI に収録されているかは、Clarivate の [Master Journal List](https:
 
 # サーベイの管理
 ./priorwork status [SURVEY]                                    # 一覧 / 進捗と次にやること
-./priorwork new "<テーマ>" --slug <slug> [--by "<モデル名>"] [--depth quick|full] [--question ... --years ... --fields ... --inclusion ... --exclusion ...]
-./priorwork scope SURVEY --question "..." [--depth quick|full] [--search-field social|all] [--by "<モデル名>"]  # 範囲の変更
+./priorwork new "<テーマ>" --slug <slug> [--by "<モデル名>"] [--mode standard|auto|manual] [--depth quick|full] [--manuscript PATH [--purpose draft|advice]] [--question ... --years ... --fields ... --inclusion ... --exclusion ...]
+./priorwork scope SURVEY --question "..." [--mode standard|auto|manual] [--go-on] [--depth quick|full] [--search-field social|all] [--by "<モデル名>"]  # 範囲・進め方の変更
+./priorwork read PATH [--out FILE]                             # 原稿（.md・.qmd・.html・.docx・.pdf など、フォルダも可）をテキストにする
+./priorwork add SURVEY --cited                                 # 原稿が引いている論文（.bib の DOI）を登録
+./priorwork export SURVEY --draft [--octavo]                   # 原稿の 1〜3 章の下書き（--octavo: Octavo の形で [@key]）
 ./priorwork archive SURVEY [--undo]                          # 一覧から隠す（ファイルは残る）
 ./priorwork list SURVEY [--status candidate maybe] [--abstract]
 ./priorwork include SURVEY 2 5 7
@@ -222,7 +242,7 @@ SSCI に収録されているかは、Clarivate の [Master Journal List](https:
 ./priorwork card SURVEY 3 [--set rq="..." evidence=abstract]   # 論文カードを表示・記入
 ./priorwork render SURVEY
 ./priorwork check SURVEY [--offline]
-./priorwork audit SURVEY [--by "<モデル名>" --note "..."]       # 別のモデルによる監査を記録 / 記録を見る
+./priorwork audit SURVEY [--by "<モデル名>" --note "..."]       # 別のモデルによる監査（任意）を記録 / 記録を見る
 ./priorwork export SURVEY [--format html|docx|md] [-o PATH] [--with-abstracts]   # 読むための版を書き出す
 ./priorwork fulltext SURVEY <番号> [--pdf <パス>]
 ./priorwork zotero [SURVEY] [--refresh]                         # Zotero 接続確認 / 採用論文の登録状況

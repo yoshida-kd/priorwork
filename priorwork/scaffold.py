@@ -63,44 +63,54 @@ Write instructions for this workspace only (fields to prefer, writing style, jou
 """,
 }
 
-# 分析まで済んだ原稿の置き場（`priorwork new --manuscript`）。無いときだけ作り、以後は触らない（ユーザーのもの）
+# ユーザーの原稿の置き場（`priorwork new --manuscript`）。無いときだけ作り、以後は触らない（ユーザーのもの）
 MANUSCRIPTS_DIR = "manuscripts"
 MANUSCRIPTS_README = {
     "ja": """# 原稿の置き場
 
-分析（データと方法・分析）まで済んだ原稿から、それを補強する先行研究と 1〜3 章（イントロ・先行研究・理論と仮説）の
-下書きを作るときに、原稿をここに置きます。1 本の論文につき 1 つのフォルダにします。
+自分の原稿から先行研究を集めるときに、原稿をここに置きます。1 本の論文につき 1 つのフォルダにします。
+作れるものは 2 種類で、両方を別々のレポートにしてもかまいません。
+
+- 分析まで済んだ原稿の 1〜3 章（イントロ・先行研究・理論と仮説）の下書き
+- 出来上がった（または書きかけの）原稿への助言（足りない先行研究・引用の向き・論の組み立て）
 
 ```
 manuscripts/
   make_or_buy/          ← 論文ごとのフォルダ（英数字の名前）
-    paper.md            ← 原稿（.md / .tex / .txt が読みやすい。.docx・.pdf も可）
+    paper.md            ← 原稿（形式は問いません: .md・.qmd・.tex・.html・.docx・.pdf など）
     tables/             ← 結果の表・図（原稿に入っていないものがあれば）
 ```
 
-- 原稿は、書けているところ（データと方法・分析）だけでかまいません。
+- 原稿は、書けているところだけでかまいません。
 - 結果が原稿とは別のファイル（回帰表の .tex、ログなど）にあるなら、同じフォルダに入れます。
-- エージェントには「manuscripts/make_or_buy の原稿のイントロ・先行研究・仮説を書いて」と頼みます。
-  サイドバーの **新しいサーベイ → 原稿から始める** でも、依頼文を作れます。
+- エージェントには「manuscripts/make_or_buy の原稿のイントロ・先行研究・仮説を書いて」「manuscripts/make_or_buy の
+  原稿に足りない先行研究を指摘して」などと頼みます。何を作るか・原稿のどこを対象にするかは、エージェントが提案し、
+  相談しながら決めます。サイドバーの **新しいサーベイ → 原稿から始める** でも、依頼文を作れます。
 - エージェントは原稿を読むだけで、書き換えません。下書きは `reports/<名前>.draft.md` に出ます。
 - このフォルダも Git に載ります（非公開リポジトリにしておくこと）。
 """,
     "en": """# Manuscripts
 
-Put a manuscript here when its analysis (data, methods and results) is done and you want the literature behind it
-and a draft of its sections 1–3 (introduction, literature review, theory and hypotheses). One folder per paper:
+Put your manuscript here when you want the literature behind it. One folder per paper. There are two kinds of report,
+and you can have both as separate reports:
+
+- a draft of sections 1–3 (introduction, literature review, theory and hypotheses) of a manuscript whose analysis is done
+- advice on a finished (or unfinished) manuscript: missing literature, the direction of its citations, the argument
+
 
 ```
 manuscripts/
   make_or_buy/          ← one folder per paper (an English name)
-    paper.md            ← the manuscript (.md / .tex / .txt read best; .docx and .pdf are fine)
+    paper.md            ← the manuscript (any format: .md, .qmd, .tex, .html, .docx, .pdf, …)
     tables/             ← tables and figures of the results (any not in the manuscript)
 ```
 
-- The manuscript only needs the parts that are written (data and methods, results).
+- The manuscript only needs the parts that are written.
 - If the results are in separate files (regression tables in .tex, logs, …), put them in the same folder.
 - Ask your agent "write the introduction, literature review and hypotheses of the manuscript in
-  manuscripts/make_or_buy". **New Survey → Start from my manuscript** in the sidebar writes the request too.
+  manuscripts/make_or_buy" or "what literature is the manuscript in manuscripts/make_or_buy missing?". The agent
+  proposes what to make and which parts to cover, and agrees it with you. **New Survey → Start from my manuscript**
+  in the sidebar writes the request too.
 - The agent only reads the manuscript; it never rewrites it. The draft goes to `reports/<name>.draft.md`.
 - This folder is in Git too (keep the repository private).
 """,

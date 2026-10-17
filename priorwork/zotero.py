@@ -179,28 +179,53 @@ class ZoteroClient:
                 return collections
 
     def collections(self) -> List[Dict[str, Any]]:
-        """コレクションの一覧（親の名前つきのパス "親 / 子" と、中の論文の数）。"""
+        """コレクションの一覧。Zotero と同じ木の順（親の直後に子、同じ親の中は名前順）で、
+        パス（"親 / 子"）・深さ（一番上が 0）・中の論文の数（items: そのコレクションだけ、
+        total: 下のコレクションも含めて）を付ける。"""
         cols = self.index.get("collections") or {}
-
-        def path(key: str, depth: int = 0) -> str:
-            c = cols.get(key)
-            if not c or depth > 20:
-                return ""
-            parent = path(c["parent"], depth + 1) if c["parent"] else ""
-            return f"{parent} / {c['name']}" if parent else c["name"]
-
-        counts: Dict[str, int] = {}
+        children: Dict[str, List[str]] = {}
+        for k, c in cols.items():
+            parent = c["parent"] if c["parent"] in cols else ""
+            children.setdefault(parent, []).append(k)
+        direct: Dict[str, int] = {}
         for i in self._parents():
             for k in i["collections"]:
-                counts[k] = counts.get(k, 0) + 1
-        return sorted(({"key": k, "name": c["name"], "path": path(k), "items": counts.get(k, 0)}
-                       for k, c in cols.items()), key=lambda c: c["path"].lower())
+                direct[k] = direct.get(k, 0) + 1
+        out: List[Dict[str, Any]] = []
+
+        def walk(parent: str, prefix: str, depth: int, seen: frozenset):
+            for k in sorted(children.get(parent, []), key=lambda k: cols[k]["name"].lower()):
+                if k in seen:      # 壊れた親子関係でも止まる
+                    continue
+                path = f"{prefix} / {cols[k]['name']}" if prefix else cols[k]["name"]
+                out.append({"key": k, "name": cols[k]["name"], "path": path, "parent": parent, "depth": depth,
+                            "items": direct.get(k, 0), "total": 0})
+                walk(k, path, depth + 1, seen | {k})
+        walk("", "", 0, frozenset())
+        for c in out:
+            c["total"] = len(self.collection_items(c["key"]))
+        return out
+
+    def subtree(self, key: str) -> set:
+        """そのコレクションと、その下のコレクションすべてのキー。"""
+        cols = self.index.get("collections") or {}
+        keys, todo = set(), [key]
+        while todo:
+            k = todo.pop()
+            if k in keys:
+                continue
+            keys.add(k)
+            todo += [c for c, v in cols.items() if v["parent"] == k]
+        return keys
 
     def find_collection(self, name_or_key: str) -> Dict[str, Any]:
-        """名前・パス・キーでコレクションを探す。見つからない / 複数あればエラー。"""
+        """パス（"親 / 子" または "親/子"）・名前・キーでコレクションを探す。見つからない / 複数あればエラー。
+        同じ名前のコレクションが別の親の下にあれば、パスで指定してもらう。"""
         q = name_or_key.strip()
+        norm = lambda p: "/".join(part.strip().lower() for part in p.split("/"))   # noqa: E731
         cols = self.collections()
         hits = ([c for c in cols if c["key"] == q] or [c for c in cols if c["path"] == q]
+                or [c for c in cols if norm(c["path"]) == norm(q)]
                 or [c for c in cols if c["name"].lower() == q.lower()])
         if len(hits) == 1:
             return hits[0]
@@ -211,7 +236,10 @@ class ZoteroClient:
                             name=q, names=", ".join(f"{c['path']} ({c['key']})" for c in hits)))
 
     def collection_items(self, key: str) -> List[Dict[str, Any]]:
-        return [i for i in self._parents() if key in i["collections"]]
+        """そのコレクションの論文。下のコレクションに入れた論文も含める（論文ごとのコレクションを
+        「理論」「方法」のように分けて使っていても、まとめて一つのコレクションとして扱う）。"""
+        keys = self.subtree(key)
+        return [i for i in self._parents() if keys & set(i["collections"])]
 
     def _parents(self) -> List[Dict[str, Any]]:
         return [i for i in self.index["items"].values() if not i["parentItem"] and i["itemType"] != "attachment"]
@@ -244,7 +272,8 @@ class ZoteroClient:
 
     def find_item(self, record: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """DOI（無ければタイトル）で、論文に対応する Zotero の親アイテムを探す。"""
-        items = sorted(self._parents(), key=lambda i: self.prefer_collection not in i.get("collections", []))
+        preferred = self.subtree(self.prefer_collection) if self.prefer_collection else set()
+        items = sorted(self._parents(), key=lambda i: not (preferred & set(i.get("collections", []))))
         doi = normalize_doi(record.get("doi", ""))
         if doi:
             for i in items:
@@ -267,7 +296,7 @@ class ZoteroClient:
         if not item:
             return {"registered": False, "key": "", "pdfs": 0, "in_collection": False}
         return {"registered": True, "key": item["key"], "pdfs": len(self.pdf_attachments(item["key"])),
-                "in_collection": bool(collection) and collection in item.get("collections", [])}
+                "in_collection": bool(collection) and bool(self.subtree(collection) & set(item.get("collections", [])))}
 
     # ---- Content ----
 

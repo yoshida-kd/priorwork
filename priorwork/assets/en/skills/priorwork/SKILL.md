@@ -2,8 +2,8 @@
 name: priorwork
 description: >-
   The entry point of Priorwork. Makes or continues a social-science literature survey end to end with
-  `./priorwork` (scope, searches, screening, citation chasing, paper cards, text, check, export) without
-  waiting between steps. Use whenever the user asks, in any words or language, for a literature survey,
+  `./priorwork` (scope, searches, screening, citation chasing, paper cards, text, check, export), stopping
+  for the user where its mode says (standard: after the scope and before the cards). Use whenever the user asks, in any words or language, for a literature survey,
   literature review or prior work on a topic, for the literature behind their own manuscript, or to
   continue, finish or improve an existing survey.
 ---
@@ -13,16 +13,16 @@ description: >-
 Follow the rules in [AGENTS.md](../../../AGENTS.md). The user asks without naming a skill, so tell from their words which of these it is:
 
 - A new topic ("review the literature on X") → from 1
-- Backing up their own manuscript ("the analysis is done; write the introduction, literature review and hypotheses", "shore up the literature of this paper") → the skill `priorwork-manuscript`. The same when continuing a survey made from a manuscript (`./priorwork status <survey>` shows "Manuscript:")
-- More of an existing survey ("carry on", "finish it") → from 2
+- From their own manuscript ("the analysis is done; write the introduction, literature review and hypotheses", "shore up the literature of this paper", "what literature is this manuscript missing?", "check how it cites the literature") → the skill `priorwork-manuscript`. The same when continuing a survey made from a manuscript (`./priorwork status <survey>` shows "Manuscript:")
+- More of an existing survey ("carry on", "finish it") → from 2. If you had stopped at a stop of the mode, this is the user's signal that they are done (before the cards, record `./priorwork scope <survey> --go-on` first)
 - One part only ("search more", "fill in the cards", "check it") → just the skill of that step
-- An audit ("audit this survey", "check it as another model") → the skill `priorwork-audit`. If you wrote the survey yourself, do not audit it; tell the user to ask another model
+- An audit ("audit this survey", "check it as another model") → the skill `priorwork-audit`. Only when asked. If you wrote the survey yourself, suggest asking another model
 
-By default, carry on to the end without stopping (AGENTS.md, "How you are asked, and how you proceed"). Wait for answers on the scope and on decisions only when the user wants to go through it together.
+Choose the mode (standard, full auto, manual) as in AGENTS.md, "Modes". If nothing says otherwise, standard: stop once the scope is set, and before filling in the cards.
 
 ## 1. A new survey
 
-Check with `./priorwork status` that there is no survey on the same topic yet. If there is none, set the scope, create it and search as in `priorwork-new`.
+Check with `./priorwork status` that there is no survey on the same topic yet. If there is none, set the scope and create it as in `priorwork-new` (record the mode with `--mode`). In standard and manual, show the scope and stop here; in full auto, go on to the searches.
 
 ## 2. Look at the state, then take the next step
 
@@ -35,16 +35,16 @@ Work through the next steps from the top. The usual order:
 1. **Search** (`priorwork-new`, part 2): while it says "Search more", add searches on other subtopics.
 2. **Screen** (`priorwork-screen`): sort every candidate into included, excluded or maybe.
 3. **Chase citations** (`priorwork-snowball`): always for full. If new candidates appear, go back to 2.
-4. **Fill in the cards** (`priorwork-extract`): every included paper.
-5. **Write the text**: 3 below.
-6. **Check and export** (`priorwork-check`): fix until there are no ERRORs, then write the HTML.
-7. **Audit**: not by you. In your report, ask the user to have another model audit it (AGENTS.md, "Audit").
+4. **Zotero** (standard and manual stop here): show the DOIs from `./priorwork zotero <survey> --dois` as they are, and wait for the user to collect the papers and their PDFs in Zotero and ask you to go on (AGENTS.md, "Modes"). Then record `./priorwork scope <survey> --go-on`. Full auto does not stop; give the number not in Zotero in the final report.
+5. **Fill in the cards** (`priorwork-extract`): every included paper.
+6. **Write the text**: 3 below.
+7. **Check and export** (`priorwork-check`): fix until there are no ERRORs, then write the HTML.
 
-Look at `./priorwork status <survey>` again after each step. This is long work, so at the end of a step you may tell the user where you are in one line (do not wait for an answer).
+Look at `./priorwork status <survey>` again after each step ("Stop here and wait for the user" marks the stop of standard). In manual, show the results and stop after each step. This is long work, so at the end of a step you may tell the user where you are in one line (except at the stops, do not wait for an answer).
 
 ## 3. Write the text
 
-For a survey made from a manuscript, write as in part 5 of `priorwork-manuscript`. Otherwise, write these sections of the report from the cards (take the numbers from the report's headings; older reports number and order them differently).
+For a survey made from a manuscript, write as in `priorwork-manuscript`. Otherwise, write these sections of the report from the cards (take the numbers from the report's headings; older reports number and order them differently).
 
 | Section | What to write |
 | :--- | :--- |
@@ -65,13 +65,12 @@ For a survey made from a manuscript, write as in part 5 of `priorwork-manuscript
 
 ## 4. When it is done, report
 
-After `priorwork-check` and the export, say briefly:
+After `priorwork-check` and the export, say briefly (refer to papers as Author (year), never by number alone):
 
 - the number of queries, candidates and included papers, and the main reasons for exclusion
 - what in the scope (question, period, criteria, depth) you decided yourself because the request did not say
 - the WARNs left and why it is a "Draft" (if it is)
 - how many included papers are not in Zotero yet (show the DOIs from `./priorwork zotero <survey> --dois` as they are; do not drop papers whose full text you could get yourself)
-- that the audit by another model is still to do: "ask another model (e.g. Claude if Gemini wrote it) in its chat to audit the survey <name>"
 - how to view the report (AGENTS.md, "Showing the report")
 - that decisions and cards corrected in the sidebar will be followed in the next round
 

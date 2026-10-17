@@ -93,6 +93,13 @@ export class Setup {
      * 無ければ拡張機能と同じ版。成功したら true。
      */
     async createVenv(root: string): Promise<boolean> {
+        if (this.context.extensionMode === vscode.ExtensionMode.Development && fs.existsSync(venvPython(root))) {
+            // 開発版の拡張機能（サンドボックス）: .venv には開発中の priorwork が入っている（tools/sandbox.py）。
+            // 公開版で上書きすると、直したコードが動かなくなる
+            void vscode.window.showWarningMessage(vscode.l10n.t(
+                'Development mode: the .venv is left as it is. To use this checkout, run python3 tools/sandbox.py in the development repository.'));
+            return false;
+        }
         const py = fs.existsSync(venvPython(root)) ? undefined : await findPython();
         let uv: string | undefined;
         if (!py && !fs.existsSync(venvPython(root))) {

@@ -3,6 +3,70 @@
 Priorwork's command-line tool (`priorwork` on PyPI) and this extension are
 released together, under one version number.
 
+## 0.1.9
+
+- **Modes: where the agent stops for you.** *Standard* (the new default)
+  stops twice: once the scope is set, and before the paper cards, showing the
+  DOIs to collect in Zotero, so that more cards are read from the PDFs. *Full
+  auto* carries on to the end (the old behaviour), and *manual* stops after
+  every step. Choose it in your request, in `AGENTS.local.md`, or with
+  `priorwork new/scope --mode standard|auto|manual`; it is recorded in the
+  survey. `priorwork status` shows the stop before the cards until
+  `priorwork scope SURVEY --go-on` records that you said to go on, and the
+  sidebar's step copies the DOIs and the request to carry on. **New Survey →
+  Ask your agent to do it** asks for the mode too.
+- **The audit by another model is optional.** `priorwork check` no longer
+  warns that a survey is not audited, the next steps no longer ask for it,
+  and the agent no longer asks you for one in its reports. Ask for an audit
+  when you want one (`priorwork audit` still records it).
+- **Start from a manuscript in any format, for a draft or for advice.**
+  `priorwork read PATH` turns a manuscript (Markdown, Quarto, LaTeX, HTML such
+  as Quarto's output, Word, PDF, or a folder of them) into text for the agent.
+  `priorwork new --manuscript PATH --purpose advice` makes a report of advice
+  on a finished manuscript: how it cites the literature (the direction of each
+  cited finding, overstatements), the literature it is missing, and the
+  argument, with a summary first. `--purpose draft` (the default) drafts
+  sections 1–3 as before. The agent proposes what to make, which parts to
+  cover and how many reports, and agrees it with you; one manuscript can have
+  both reports.
+- The agent names papers as "Author (year)" in its reports, not by numbers
+  such as `#232`.
+- The report viewer lets you select and copy text, and search the page with
+  Ctrl+F.
+- `priorwork zotero SURVEY --dois` works without the Zotero link (it lists
+  the DOIs of all included papers).
+- **Octavo.** Surveys and [Octavo](https://github.com/yoshida-kd/octavo)
+  projects are many-to-many, joined through Zotero collections:
+  - A manuscript in an Octavo project (another repository) is used where it
+    is, recorded relative to the workspace. `priorwork read` also reads the
+    project's results, tables and analyses and lists the literature the
+    manuscript cites; `priorwork add SURVEY --cited` registers it from the
+    `.bib`. **New Survey → Start from my manuscript** takes a paper in an
+    Octavo project without copying it.
+  - `priorwork scope SURVEY --octavo PATH` (repeatable; **Link to an Octavo
+    Project…**) links other projects that use a survey, so a survey on a
+    topic can serve several papers.
+  - `priorwork export SURVEY --octavo [PROJECT]` (**Export for an Octavo
+    Project…**) writes the draft of the manuscript, or the sections on the
+    literature, with `[@key]` citations from that project's `.bib`
+    (`reports/<name>.<project>.octavo.md`). Papers not in the `.bib` yet
+    become `[@PRIORWORK:…]`, with their DOIs listed.
+  - The survey is linked to the Zotero collection the Octavo project pulls its
+    `.bib` from (`zotero_collection` in its settings: a name or a list). Each
+    survey can use a collection under it, and `priorwork check` says, project
+    by project, when the survey's collection is not among them or when its
+    text cites papers missing from the `.bib`. `priorwork status` lists the
+    other surveys for the same projects. (Lists of collections, and choosing
+    them in Octavo's sidebar, come with the next Octavo release.)
+- **Zotero collections as Zotero shows them.** Choosing the collection goes
+  folder by folder: only the top folders are listed, and choosing one opens
+  it ("Use this folder", "Up", and a search over all folders). A collection
+  can be given by its path (`"parent / child"`, needed when a name is used
+  twice), and papers in a collection under the linked one count as in it.
+  The row is always under each survey (it opens the settings when Zotero is
+  not set up), the list can be reloaded after you make a collection in
+  Zotero, and it explains how to make one.
+
 ## 0.1.8
 
 - **The agent works on a branch and opens a pull request.** It commits on a

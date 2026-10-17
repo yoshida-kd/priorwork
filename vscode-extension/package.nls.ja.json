@@ -49,5 +49,7 @@
   "command.viewHtml": "Priorwork でレポートを見る",
   "command.zoteroCollection": "Zotero のコレクションを結び付ける…",
   "command.archive": "サーベイをアーカイブする…",
-  "command.unarchive": "アーカイブから戻す"
+  "command.unarchive": "アーカイブから戻す",
+  "command.linkOctavo": "Octavo のプロジェクトに結び付ける…",
+  "command.exportOctavo": "Octavo のプロジェクト用に書き出す…"
 }

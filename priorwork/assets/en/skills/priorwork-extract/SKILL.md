@@ -61,4 +61,4 @@ In a survey made from a manuscript (`priorwork-manuscript`), the papers the draf
    ./priorwork check <survey> --offline
    ```
 
-Only in consultation mode, report the key points (identification strategy, main findings) every 2–3 papers and check whether to go on.
+Only in manual mode, report the key points (identification strategy, main findings) every 2–3 papers, naming the papers as Author (year), and check whether to go on.

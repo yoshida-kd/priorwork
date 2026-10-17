@@ -78,6 +78,26 @@ def test_collections_and_lookup(tmp_path):
         z.find_collection("nothing")
 
 
+def test_collections_form_a_tree_and_count_subcollections(tmp_path):
+    z = fake_zotero(tmp_path)
+    cols = z._index["collections"]
+    cols["C3"] = {"key": "C3", "name": "Another paper", "parent": ""}
+    cols["C4"] = {"key": "C4", "name": "reading", "parent": "C3"}           # 同じ名前が別の親の下に
+    cols["C5"] = {"key": "C5", "name": "Theory", "parent": "C2"}
+    z._index["items"]["B"]["collections"] = ["C5"]                          # 孫のコレクションに入れた論文
+    got = z.collections()
+    assert [(c["path"], c["depth"], c["items"], c["total"]) for c in got] == [
+        ("Another paper", 0, 0, 0), ("Another paper / reading", 1, 0, 0),
+        ("make-or-buy", 0, 3, 4), ("make-or-buy / reading", 1, 0, 1), ("make-or-buy / reading / Theory", 2, 1, 1)]
+    assert got[1]["parent"] == "C3"
+    with pytest.raises(ZoteroError, match="make-or-buy / reading"):           # 名前だけでは決まらない
+        z.find_collection("reading")
+    assert z.find_collection("make-or-buy/reading")["key"] == "C2"          # 区切りの空白は問わない
+    assert z.find_collection("Make-or-buy / Reading / theory")["key"] == "C5"
+    record = {"doi": "10.1/1", "title": "Paper number 1 on minimum wages"}
+    assert z.status(record, "C1")["in_collection"] and not z.status(record, "C3")["in_collection"]
+
+
 def test_link_a_collection_import_and_list_dois(ws, tmp_path, monkeypatch, capsys):  # noqa: F811
     z = fake_zotero(tmp_path)
     monkeypatch.setattr(zotero.ZoteroClient, "from_env", classmethod(lambda cls: z))

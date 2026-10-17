@@ -23,9 +23,12 @@ from .fulltext import FulltextError, fetch_fulltext, incomplete_fulltext
 from .i18n import t, tl
 from .snowball import snowball
 from .survey import (
-    CANDIDATE, DEFAULT_DEPTH, DEPTHS, EVIDENCE_KEYS, EXCLUDED, INCLUDED, MAYBE, SEARCH_FIELDS, STATUSES, Survey,
+    CANDIDATE, DEFAULT_DEPTH, DEPTHS, EVIDENCE_KEYS, EXCLUDED, INCLUDED, MAYBE, MODES, PURPOSES, SEARCH_FIELDS,
+    STATUSES, Survey,
     SurveyError, author_short, off_field, evidence_key, evidence_label, now_iso, status_label, status_trail,
 )
+from . import octavo
+from .manuscript import ManuscriptError
 from .workspace import ROOT, meta_dir, workspace_lang
 from .zotero import ZoteroClient, ZoteroError
 
@@ -54,7 +57,8 @@ USAGE_LINES = [
     "Surveys",
     "  status [SURVEY]            list the surveys / progress and next steps",
     "  new TOPIC --slug SLUG      create a survey (reports/YYYYMMDD_<slug>.md and .priorwork/surveys/*.json)",
-    "  new ... --manuscript PATH  start from a manuscript whose analysis is done (drafts its sections 1–3)",
+    "  new ... --manuscript PATH  start from your manuscript (--purpose draft: its sections 1–3; advice: advice on it)",
+    "  read PATH                  print the text of a manuscript (.md, .qmd, .html, .docx, .pdf, … or a folder)",
     "  scope SURVEY ...           set the scope (research question, period, criteria)",
     "  archive SURVEY [--undo]    hide a survey from the list, keeping its files (e.g. one that was redone)",
     "  list SURVEY                list the papers (numbers, decisions, SSCI)",
@@ -65,7 +69,7 @@ USAGE_LINES = [
     "  export SURVEY              write the report for reading (HTML / Word / Markdown)",
     "  export SURVEY --draft      write the draft of the manuscript's sections 1–3 with its references",
     "  check SURVEY               find empty fields, unregistered citations and DOI mismatches",
-    "  audit SURVEY --by MODEL    record an audit by an AI model other than the one that wrote the survey",
+    "  audit SURVEY --by MODEL    record an audit by another AI model (optional; when you ask for one)",
     "  fulltext SURVEY N          get the full text (Zotero / open-access PDF)",
     "  zotero [SURVEY]            check the Zotero link / which included papers are in Zotero",
     "  zotero SURVEY --collection NAME   link a Zotero collection (--import registers its papers, --dois lists the DOIs to add)",
@@ -163,7 +167,8 @@ ZOTERO_SOFT_ERRORS = (ZoteroError, OSError, ValueError, requests.RequestExceptio
 
 def survey_summary(s: Survey) -> Dict[str, Any]:
     return {"name": s.name, "topic": s.data["topic"], "created": s.data.get("created", ""), "version": s.version,
-            "depth": s.depth, "lang": s.lang, "report": str(s.md_path), "manuscript": s.manuscript or None,
+            "depth": s.depth, "mode": s.mode, "lang": s.lang, "report": str(s.md_path),
+            "manuscript": s.manuscript or None, "purpose": s.purpose or None,
             "zotero_collection": s.zotero_collection or None, "archived": s.archived or None,
             "counts": s.counts(), "searches": len(s.data["searches"])}
 
@@ -302,21 +307,33 @@ def next_steps(s: Survey, zotero_missing: List[Dict[str, Any]], zotero_pending: 
     if zotero_missing:
         step("zotero", t("Add {n|# included paper|# included papers} to Zotero ({numbers})", n=len(zotero_missing),
                          numbers=", ".join(f"#{e['number']}" for e in zotero_missing[:10])), ["zotero", s.name])
+    if unfilled and len(unfilled) == c[INCLUDED] and s.mode == "standard" and not s.data.get("cards_go"):
+        # 標準の進め方: カードの記入の前に止まり、ユーザーが Zotero に論文と PDF を集めるのを待つ
+        # （本文で確かめられるカードが増える）。ユーザーが続きを頼んだら `scope --go-on` で記録して進む
+        step("wait_zotero", t("Stop here and wait for the user (standard mode): show the DOIs to add to Zotero "
+                              "(`priorwork zotero {name} --dois`), and when the user says to go on, record it with "
+                              "`priorwork scope {name} --go-on` and fill in the cards", name=s.name),
+             ["zotero", s.name, "--dois"])
     if unfilled:
         numbers = ", ".join(f"#{e['number']}" for e in unfilled[:10])
         text = (t("Fill in {n|# card|# cards} from the abstracts ({numbers}); \"abstract only\" is fine",
                   n=len(unfilled), numbers=numbers) if s.depth == "quick"
                 else t("Fill in {n|# card|# cards} from the full texts ({numbers})", n=len(unfilled), numbers=numbers))
         step("fill", text, ["fulltext", s.name, str(unfilled[0]["number"])])
-    if s.manuscript and c[INCLUDED]:
+    if s.purpose == "advice" and c[INCLUDED]:
+        step("advice", t("Write the advice on the manuscript (missing literature, the direction of its citations, "
+                         "the argument)"), ["check", s.name])
+    if s.purpose == "draft" and c[INCLUDED]:
         step("draft", t("Write the draft of the manuscript's introduction, literature review and hypotheses, "
-                        "then export it"), ["export", s.name, "--draft"])
+                        "then export it"), ["export", s.name, "--draft"] + (["--octavo"] if s.octavo else []))
+    linked = [p for p in s.octavo_projects if not p.get("manuscript") and not p.get("missing")]
+    if linked and c[INCLUDED] and s.purpose != "draft":
+        step("octavo", t("Write the sections on the literature for the Octavo {n|project|projects} {names}",
+                         n=len(linked), names=", ".join(p["name"] for p in linked)),
+             ["export", s.name, "--octavo", linked[0]["name"]])
     step("check", t("Check"), ["check", s.name])
     if c[INCLUDED]:
         step("export", t("Write the version for reading (HTML)"), ["export", s.name])
-    if c[INCLUDED] and not unfilled and not s.audits:
-        step("audit", t("Have another AI model audit it (not the one that wrote it), then record the audit"),
-             ["audit", s.name, "--by", "<model>"])
     return steps
 
 
@@ -366,7 +383,8 @@ def cmd_status(args, client):
         return dump_json({**survey_summary(s), "scope": s.data["scope"],
                           "unfilled": [e["number"] for e in s.unfilled()],
                           "zotero_missing": [e["number"] for e in zotero_missing],
-                          "written_by": s.written_by, "audits": s.audits,
+                          "written_by": s.written_by, "audits": s.audits, "octavo": s.octavo,
+                          "octavo_projects": s.octavo_projects,
                           "sync": scaffold.sync_status(ROOT), "next": steps})
     print(f"# {s.name}: {s.data['topic']}")
     if s.archived:
@@ -374,23 +392,41 @@ def cmd_status(args, client):
                         date=s.archived[:10], name=s.name))
     print(t("Report: {path}", path=s.md_path))
     if s.manuscript:
-        print(t("Manuscript: {path}", path=s.manuscript))
+        print(t("Manuscript: {path}", path=s.manuscript) + " | "
+              + (t("purpose: advice on the manuscript") if s.purpose == "advice"
+                 else t("purpose: a draft of its sections 1–3")))
+    for p in s.octavo_projects:
+        print(t("Octavo project: {root} | .bib: {bib} | Zotero collections: {collections}", root=p["root"],
+                bib=(Path(p["bib"]).name if p["bib"] else "-") + ("" if p["bib_exists"] else " " + t("(not there yet)")),
+                collections=", ".join(p["zotero_collections"]) or t("(not set)")))
+    roots = {p["root"] for p in s.octavo_projects}
+    if roots:
+        others = [o for o in Survey.list_all() if o.name != s.name and roots & {p["root"] for p in o.octavo_projects}]
+        if others:
+            print(t("Other surveys for these Octavo projects: {names}", names=", ".join(
+                o.name + (f" ({o.zotero_collection['name']})" if o.zotero_collection else "") for o in others)))
     notice = scaffold.sync_status(ROOT)
     if notice:
         print(f"⚠️ {notice}")
     sc = s.data["scope"]
     unset = t("(not set)")
     print(t("RQ: {question} | period: {years} | depth: {depth}", question=sc.get("question") or unset,
-            years=sc.get("years") or unset, depth=s.depth))
+            years=sc.get("years") or unset, depth=s.depth)
+          + " | " + t("mode: {mode}", mode=mode_label(s.mode) + ("" if s.data.get("mode") else " " + t("(default)"))))
     print(t("included {included} / maybe {maybe} / candidates {candidate} / excluded {excluded}", **s.counts())
           + " | " + t("{n|# search|# searches}", n=len(s.data["searches"])))
     if s.written_by or s.audits:
         print(t("Written by: {writers}", writers=", ".join(s.written_by) or t("(not recorded)")) + " | "
               + (t("audited by {models}", models=", ".join(a["by"] for a in s.audits)) if s.audits
-                 else t("not audited yet")))
+                 else t("no audit (optional)")))
     print("\n" + t("Next:"))
     for i, st in enumerate(steps, 1):
         print(f"  {i}. {st['text']}: priorwork {' '.join(_shell(a) for a in st['args'])}")
+
+
+def mode_label(mode: str) -> str:
+    return {"standard": t("standard (stops after the scope and before the cards)"), "auto": t("full auto"),
+            "manual": t("manual (stops after every step)")}.get(mode, mode)
 
 
 def _shell(arg: str) -> str:
@@ -417,14 +453,17 @@ def zotero_unregistered(s: Survey) -> List[Dict[str, Any]]:
 def cmd_new(args, client):
     scope = {k: getattr(args, k) or "" for k in ("question", "years", "fields", "inclusion", "exclusion")}
     s = Survey.create(args.topic, args.slug, scope, depth=args.depth or DEFAULT_DEPTH, lang=args.lang,
-                      manuscript=args.manuscript)
-    if args.by or args.search_field:
+                      manuscript=args.manuscript, purpose=args.purpose)
+    if args.by or args.search_field or args.mode:
         if args.by:
             s.add_writer(args.by)
         if args.search_field:
             s.set_search_field(args.search_field)
+        if args.mode:
+            s.set_mode(args.mode)
         s.save()
         s.render()
+    link_octavo_collection(s)
     others = same_topic(s, Survey.list_all())
     if others:
         print("[Notice] " + t("Other surveys have the same topic: {names}. If this one redoes them, archive the old "
@@ -437,6 +476,43 @@ def cmd_new(args, client):
     print(t("Next: priorwork search \"<English query>\" --into {name}", name=s.name))
 
 
+def link_octavo_collection(s: Survey):
+    """原稿が Octavo のプロジェクトにあり、その .bib を引くコレクションが 1 つに決まっていれば、サーベイにも
+    結び付ける（同じコレクションに論文を集めれば、Octavo の参考文献にもなる）。"""
+    info = s.octavo
+    names = (info or {}).get("zotero_collections", [])
+    if not names or s.zotero_collection:
+        return
+    others = [o for o in Survey.list_all() if o.name != s.name and not o.archived
+              and info["root"] in {p["root"] for p in o.octavo_projects}]
+    if others or len(names) > 1:
+        # ほかのサーベイと同じコレクションに混ぜない（--import で互いの論文が候補に入ってしまう）。
+        # サーベイごとに、Octavo のコレクションのどれかの下のコレクションを使ってもらう
+        print("[Notice] " + t("The Octavo project pulls its .bib from {names}{others}. Make a collection for this "
+                              "survey under one of them in Zotero, and link it: `priorwork zotero {survey} "
+                              "--collection \"<path>\"` (Octavo pulls the collections under them too)",
+                              names=", ".join(f'"{n}"' for n in names), survey=s.name,
+                              others=t(", and other surveys use it too ({names})",
+                                       names=", ".join(o.name for o in others)) if others else ""), file=sys.stderr)
+        return
+    name = names[0]
+    z = ZoteroClient.from_env()
+    if z is None:
+        print("[Notice] " + t("The Octavo project pulls its .bib from the Zotero collection \"{name}\". Set up Zotero "
+                              "and link the survey to it too", name=name), file=sys.stderr)
+        return
+    try:
+        z.sync()
+        found = z.find_collection(name)
+    except ZOTERO_SOFT_ERRORS as e:
+        print(f"[Notice] {e}", file=sys.stderr)
+        return
+    s.set_zotero_collection(found["key"], found["path"])
+    s.save()
+    print("[Notice] " + t("Linked the Zotero collection \"{name}\" that the Octavo project uses", name=found["path"]),
+          file=sys.stderr)
+
+
 def cmd_scope(args, client):
     s = Survey.load(args.survey)
     s.update_scope(**{k: getattr(args, k) for k in ("question", "years", "fields", "inclusion", "exclusion")})
@@ -446,17 +522,62 @@ def cmd_scope(args, client):
         s.set_search_field(args.search_field)
     if args.manuscript:
         s.set_manuscript(args.manuscript)
+        s.save()
+        link_octavo_collection(s)
     if args.by:
         s.add_writer(args.by)
+    if args.mode:
+        s.set_mode(args.mode)
+    if args.go_on:
+        s.data["cards_go"] = now_iso()
+    for path in args.octavo or []:
+        s.link_octavo(path)
+    for path in args.unlink_octavo or []:
+        s.link_octavo(path, unlink=True)
     render_and_report(s)
     if args.json:
-        return dump_json({"scope": s.data["scope"], "depth": s.depth, "manuscript": s.manuscript or None})
+        return dump_json({"scope": s.data["scope"], "depth": s.depth, "mode": s.mode,
+                          "manuscript": s.manuscript or None, "purpose": s.purpose or None,
+                          "octavo_projects": s.octavo_projects})
     for k, v in s.data["scope"].items():
         print(f"{k}: {v}")
     print(f"depth: {s.depth}")
+    print(f"mode: {s.mode}")
     print(f"search field: {s.search_field}")
     if s.manuscript:
-        print(f"manuscript: {s.manuscript}")
+        print(f"manuscript: {s.manuscript} ({s.purpose})")
+    for p in s.octavo_projects:
+        print(f"octavo: {p['root']}")
+
+
+def cmd_read(args, client):
+    from . import manuscript
+    path = Path(args.path).expanduser()
+    files = manuscript.read(path)
+    bib, cited = manuscript.cited_entries(path)
+    if args.json:
+        return dump_json({"files": [{"path": str(f), "text": text} for f, text in files],
+                          "bib": str(bib) if bib else None, "cited": cited})
+    base = octavo.find_project(path) or (path if path.is_dir() else path.parent)
+    parts = []
+    for f, text in files:
+        try:
+            name = f.resolve().relative_to(base.resolve()).as_posix()
+        except ValueError:
+            name = f.name
+        parts.append(f"=== {name} ===\n" + (text.rstrip() if text else t("(not text: a figure or another kind of file)"))
+                     + "\n")
+    if bib:
+        lines = [f"- [@{e['key']}] {', '.join(e['authors'][:3])}{' et al.' if len(e['authors']) > 3 else ''} "
+                 f"({e['year'] or 'n.d.'}) {e['title']}" + (f" doi:{e['doi']}" if e["doi"] else "") for e in cited]
+        parts.append(f"=== {t('Literature the manuscript cites ({bib}): {n}', bib=bib.name, n=len(cited))} ===\n"
+                     + "\n".join(lines) + "\n")
+    out = "\n".join(parts)
+    if args.out:
+        Path(args.out).write_text(out, encoding="utf-8")
+        print(t("Wrote the text of {n|# file|# files} to {path}", n=len(files), path=args.out))
+    else:
+        print(out, end="")
 
 
 def cmd_archive(args, client):
@@ -508,9 +629,33 @@ def cmd_set_status(args, client):
 def cmd_add(args, client):
     s = Survey.load(args.survey)
     status = CANDIDATE if args.candidate else INCLUDED
+    ids = list(args.paper_ids)
+    no_doi: List[Dict[str, Any]] = []
+    if args.cited:
+        from . import manuscript
+        if not s.manuscript:
+            raise SurveyError(t("{name} has no manuscript (`priorwork scope {name} --manuscript <path>`)", name=s.name))
+        bib, cited = manuscript.cited_entries(s.root / s.manuscript)
+        if bib is None:
+            raise SurveyError(t("No .bib was found for the manuscript {path}", path=s.manuscript))
+        ids += [e["doi"] for e in cited if e["doi"]]
+        no_doi = [e for e in cited if not e["doi"]]
+        if not args.json:
+            print(t("The manuscript cites {n|# work|# works} in {bib} ({doi} with a DOI)", n=len(cited), bib=bib.name,
+                    doi=len(cited) - len(no_doi)))
+    if not ids and not no_doi:
+        raise SurveyError(t("Give the DOIs to register, or --cited"))
     added = []
-    for pid in args.paper_ids:
-        rec = client.get_paper(pid)
+    failed: List[str] = []
+    for pid in ids:
+        try:
+            rec = client.get_paper(pid)
+        except ApiError as e:
+            if not args.cited:
+                raise
+            failed.append(pid)
+            print(f"[Notice] {pid}: {e}", file=sys.stderr)
+            continue
         old = s.find(rec)
         old_key = old and old["key"]
         entry, is_new = s.upsert(rec, "manual", status=status)
@@ -525,11 +670,16 @@ def cmd_add(args, client):
             else:
                 state = t("already registered")
             print_paper(rec, f"#{entry['number']} [{state} → {status_label(entry['status'])}]")
-    s.log_search("manual", ", ".join(args.paper_ids), {"status": status}, len(args.paper_ids),
-                 sum(1 for _, n in added if n))
+    s.log_search("manual", t("cited by the manuscript") if args.cited else ", ".join(ids), {"status": status},
+                 len(ids), sum(1 for _, n in added if n))
     render_and_report(s)
     if args.json:
-        dump_json({"added": added_json(added)})
+        return dump_json({"added": added_json(added), "failed": failed,
+                          "no_doi": [f"{e['key']}: {e['title']}" for e in no_doi]})
+    for e in no_doi:
+        print("  " + t("no DOI in the .bib (search it by title): [@{key}] {title}", key=e["key"], title=e["title"]))
+    for pid in failed:
+        print("  " + t("not found in the databases: {doi}", doi=pid))
 
 
 def cmd_fix(args, client):
@@ -601,8 +751,8 @@ def cmd_audit(args, client):
         for a in s.audits:
             print(f"  {a['at'][:16].replace('T', ' ')} {a['by']}" + (f" — {a['note']}" if a.get("note") else ""))
         if not s.audits:
-            print(t("Not audited yet. Ask another AI model to audit it, then record it with "
-                    "`priorwork audit {name} --by \"<model>\"`", name=s.name))
+            print(t("No audit recorded. An audit is optional: when you want one, ask another AI model to audit "
+                    "it, and it records it with `priorwork audit {name} --by \"<model>\"`", name=s.name))
         return
     audit = s.add_audit(args.by, args.note)
     s.save()
@@ -639,6 +789,10 @@ def cmd_check(args, client):
 def cmd_export(args, client):
     s = Survey.load(args.survey)
     output = Path(args.output) if args.output else None
+    if args.octavo is not None or args.bib:
+        if args.octavo is None:
+            args.octavo = ""
+        return export_for_octavo(s, args, output)
     try:
         if args.draft:
             out, issues = export_draft(s, args.format or "md", output)
@@ -653,6 +807,55 @@ def cmd_export(args, client):
         print("⚠️ " + t("Written as a draft (marked at the top):"))
         for issue in issues:
             print(f"  - {issue}")
+
+
+def pick_octavo_project(s: Survey, which: str) -> Dict[str, Any]:
+    """`--octavo [PROJECT]` のプロジェクト。PROJECT はパスかフォルダの名前。省けるのは 1 つだけのとき。"""
+    projects = [p for p in s.octavo_projects if not p.get("missing")]
+    if not projects:
+        raise SurveyError(t("{name} is not linked to an Octavo project. Link one with "
+                            "`priorwork scope {name} --octavo <path>`", name=s.name))
+    if not which:
+        if len(projects) == 1:
+            return projects[0]
+        raise SurveyError(t("{name} is linked to several Octavo projects; name one: {projects}", name=s.name,
+                            projects=", ".join(p["name"] for p in projects)))
+    target = Path(which).expanduser()
+    target = (target if target.is_absolute() else Path.cwd() / target).resolve()
+    for p in projects:
+        if p["name"] == which or Path(p["root"]).resolve() == target:
+            return p
+    raise SurveyError(t("{name} is not linked to the Octavo project {project}. The linked ones: {projects}",
+                        name=s.name, project=which, projects=", ".join(p["name"] for p in projects)))
+
+
+def export_for_octavo(s: Survey, args, output: Optional[Path]):
+    from .export import export_octavo
+    if args.bib:
+        bib, project = Path(args.bib), {"name": "", "zotero_collections": []}
+    else:
+        project = pick_octavo_project(s, args.octavo)
+        bib = Path(project["bib"])
+    try:
+        out, missing = export_octavo(s, bib, output, project["name"])
+    except (RuntimeError, OSError) as e:
+        sys.exit(t("Error: {message}", message=e))
+    coll = s.zotero_collection.get("name", "") or ", ".join(project["zotero_collections"])
+    if args.json:
+        return dump_json({"path": str(out.resolve()), "bib": str(bib),
+                          "missing": [{"number": e["number"], "doi": e["record"].get("doi") or "",
+                                       "title": e["record"]["title"]} for e in missing]})
+    print(t("Written: {path}", path=out))
+    if missing:
+        print("⚠️ " + t("{n|# paper cited in the draft is|# papers cited in the draft are} not in {bib}, so "
+                        "{n|it is|they are} written as [@{prefix}…] (Octavo shows ?? until it is there). Add "
+                        "{n|it|them} to Zotero{where}, run `octavo bib pull` in the Octavo project, then export again:",
+                        n=len(missing), bib=bib.name, prefix=octavo.MISSING_PREFIX,
+                        where=t(" (the collection \"{name}\")", name=coll) if coll else ""))
+        for e in missing:
+            r = e["record"]
+            print(f"  {author_short(r['authors'])} ({r.get('year') or 'n.d.'}) "
+                  + (f"https://doi.org/{r['doi']}" if r.get("doi") else r["title"]))
 
 
 def cmd_fulltext(args, client):
@@ -713,6 +916,14 @@ def zotero_to_import(s: Survey, z: ZoteroClient) -> List[Dict[str, Any]]:
 
 def cmd_zotero(args, client):
     z = ZoteroClient.from_env()
+    if z is None and args.survey and args.dois and not (args.collection or args.import_collection or args.json):
+        # Zotero の連携が無くても、Zotero に入れる DOI の一覧（採用論文すべて）は出せる
+        print("[Notice] " + t("Zotero is not set up, so these are the DOIs of all the papers, whether in Zotero or not"),
+              file=sys.stderr)
+        for e in Survey.load(args.survey).by_status(*(args.status or [INCLUDED])):
+            if e["record"].get("doi"):
+                print(e["record"]["doi"])
+        return
     if z is None:
         sys.exit(t("Error: {message}", message=t("Zotero is not set up. Set ZOTERO_API_KEY and ZOTERO_USER_ID in .env")))
     index = z.sync(force=args.refresh)
@@ -721,8 +932,8 @@ def cmd_zotero(args, client):
         cols = z.collections()
         if args.json:
             return dump_json({"collections": cols})
-        for c in cols:
-            print(f"{c['path']}  ({t('{n|# item|# items}', n=c['items'])}, key {c['key']})")
+        for c in cols:   # Zotero と同じ木の形で（下のコレクションの論文も数に含める）
+            print(f"{'  ' * c['depth']}{c['name']}  ({t('{n|# item|# items}', n=c['total'])}, key {c['key']})")
         if not cols:
             print(t("No collections in the Zotero library"))
         return
@@ -1002,6 +1213,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("survey", nargs="?")
     p.add_argument("--archived", action="store_true", help=t("list the archived surveys instead"))
 
+    p = sub.add_parser("read", parents=[common, as_json],
+                       help=t("print the text of a manuscript (.md, .qmd, .tex, .html, .docx, .pdf, … or a folder)"))
+    p.add_argument("path", help=t("the manuscript file, or its folder"))
+    p.add_argument("--out", metavar="FILE", help=t("write the text to a file instead"))
+
     p = sub.add_parser("archive", parents=[common, as_json],
                        help=t("archive a survey: hide it from the list, keeping its files"))
     p.add_argument("survey")
@@ -1020,19 +1236,32 @@ def build_parser() -> argparse.ArgumentParser:
                                    "the social sciences, the default for new surveys; all: keep everything)"))
     scope_args.add_argument("--by", metavar="MODEL",
                             help=t("the AI model writing the survey (e.g. \"Gemini 3.1 Pro\"); "
-                                   "the audit must then be by another model"))
+                                   "an audit, if you ask for one, is then by another model"))
+    scope_args.add_argument("--mode", choices=list(MODES),
+                            help=t("where the agent stops for you (standard: after the scope and before the cards, "
+                                   "so you can collect the papers in Zotero, the default; auto: never; "
+                                   "manual: after every step)"))
     scope_args.add_argument("--manuscript", metavar="PATH",
-                            help=t("your manuscript whose analysis is done (a file, or a folder under manuscripts/ "
-                                   "with the manuscript and its tables): the survey then backs it up and drafts "
-                                   "its introduction, literature review and hypotheses"))
+                            help=t("your manuscript (a file in any format, or a folder under manuscripts/ with the "
+                                   "manuscript and its tables): the survey then drafts its sections 1–3 or advises on it "
+                                   "(--purpose)"))
 
     p = sub.add_parser("new", parents=[common, scope_args, as_json], help=t("create a survey"))
     p.add_argument("topic", help=t("the topic (any language)"))
     p.add_argument("--slug", required=True, help=t("an English slug for the file name (e.g. minimum_wage_employment)"))
     p.add_argument("--lang", choices=i18n.LANGS, help=t("the language of the report (default: the workspace's)"))
+    p.add_argument("--purpose", choices=list(PURPOSES),
+                   help=t("with --manuscript, what the report is for (draft: a draft of the manuscript's sections 1–3, "
+                          "the default; advice: advice on a finished manuscript — missing literature, the direction of "
+                          "its citations, the argument)"))
 
     p = sub.add_parser("scope", parents=[common, scope_args, as_json], help=t("set the scope"))
     p.add_argument("survey")
+    p.add_argument("--octavo", action="append", metavar="PATH",
+                   help=t("link an Octavo project that uses this survey (repeatable; a survey can serve several papers)"))
+    p.add_argument("--unlink-octavo", action="append", metavar="PATH", help=t("unlink an Octavo project"))
+    p.add_argument("--go-on", action="store_true",
+                   help=t("record that the user said to go on to the cards (standard mode stops before them)"))
 
     p = sub.add_parser("list", parents=[common, as_json], help=t("list the papers"))
     p.add_argument("survey")
@@ -1047,8 +1276,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("add", parents=[common, as_json], help=t("register papers by DOI or ID (included by default)"))
     p.add_argument("survey")
-    p.add_argument("paper_ids", nargs="+", help="DOI / DOI URL / Semantic Scholar ID / OpenAlex ID")
+    p.add_argument("paper_ids", nargs="*", help="DOI / DOI URL / Semantic Scholar ID / OpenAlex ID")
     p.add_argument("--candidate", action="store_true", help=t("register as a candidate, not as included"))
+    p.add_argument("--cited", action="store_true",
+                   help=t("register the papers the survey's manuscript cites (the DOIs in its .bib)"))
 
     p = sub.add_parser("fix", parents=[common, as_json],
                        help=t("correct the details of a registered paper (published-version DOI, authors, year, title) "
@@ -1091,6 +1322,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--draft", action="store_true",
                    help=t("write only the draft of the manuscript's sections 1–3, with its references "
                           "(a survey made with --manuscript)"))
+    p.add_argument("--octavo", nargs="?", const="", default=None, metavar="PROJECT",
+                   help=t("write for an Octavo project, with citations as [@key] from its .bib: the draft of the "
+                          "manuscript, or the sections on the literature (reports/<name>.<project>.octavo.md). Name "
+                          "the project (path or folder name) when the survey is linked to several"))
+    p.add_argument("--bib", metavar="PATH", help=t("the .bib to take the keys from (default: the Octavo project's)"))
 
     p = sub.add_parser("fulltext", parents=[common, as_json], help=t("get the full text"))
     p.add_argument("survey")
@@ -1149,7 +1385,7 @@ HANDLERS = {
     "init": cmd_init, "sync": cmd_sync, "upgrade": cmd_upgrade, "doctor": cmd_doctor, "settings": cmd_settings,
     "status": cmd_status, "archive": cmd_archive, "new": cmd_new, "scope": cmd_scope, "list": cmd_list,
     "include": cmd_set_status, "exclude": cmd_set_status, "maybe": cmd_set_status, "reset": cmd_set_status,
-    "add": cmd_add, "fix": cmd_fix, "card": cmd_card, "render": cmd_render, "check": cmd_check, "audit": cmd_audit, "export": cmd_export, "fulltext": cmd_fulltext, "zotero": cmd_zotero,
+    "add": cmd_add, "fix": cmd_fix, "card": cmd_card, "render": cmd_render, "check": cmd_check, "audit": cmd_audit, "read": cmd_read, "export": cmd_export, "fulltext": cmd_fulltext, "zotero": cmd_zotero,
     "search": cmd_search, "snowball": cmd_snowball, "get": cmd_get,
     "citations": cmd_linked, "references": cmd_linked, "journal": cmd_journal,
 }
@@ -1166,7 +1402,8 @@ def main(argv: Optional[List[str]] = None):
         hint = ("\n" + t("It is on the branch {branch}: switch to it with `git switch {branch}`", branch=branches[0])
                 if len(branches) == 1 and scaffold.git_branch(ROOT) != branches[0] else "")
         sys.exit(t("Error: {message}", message=e) + hint)
-    except (ApiError, FulltextError, ZoteroError, scaffold.ScaffoldError, settings.SettingsError) as e:
+    except (ApiError, FulltextError, ManuscriptError, ZoteroError, scaffold.ScaffoldError,
+            settings.SettingsError) as e:
         sys.exit(t("Error: {message}", message=e))
     except KeyboardInterrupt:
         sys.exit(130)

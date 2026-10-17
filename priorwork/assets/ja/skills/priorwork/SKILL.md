@@ -2,8 +2,8 @@
 name: priorwork
 description: >-
   The entry point of Priorwork. Makes or continues a social-science literature survey end to end with
-  `./priorwork` (scope, searches, screening, citation chasing, paper cards, text, check, export) without
-  waiting between steps. Use whenever the user asks, in any words or language, for a literature survey,
+  `./priorwork` (scope, searches, screening, citation chasing, paper cards, text, check, export), stopping
+  for the user where its mode says (standard: after the scope and before the cards). Use whenever the user asks, in any words or language, for a literature survey,
   literature review or prior work on a topic, for the literature behind their own manuscript, or to
   continue, finish or improve an existing survey.
 ---
@@ -13,16 +13,16 @@ description: >-
 ルールは [AGENTS.md](../../../AGENTS.md) に従う。ユーザーはスキル名を打たずに頼むので、依頼の言葉から次のどれかを判断する。
 
 - 新しいテーマ（「〇〇について先行研究をまとめて」）→ 1 から
-- 自分の原稿の補強（「分析はできているので、イントロ・先行研究・仮説を書いて」「この論文の先行研究を固めて」）→ スキル `priorwork-manuscript`。原稿から作ったサーベイ（`./priorwork status <survey>` に「原稿:」と出る）を続けるときも同じ
-- 既存のサーベイの続き（「続けて」「仕上げて」）→ 2 から
+- 自分の原稿から（「分析はできているので、イントロ・先行研究・仮説を書いて」「この論文の先行研究を固めて」「この原稿に足りない先行研究を指摘して」「引用の仕方を確かめて」）→ スキル `priorwork-manuscript`。原稿から作ったサーベイ（`./priorwork status <survey>` に「原稿:」と出る）を続けるときも同じ
+- 既存のサーベイの続き（「続けて」「続きをやって」「仕上げて」）→ 2 から。止まる場所で止まっていたなら、それはユーザーが確かめ終えたという合図（カードの前なら `./priorwork scope <survey> --go-on` を記録してから進む）
 - 一部だけ（「もっと検索して」「カードを埋めて」「検査して」）→ 該当する工程のスキルだけ
-- 監査（「このサーベイを監査して」「別のモデルとして確かめて」）→ スキル `priorwork-audit`。ただし自分が書いたサーベイなら監査せず、別のモデルに頼むよう伝える
+- 監査（「このサーベイを監査して」「別のモデルとして確かめて」）→ スキル `priorwork-audit`。頼まれたときだけ行う。自分が書いたサーベイなら、別のモデルに頼むよう伝える
 
-既定では途中で止まらずに最後まで進める（AGENTS.md「頼まれ方と進め方」）。ユーザーが相談しながら進めたいと言ったときだけ、範囲と採否で答えを待つ。
+進め方（標準・全自動・手動）は AGENTS.md「進め方」で決める。何も言われなければ標準: 範囲を決めたところと、カードの記入の前で止まる。
 
 ## 1. 新しいサーベイ
 
-`./priorwork status` で同じテーマのサーベイが無いか確かめ、無ければ `priorwork-new` の手順で範囲を決めて作成し、検索する。
+`./priorwork status` で同じテーマのサーベイが無いか確かめ、無ければ `priorwork-new` の手順で範囲を決めて作成する（`--mode` で進め方を記録する）。標準と手動では、ここで範囲を示して止まる。全自動ならそのまま検索する。
 
 ## 2. 状態を見て、次の工程へ
 
@@ -35,16 +35,16 @@ description: >-
 1. **検索**（`priorwork-new` の 2）: 「検索を足す」と出ている間は、サブテーマを変えて検索を足す。
 2. **選別**（`priorwork-screen`）: 候補をすべて採用・除外・保留に分ける。
 3. **引用をたどる**（`priorwork-snowball`）: full なら必ず。新しい候補が出たら 2 に戻る。
-4. **カードの記入**（`priorwork-extract`）: 採用論文すべて。
-5. **文章**: 下の 3。
-6. **検査と書き出し**（`priorwork-check`）: ERROR が 0 になるまで直し、HTML を書き出す。
-7. **監査**: 自分ではしない。報告で、別のモデルに監査を頼むよう伝える（AGENTS.md「監査」）。
+4. **Zotero への取り込み**（標準と手動では、ここで止まる）: `./priorwork zotero <survey> --dois` の DOI をそのまま示し、ユーザーが Zotero に論文と PDF を集めて続きを頼むのを待つ（AGENTS.md「進め方」）。続きを頼まれたら `./priorwork scope <survey> --go-on`。全自動では止まらず、Zotero に未登録の本数を最後の報告で伝える。
+5. **カードの記入**（`priorwork-extract`）: 採用論文すべて。
+6. **文章**: 下の 3。
+7. **検査と書き出し**（`priorwork-check`）: ERROR が 0 になるまで直し、HTML を書き出す。
 
-工程が終わるたびに `./priorwork status <survey>` を見直す。長い作業になるので、工程の区切りで「いまどこまで進んだか」を一行だけ伝えてよい（答えは待たない）。
+工程が終わるたびに `./priorwork status <survey>` を見直す（「ここで止まってユーザーを待つ」と出たら、標準の止まる場所）。手動では、各工程の後で結果を示して止まる。長い作業になるので、工程の区切りで「いまどこまで進んだか」を一行だけ伝えてよい（止まる場所以外では答えを待たない）。
 
 ## 3. 文章を書く
 
-原稿から作ったサーベイは、`priorwork-manuscript` の 5 で書く。それ以外は、カードをもとに、レポートの次の節を書く（節の番号はレポートの見出しに従う。古いレポートでは番号と並びが違う）。
+原稿から作ったサーベイは、`priorwork-manuscript` の手順で書く。それ以外は、カードをもとに、レポートの次の節を書く（節の番号はレポートの見出しに従う。古いレポートでは番号と並びが違う）。
 
 | 節 | 書くこと |
 | :--- | :--- |
@@ -65,13 +65,12 @@ description: >-
 
 ## 4. 終わったら報告する
 
-`priorwork-check` を通して書き出したら、次を短く伝える。
+`priorwork-check` を通して書き出したら、次を短く伝える。論文は「著者 (年)」で示す（番号だけで示さない）。
 
 - 検索のクエリ数・候補数・採用数・除外の主な理由
 - 範囲（RQ・期間・基準・深さ）のうち、依頼に無く自分で決めたもの
 - 残った WARN と「下書き」の理由（あれば）
 - Zotero に未登録の採用論文の本数（`./priorwork zotero <survey> --dois` の DOI をそのまま示す。本文を自分で取得できた論文も除かない）
-- 別のモデルによる監査がまだなこと。「別のモデル（例: 書いたのが Gemini なら Claude）のチャットで『サーベイ <名前> を監査して』と頼んでください」
 - レポートの見方（AGENTS.md「レポートを見せる」）
 - 採否やカードは、サイドバーで直せば次の作業でそれに従うこと
 

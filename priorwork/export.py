@@ -302,3 +302,114 @@ def export(survey: Survey, fmt: str = "html", out: Optional[Path] = None, with_a
     out = out or survey.md_path.with_name(survey.md_path.stem + FORMATS[fmt])
     _write(out, text, title, fmt, lang)
     return out, issues[i18n.language()]
+
+
+# ---------------- Octavo の原稿の書き方（[@key]）----------------
+
+_O_NAME = r"(?:(?:van|von|de|der|den|du|da|di|le|la|del|dos)\s+){0,2}[A-ZÀ-Þ][\w'\-]+"
+_O_AUTHORS = rf"{_O_NAME}(?:\s+et\s+al\.?|(?:\s*,\s*{_O_NAME})*,?\s*(?:and|&)\s*{_O_NAME})?"
+_O_YEARS = r"\d{4}[a-z]?(?:\s*[,;]\s*\d{4}[a-z]?)*"
+# 叙述型: Smith (2010) / Smith ら（2010, p. 5）
+_O_NARRATIVE = re.compile(rf"\b({_O_AUTHORS})(\s*(?:ら|ほか|他)?\s*)[(（]\s*({_O_YEARS})\s*(?:[,，:]\s*([^()（）]*?))?\s*[)）]")
+# 括弧型の中身の 1 件: e.g., Smith 2010, p. 3 / Smith and Jones, 2010a
+_O_ITEM = re.compile(rf"^(.*?)\b({_O_AUTHORS})\s*,?\s+({_O_YEARS})\s*(?:,\s*(.+))?$", re.S)
+_O_PAREN = re.compile(r"[(（]([^()（）]*\d{4}[^()（）]*)[)）]")
+
+
+def _o_key(name_part: str, year: str, labels_index: Dict[Tuple[str, str], dict], bib_keys: Dict[str, str],
+           missing: Dict[str, dict]) -> Optional[str]:
+    first = re.split(r"\s+et\s+al|\s*,\s*|\s*(?:\band\b|&)\s*", name_part.strip())[0].split()[-1]
+    from .survey import surname
+    entry = labels_index.get((surname(first), year))
+    if entry is None:
+        return None
+    key = bib_keys.get(entry["key"])
+    if key:
+        return key
+    missing[entry["key"]] = entry
+    from .octavo import MISSING_PREFIX
+    return f"{MISSING_PREFIX}{re.sub(r'[^A-Za-z0-9]', '', first)}{year}"
+
+
+def octavo_citations(text: str, survey: Survey, bib_entries: List[dict]) -> Tuple[str, List[dict]]:
+    """下書きの「著者 (年)」を Pandoc の引用（[@key]）にする。戻り値: (本文, .bib に無い採用論文)。
+    採用論文に当たらない引用は、そのまま残す（check が ERROR にする）。"""
+    from .octavo import match_entry
+    included = survey.by_status(INCLUDED)
+    labels = year_labels(included)
+    index = {(first_surname(e["record"]), labels[e["key"]]): e for e in included}
+    bib_keys = {e["key"]: (match_entry(e["record"], bib_entries) or {}).get("key", "") for e in included}
+    missing: Dict[str, dict] = {}
+
+    def years(s: str) -> List[str]:
+        return re.findall(r"\d{4}[a-z]?", s)
+
+    def paren(m: "re.Match") -> str:
+        items, out = m.group(1).split(";"), []
+        for item in items:
+            im = _O_ITEM.match(item.strip())
+            if not im:
+                return m.group(0)
+            prefix, names, ys, loc = im.group(1).strip(), im.group(2), years(im.group(3)), (im.group(4) or "").strip()
+            keys = [_o_key(names, y, index, bib_keys, missing) for y in ys]
+            if None in keys:
+                return m.group(0)
+            for i, k in enumerate(keys):
+                out.append(" ".join(x for x in (prefix if i == 0 else "", f"@{k}", loc if i == len(keys) - 1 else "")
+                                    if x))
+        return "[" + "; ".join(out) + "]"
+
+    def narrative(m: "re.Match") -> str:
+        names, ys, loc = m.group(1), years(m.group(3)), (m.group(4) or "").strip()
+        keys = [_o_key(names, y, index, bib_keys, missing) for y in ys]
+        if None in keys:
+            return m.group(0)
+        if len(keys) == 1:
+            return f"@{keys[0]}" + (f" [{loc}]" if loc else "")
+        return f"{names} [" + "; ".join(f"-@{k}" for k in keys) + (f", {loc}" if loc else "") + "]"
+
+    text = _O_PAREN.sub(paren, text)
+    text = _O_NARRATIVE.sub(narrative, text)
+    return text, list(missing.values())
+
+
+def synthesis_sections(md: str) -> str:
+    """先行研究のまとめの節（テンプレートで `<!-- priorwork:synthesis -->` を付けた節: 学説・手法・論争・空白など）を
+    ひと続きにする。見出しの番号（「2. 」）と、書き方の注・空の記入欄は除く。"""
+    from .check import SYNTHESIS_MARK
+    parts = []
+    for m in re.finditer(re.escape(SYNTHESIS_MARK), md):
+        head = md.rfind("\n## ", 0, m.start())
+        if head < 0:
+            continue
+        title = re.sub(r"^\d+\.\s*", "", md[head + 4:md.find("\n", head + 1)].strip())
+        end = md.find("\n## ", m.end())
+        body = re.sub(r"<!--.*?-->[ \t]*\n?", "", md[m.end():end if end >= 0 else len(md)], flags=re.S)
+        body = "\n".join(_drop_empty_items(body.strip().splitlines())).strip()
+        if body:
+            parts.append(f"## {title}\n\n{body}\n")
+    return "\n".join(parts)
+
+
+def octavo_text(survey: Survey, md: str) -> str:
+    """Octavo の原稿に持っていく文章: 原稿の 1〜3 章を書くサーベイなら下書き、それ以外は先行研究のまとめの節。"""
+    return draft_section(md) if survey.purpose == "draft" else synthesis_sections(md)
+
+
+def export_octavo(survey: Survey, bib: Path, out: Optional[Path] = None, project: str = "") -> Tuple[Path, List[dict]]:
+    """Octavo の原稿に貼れる形（[@key] の引用。参考文献は Octavo が .bib から作る）で書き出す。
+    キーはそのプロジェクトの .bib から取るので、プロジェクトごとに書き出す（reports/<名前>.<プロジェクト>.octavo.md）。"""
+    from .octavo import read_bib
+    text = octavo_text(survey, survey.md_path.read_text(encoding="utf-8"))
+    if not re.search(r"^(?!#)\S", text, re.MULTILINE):
+        raise RuntimeError(t("The draft of the manuscript is not written yet") if survey.purpose == "draft"
+                           else t("The sections on the literature (theories, methods, debates, gaps) are not written yet"))
+    entries = read_bib(bib)
+    if not entries:
+        raise RuntimeError(t("No entries in {path}. Pull it from Zotero first (`octavo bib pull`)", path=bib))
+    text, missing = octavo_citations(text, survey, entries)
+    stem = survey.md_path.stem + (f".{re.sub(r'[^A-Za-z0-9_-]+', '_', project)}" if project else "")
+    out = out or survey.md_path.with_name(stem + ".octavo.md")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(text, encoding="utf-8")
+    return out, missing

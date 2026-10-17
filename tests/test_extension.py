@@ -91,4 +91,4 @@ def test_webview_script_only_sends_messages_the_panel_handles():
 
 def test_report_viewer_allows_the_mermaid_script():
     from priorwork.export import MERMAID_JS
-    assert f"script-src {MERMAID_JS};" in (EXT / "src" / "extension.ts").read_text(encoding="utf-8")
+    assert f"script-src 'nonce-${{nonce}}' {MERMAID_JS};" in (EXT / "src" / "extension.ts").read_text(encoding="utf-8")

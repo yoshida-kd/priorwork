@@ -5,12 +5,12 @@ description: >-
   the direction of every citation in the text, the separation of the literature from the user's own
   hypotheses, mechanical exclusions in screening and the SSCI status; fixes what is wrong and records the
   audit with `./priorwork audit`. Use when asked to audit, review or double-check a survey that a different
-  model wrote. Never use it on a survey you wrote yourself.
+  model wrote. An audit is optional: only when the user asks for one. Never use it on a survey you wrote yourself.
 ---
 
 # 別のモデルが書いたサーベイを監査する
 
-ルールは [AGENTS.md](../../../AGENTS.md) に従う。サーベイは、書いたモデルと別のモデルが監査して初めて 1 回分になる（AGENTS.md「監査」）。
+ルールは [AGENTS.md](../../../AGENTS.md) に従う。監査は任意で、ユーザーに頼まれたときだけ行う（AGENTS.md「監査」）。
 
 ## 0. 監査してよいか確かめる
 
@@ -75,4 +75,4 @@ ERROR と、カード・まとめの節・採用数・Zotero の WARN を控え�
 ./priorwork audit <survey> --by "<自分のモデル名>" --note "<確かめた範囲と直したこと（1 行）>"
 ```
 
-報告では、見つけた問題を種類ごとに（カードの誤り・引用の向き・仮説の混同・選別・SSCI）件数と代表例で伝え、直したもの・直せなかったものを分ける。
+報告では、見つけた問題を種類ごとに（カードの誤り・引用の向き・仮説の混同・選別・SSCI）件数と代表例で伝え、直したもの・直せなかったものを分ける。代表例の論文は著者 (年) で示す。

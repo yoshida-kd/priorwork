@@ -29,10 +29,14 @@ export interface SurveySummary {
     /** やり直しの版（0.1.6 から。名前の日付の直後の v2 など。古い CLI には無い） */
     version?: number;
     depth: string;
+    /** 進め方: standard（範囲とカードの前で止まる）/ auto / manual（0.1.9 から） */
+    mode?: string;
     lang: string;
     report: string;
     /** 原稿から始めたサーベイの原稿のパス（0.1.4 から。古い CLI には無い） */
     manuscript?: string | null;
+    /** 原稿から始めたサーベイの目的: draft（1〜3 章の下書き）/ advice（原稿への助言）（0.1.9 から） */
+    purpose?: string | null;
     /** 結び付けた Zotero のコレクション（0.1.5 から一覧にも出る。古い CLI では詳細にだけある） */
     zotero_collection?: ZoteroCollectionLink | null;
     /** アーカイブした日時（0.1.5 から） */
@@ -86,8 +90,27 @@ export interface SurveyDetail extends SurveySummary {
     written_by?: string[];
     /** 書いたのと別のモデルによる監査（0.1.6 から） */
     audits?: Audit[];
+    /** 原稿が Octavo のプロジェクトにあるときの、その根・.bib・Zotero のコレクション（0.1.9 から） */
+    octavo?: OctavoProject | null;
+    /** このサーベイを使う Octavo のプロジェクトすべて（0.1.9 から。多対多） */
+    octavo_projects?: OctavoProject[];
     sync: string | null;
     next: NextStep[];
+}
+
+/** このサーベイを使う Octavo のプロジェクト（`octavo.config.py` から読んだもの）。 */
+export interface OctavoProject {
+    root: string;
+    /** フォルダの名前（`export --octavo NAME` で使う） */
+    name: string;
+    bib: string;
+    bib_exists: boolean;
+    /** Octavo が .bib を取ってくる Zotero のコレクション（並び。無ければ空 = ライブラリ全体） */
+    zotero_collections: string[];
+    /** 原稿のあるプロジェクトか（`new --manuscript`）、結び付けたものか（`scope --octavo`） */
+    manuscript?: boolean;
+    /** 結び付けたのに見つからない */
+    missing?: boolean;
 }
 
 /** `priorwork audit SURVEY --by MODEL` の記録。 */
@@ -112,8 +135,16 @@ export interface ZoteroCollections {
 export interface ZoteroCollection {
     key: string;
     name: string;
+    /** "親 / 子" */
     path: string;
+    /** 親のキー（一番上なら ''。0.1.9 から） */
+    parent?: string;
+    /** 深さ（一番上が 0。一覧は Zotero と同じ木の順。0.1.9 から） */
+    depth?: number;
+    /** そのコレクションだけの論文の数 */
     items: number;
+    /** 下のコレクションも含めた論文の数（0.1.9 から） */
+    total?: number;
 }
 
 /** `priorwork zotero SURVEY [--collection X] [--import] --json` */

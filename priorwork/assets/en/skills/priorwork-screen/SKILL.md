@@ -3,14 +3,14 @@ name: priorwork-screen
 description: >-
   Screens the candidate papers of a literature survey against its inclusion and exclusion criteria and
   records include/exclude/maybe with a reason for each (`./priorwork include|exclude|maybe`). Decides on its
-  own by default; in consultation mode, presents recommendations and waits. Use when a survey has unscreened candidates.
+  own in the standard and full-auto modes; in the manual mode, presents recommendations and waits. Use when a survey has unscreened candidates.
 ---
 
 # Screen the candidates
 
 Follow the rules in [AGENTS.md](../../../AGENTS.md).
 
-## Steps (default: you are trusted to proceed)
+## Steps (standard, full auto: decide on your own)
 
 1. Show the candidates with their abstracts.
 
@@ -34,13 +34,13 @@ Follow the rules in [AGENTS.md](../../../AGENTS.md).
    - Working papers, preprints, book reviews and comments are excluded (AGENTS.md, rule 1). For ⚠️ papers, see below.
    - **Never change a decision the user made.** Decide only candidates.
 
-3. Repeat until no candidates are left. Note the numbers included, maybe and excluded, then go on to the next step (`priorwork-snowball` or `priorwork-extract`).
+3. Repeat until no candidates are left. Note the numbers included, maybe and excluded, then go on to the next step (`priorwork-snowball`, or the Zotero step if that is done too). Standard and manual stop before filling in the cards (AGENTS.md, "Modes").
 
-## Consultation mode
+## In manual mode
 
-When the user wants to go through it together (or `AGENTS.local.md` says so), wait for their answer before recording anything.
+When the mode is manual (the user wants to go through it together, or `AGENTS.local.md` says so), wait for their answer before recording anything.
 
-1. Present 5–10 papers at a time like this (use the `#` numbers as they are):
+1. Present 5–10 papers at a time like this (add the `#` numbers so the user can answer with them, but make each paper recognisable by Author (year) and title):
 
    | # | Author (year) | Journal | Recommendation | Reason (one line, against the criteria) |
    | :--- | :--- | :--- | :--- | :--- |

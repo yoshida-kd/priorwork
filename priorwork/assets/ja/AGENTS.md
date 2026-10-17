@@ -8,18 +8,42 @@
 ## 頼まれ方と進め方
 
 - **ユーザーはコマンドもスキル名も打たない。** 「〇〇について先行研究をまとめて」「full でサーベイして」「続きをやって」のような普通の言葉で頼まれる。その依頼から工程を判断し、スキル `priorwork`（入口）の手順で進める。`/priorwork` と打たれた場合も同じ。
-- **既定は「任せて進める」。** 範囲の設定から、検索・選別・引用の追跡・カードの記入・文章・検査・書き出しまで、途中でユーザーの判断を待たずに最後まで進める。工程ごとに止まって「次に進みますか？」と聞かない。
-  - 止まって聞くのは、テーマが曖昧で検索語を決められないとき、API キーなどの設定が無くて進めないとき、⚠️ の論文で掲載版が見つからず採否が結果を大きく左右するときだけ。
-  - ユーザーが「相談しながら」「1件ずつ見せて」と言ったとき、または `AGENTS.local.md` にそう書かれているときは、**相談モード**にする: 範囲と採否は推薦を示してユーザーの答えを待つ（スキル `priorwork-screen` の「相談モード」）。
-- **判断はすべて記録に残す。** 採否には必ず理由を付ける（採用にも `--reason`）。範囲（RQ・期間・基準）は `./priorwork new` / `scope` で書き込む。書いた自分のモデル名も `--by "<モデル名>"` で残す（下の「監査」）。ユーザーはそれを見て、サイドバーや会話で覆せる。
+- **進め方（どこで止まってユーザーを待つか）は 3 つ。** 止まる場所以外では、工程ごとに「次に進みますか？」と聞かず、理由を残しながら自分で判断して進める（下の「進め方」）。
+  1. **標準**（既定）: 範囲を決めたところと、カードの記入の前（Zotero への取り込み）の 2 か所で止まる。
+  2. **全自動**: 途中で止まらずに最後まで進める。
+  3. **手動**: 工程ごとに止まって、ユーザーに確かめながら進める。
+- **判断はすべて記録に残す。** 採否には必ず理由を付ける（採用にも `--reason`）。範囲（RQ・期間・基準）は `./priorwork new` / `scope` で書き込む。書いた自分のモデル名も `--by "<モデル名>"` で残す。ユーザーはそれを見て、サイドバーや会話で覆せる。
 - **ユーザーが下した判断を覆さない。** ユーザーが採否を変えた・カードを直したと言ったら、それに従う。自分の記憶ではなく `./priorwork list <survey>` とレポートを読み直してから続ける。
-- **終わったら、まとめて報告する。** 何本検索して何本採用したか、範囲をどう決めたか（推測で決めた点）、残った WARN、Zotero に未登録の採用論文の数、読むための版の見方（下の「レポートを見せる」）、別のモデルによる監査がまだなこと（下の「監査」）を短く伝える。
+- **論文は「著者 (年)」で示す。** 報告や相談で論文を指すときは「Goldschlag & Tabarrok (2018)」のように著者 (年) で書く。`#232` のような番号は `./priorwork` の中の通し番号で、ユーザーには何の論文か分からない。番号だけで示さない（必要なら「Goldschlag & Tabarrok (2018)（#232）」と添える）。
+- **終わったら（止まったら）、まとめて報告する。** 何本検索して何本採用したか、範囲をどう決めたか（推測で決めた点）、残った WARN、Zotero に未登録の採用論文の数、読むための版の見方（下の「レポートを見せる」）を短く伝える。止まったときは、何を確かめてほしいか・何をしたら続きを頼めばよいかを書く。
+
+## 進め方（標準・全自動・手動）
+
+どの進め方にするかは、次の順に決める。
+
+1. その依頼の言葉: 「全自動で」「最後まで止まらずに」→ 全自動。「相談しながら」「1件ずつ見せて」「工程ごとに確認して」→ 手動。
+2. `AGENTS.local.md` に書かれた進め方。
+3. サーベイに記録した進め方（`./priorwork status <survey>` の「進め方」）。
+4. どれも無ければ標準。
+
+新しいサーベイは `./priorwork new ... --mode standard|auto|manual` で進め方を記録する。途中でユーザーが変えたら `./priorwork scope <survey> --mode ...` で記録し直す（次の会話でも同じ進め方で続けられる）。
+
+**標準**で止まる 2 か所:
+
+- **範囲を決めたところ**: `./priorwork new` で作ったら、RQ・期間・分野・採用基準・除外基準・深さと、推測で決めた点を示して止まる。ユーザーが直したら `./priorwork scope` で直してから、検索に進む。
+- **カードの記入の前**: 選別と引用の追跡が終わったら、`./priorwork zotero <survey> --dois` の DOI の一覧をそのまま示し、「Zotero で集めたいコレクションを選び、魔法の杖に貼って、PDF もそろったら『続きをやって』と言ってください」と伝えて止まる（PDF から本文で確かめたカードが増え、結果として手間が減る）。ユーザーが続きを頼んだら `./priorwork scope <survey> --go-on` で記録し、カードの記入から再開する（`./priorwork status` の次にやることに「ここで止まってユーザーを待つ」が出ている間は、この止まる場所の前にいる）。
+
+その間（検索・選別・引用の追跡、カード・文章・検査・書き出し）は止まらずに進める。
+
+**手動**では、範囲・検索・選別・引用の追跡・Zotero への取り込み・カード（数本ごと）・文章・検査のそれぞれの後で止まり、結果と次にすることを示して答えを待つ。採否は推薦を示して答えを待つ（スキル `priorwork-screen` の「手動のとき」）。
+
+どの進め方でも、テーマが曖昧で検索語を決められないとき、API キーなどの設定が無くて進めないとき、⚠️ の論文で掲載版が見つからず採否が結果を大きく左右するときは止まって聞く。
 
 ## ディレクトリ
 
 - `reports/YYYYMMDD_<slug>.md` … 作業用のレポート（管理ブロックや記入欄を含む）。エージェントが書く。やり直した版は `YYYYMMDD_v2_<slug>.md`。
-- `manuscripts/<論文名>/` … 分析まで済んだユーザーの原稿と結果の表・図（`priorwork-manuscript` で使う）。**読むだけで、書き換えない。**
-- `reports/YYYYMMDD_<slug>.draft.md` … 原稿から作ったサーベイで `./priorwork export --draft` が作る、原稿の 1〜3 章の下書き（参考文献つき）。
+- `manuscripts/<論文名>/` … ユーザーの原稿（形式は問わない: Markdown・Quarto・HTML・Word・PDF など）と結果の表・図（`priorwork-manuscript` で使う）。**読むだけで、書き換えない。** Octavo のプロジェクト（別のリポジトリ。`octavo.config.py` がある）の原稿は、写さずにその場所のまま使う（`../<プロジェクト>/papers/<名前>`。これも読むだけ）。
+- `reports/YYYYMMDD_<slug>.draft.md` … 原稿の 1〜3 章を書くサーベイで `./priorwork export --draft` が作る下書き（参考文献つき）。原稿が Octavo のプロジェクトにあれば、`--octavo` で `reports/YYYYMMDD_<slug>.octavo.md`（引用が `[@key]`。ユーザーが Octavo の原稿に貼る）。
 - `reports/YYYYMMDD_<slug>.html` … `./priorwork export` が作る**読むための版。人が読むのはこれ**。
   未記入・未確認・`check` の ERROR が残っていると、冒頭に「下書き」と表示される。
 - `.priorwork/surveys/YYYYMMDD_<slug>.json` … 論文の候補・採否・検索履歴（状態）。`./priorwork` だけが書き換える。
@@ -51,10 +75,10 @@
 | 引用をたどって見落としを補う | `priorwork-snowball` | `snowball` |
 | 各論文カードの記入 | `priorwork-extract` | `fulltext`, `card`, `render` |
 | 検査と修正・書き出し | `priorwork-check` | `check`, `export` |
-| 別のモデルとして監査する（頼まれたとき） | `priorwork-audit` | `check`, `card`, `audit` |
-| 分析まで済んだ原稿の 1〜3 章を書く | `priorwork-manuscript` | `new --manuscript`, `card --set role=…`, `export --draft` |
+| 別のモデルとして監査する（頼まれたときだけ） | `priorwork-audit` | `check`, `card`, `audit` |
+| 原稿から始める（1〜3 章の下書き・原稿への助言） | `priorwork-manuscript` | `read`, `new --manuscript --purpose …`, `card --set role=…`, `export --draft` |
 
-ユーザーが自分の原稿（分析まで書いたもの）を示して、イントロ・先行研究・理論と仮説や、それを支える文献を求めたら、`priorwork-manuscript` の手順で進める。原稿は読むだけで、書き換えない。
+ユーザーが自分の原稿を示して、イントロ・先行研究・理論と仮説の下書きや、それを支える文献、足りない先行研究・引用の向き・論の組み立てへの助言を求めたら、`priorwork-manuscript` の手順で進める。原稿の形式は問わない（`./priorwork read` でテキストにする）。原稿は読むだけで、書き換えない。
 
 ## 深さ（quick / full）
 
@@ -78,13 +102,13 @@
 - VS Code の Priorwork のサイドバーで、サーベイを右クリック →「レポートを書き出して見る」。
 - またはエクスプローラーで `reports/<名前>.html` を右クリック →「Priorwork でレポートを見る」。
 
-## 監査（書いたのと別のモデル）
+## 監査（任意。頼まれたときだけ）
 
-サーベイは、**書いたモデルと別のモデルが監査して、初めて 1 回分**とする。同じモデルは自分の誤読・でっち上げに気付きにくい（軽いモデルが書いたカードに、本文に無い数値や手法、引用の向きの取り違えが見つかったことがある）。
+監査は、ユーザーが頼んだときだけ行う。サーベイの完成の条件ではない。報告で監査を勧めたり、「監査がまだ」と書いたりしない。
 
-- 書くときは、自分のモデル名を記録する: `./priorwork new ... --by "<モデル名>"`。別のモデルが続きを書くときは `./priorwork scope <survey> --by "<モデル名>"`。
-- **自分が書いた（`--by` に自分がある）サーベイを監査しない。** 書き終えたら、報告で「別のモデル（例: 書いたのが Gemini なら Claude）のチャットで『サーベイ <名前> を監査して』と頼んでください」と伝える。
+- 書くときは、自分のモデル名を記録する: `./priorwork new ... --by "<モデル名>"`。別のモデルが続きを書くときは `./priorwork scope <survey> --by "<モデル名>"`。監査を頼まれたとき、誰が書いたかが分かる。
 - 監査を頼まれたら、スキル `priorwork-audit` の手順で行い、最後に `./priorwork audit <survey> --by "<自分のモデル名>" --note "<確かめたこと>"` で記録する。
+- 自分が書いた（`--by` に自分がある）サーベイの監査を頼まれたら、同じモデルは自分の誤読に気付きにくいので、別のモデル（例: 書いたのが Gemini なら Claude）に頼むよう伝える。
 
 ## Git（作業ブランチと PR）
 
@@ -94,7 +118,7 @@
 - **始めるとき**: `git status` を見る。このサーベイのものでない未コミットの変更があれば、ブランチを切り替えずに報告で聞く。
   - 新しいサーベイ: main を最新にし（`git switch main` → リモートがあれば `git pull --ff-only`）、`./priorwork new` のあとに `git switch -c <サーベイ名>`。
   - 続き・監査: `git switch <サーベイ名>`（無ければ main から作る）。リモートにあれば `git pull --ff-only`。
-- **コミット**: 工程の区切り（検索・選別・カード・検査・書き出し・監査）ごとに。足すのはこのサーベイのファイルだけ（`git add reports/<サーベイ名>.* .priorwork/surveys/<サーベイ名>.json`）。`git add -A` は使わない。メッセージはレポートの言語で 1 行（例: 「候補の選別（採用 42 本）」）。
+- **コミット**: 工程の区切り（検索・選別・カード・検査・書き出し・監査）と、止まる前に。足すのはこのサーベイのファイルだけ（`git add reports/<サーベイ名>.* .priorwork/surveys/<サーベイ名>.json`）。`git add -A` は使わない。メッセージはレポートの言語で 1 行（例: 「候補の選別（採用 42 本）」）。
 - **push**: 作業ブランチだけ（`git push -u origin <サーベイ名>`）。リモートが無ければ push せず、報告で伝える。
 - **PR**: 書き出しまで済んだら `gh pr create --base main --head <サーベイ名> --title "<テーマ>" --body "<報告の要約>"`。PR が既にあれば作らない（push で更新される）。`gh` が無い・ログインしていなければ PR は作らず、報告で伝える。報告に PR の URL を書く。
 - **しないこと**: マージ（`git merge`・`gh pr merge`）、main へのコミット・push、force push、`git reset --hard`・`git rebase`・`git clean`、ブランチの削除。`.env`（API キー）はコミットしない。
@@ -107,10 +131,12 @@ Zotero への書き込みはユーザーが手作業で行う。エージェン�
 - Zotero に入れる一覧は、**必ず `./priorwork zotero <survey> --dois` の出力をそのまま示す。** 自分で選び直したり、絞ったりしない。報告では未登録の本数を伝える（`./priorwork check` も WARN で出す）。
 
 - **採用論文を Zotero に集めたい**と言われたら、`./priorwork zotero <survey> --dois` の DOI の一覧を示し、「Zotero で集めたいコレクションを選び、魔法の杖（識別子でアイテムを追加）に貼る」と伝える。サイドバーの次にやることの「Zotero に追加」でも DOI をまとめてコピーできる。
-- **ユーザーが Zotero のコレクションを教えてくれたら**、`./priorwork zotero <survey> --collection "<名前>"` で結び付ける（名前が分からなければ `./priorwork zotero --collections` で一覧）。以後、
-  - 「Zotero にあるか」はそのコレクションに入っているかで判定される。
+- **ユーザーが Zotero のコレクションを教えてくれたら**、`./priorwork zotero <survey> --collection "<名前>"` で結び付ける（名前が分からなければ `./priorwork zotero --collections` で一覧）。Zotero のコレクションは入れ子にできる。同じ名前が別の親の下にあれば、パスで指定する（`"親 / 子"`）。以後、
+  - 「Zotero にあるか」はそのコレクションに入っているかで判定される（その下のコレクションに入っていてもよい）。
   - `./priorwork zotero <survey> --import` で、コレクションの論文を候補に登録できる。これはユーザーが自分で選んで入れた論文なので、範囲から明らかに外れない限り採用する。
   - 本文（`./priorwork fulltext`）はそのコレクションの PDF を優先して読む。カードの記入も、コレクションに PDF がある論文から始める。
+- **原稿が Octavo のプロジェクトにあるとき**、Octavo はその設定（`zotero_collection`）の Zotero のコレクションから参考文献の `.bib` を取る。サーベイも同じコレクションに結び付ける（`./priorwork new --manuscript` が自動で結び付ける。違っていれば `./priorwork check` が知らせる）。採用論文をそのコレクションに入れれば、Octavo の参考文献にもなる。Octavo はその下のコレクションの文献も取るので、**1 つの Octavo のプロジェクトに複数のサーベイがあるときは、サーベイごとに Octavo のコレクションの下のコレクション**（`"<Octavo のコレクション> / <サーベイ>"`）を使う（同じコレクションに混ぜると、`--import` で互いの論文が候補に入る）。コレクションはユーザーが Zotero で作る。Octavo のプロジェクトのファイル（設定・`.bib`・原稿）は書き換えない。
+- **サーベイと Octavo のプロジェクトは多対多。** テーマのサーベイを論文（Octavo のプロジェクト）で使うと頼まれたら、`./priorwork scope <survey> --octavo <プロジェクトのパス>` で結び付け（いくつでも）、`./priorwork export <survey> --octavo <プロジェクト>` でそのプロジェクトの `.bib` のキーを使って書き出す（`reports/<名前>.<プロジェクト>.octavo.md`。原稿の下書きのサーベイなら下書き、それ以外は学説・手法・論争・空白の節）。Octavo のプロジェクトの Zotero のコレクション（並びでもよい）にサーベイのコレクションが入っていなければ `./priorwork check` が知らせるので、Octavo 側に足すようユーザーに伝える。
 
 ## ルール
 
@@ -139,23 +165,26 @@ Zotero への書き込みはユーザーが手作業で行う。エージェン�
 
 ```bash
 ./priorwork status [SURVEY]          # 一覧 / 進捗と次にやること
-./priorwork new "<テーマ>" --slug <slug> --by "<モデル名>" [--depth quick|full] [--manuscript PATH] [--question ... --years ... --fields ... --inclusion ... --exclusion ...]
-./priorwork scope SURVEY [--question ...] [--depth quick|full] [--search-field social|all] [--manuscript PATH] [--by "<モデル名>"]
+./priorwork new "<テーマ>" --slug <slug> --by "<モデル名>" [--mode standard|auto|manual] [--depth quick|full] [--manuscript PATH [--purpose draft|advice]] [--question ... --years ... --fields ... --inclusion ... --exclusion ...]
+./priorwork scope SURVEY [--question ...] [--mode standard|auto|manual] [--go-on] [--depth quick|full] [--search-field social|all] [--manuscript PATH] [--by "<モデル名>"]
 ./priorwork archive SURVEY [--undo]  # 一覧から隠す（ファイルは残る）。アーカイブの一覧は status --archived
 ./priorwork search "<English query>" [--into SURVEY] [--bulk] [--sort citations|relevance|recent|cpy] [--year 2010-2024] [--ssci-only] [--field social|all] [--limit N]
 ./priorwork list SURVEY [--status candidate maybe included excluded] [--abstract]
 ./priorwork include SURVEY N... --reason "..."   ./priorwork exclude SURVEY N... --reason "..."   ./priorwork maybe SURVEY N... --reason "..."   ./priorwork reset SURVEY N...
-./priorwork add SURVEY <DOI>... [--candidate]
+./priorwork add SURVEY <DOI>... [--candidate]      ./priorwork add SURVEY --cited   # 原稿が引いている論文（.bib の DOI）を登録
 ./priorwork fix SURVEY N [--id <掲載版の DOI>] [--authors "A; B"] [--year Y] [--confirm "<確かめたこと>"]
 ./priorwork snowball SURVEY [--direction both|references|citations] [--limit N] [--min-links N]
 ./priorwork fulltext SURVEY N [--pdf PATH]
 ./priorwork card SURVEY N [--set KEY=VALUE ...]
 ./priorwork render SURVEY
 ./priorwork check SURVEY [--offline]
-./priorwork audit SURVEY [--by "<モデル名>" --note "..."]   # 別のモデルによる監査を記録（--by なしで記録を見る）
+./priorwork audit SURVEY [--by "<モデル名>" --note "..."]   # 頼まれた監査を記録（--by なしで記録を見る）
 ./priorwork export SURVEY [--format html|docx|md] [--with-abstracts]   # 読むための版を書き出す
-./priorwork export SURVEY --draft [--format md|docx|html]             # 原稿の 1〜3 章の下書き（原稿から作ったサーベイ）
-./priorwork zotero [SURVEY] [--collections] [--collection NAME] [--import] [--dois]
+./priorwork export SURVEY --draft [--format md|docx|html]             # 原稿の 1〜3 章の下書き（--purpose draft のサーベイ）
+./priorwork export SURVEY --octavo [PROJECT] [--bib PATH]             # Octavo のプロジェクト用に（引用を [@key] に。下書きか、まとめの節）
+./priorwork scope SURVEY --octavo PATH [--octavo PATH ...]           # このサーベイを使う Octavo のプロジェクトを結び付ける（--unlink-octavo で外す）
+./priorwork read PATH [--out FILE]   # 原稿（.md・.qmd・.html・.docx・.pdf など、フォルダも可）をテキストにする
+./priorwork zotero [SURVEY] [--collections] [--collection NAME] [--import] [--dois]   # --dois は Zotero の連携が無くても使える
 ./priorwork get <DOI>      ./priorwork citations <DOI> [--sort cited]      ./priorwork references <DOI> [--sort cited]      ./priorwork journal "<誌名>"
 ./priorwork doctor [--online]        # 設定の診断（動作がおかしいとき）
 ./priorwork sync                     # AGENTS.md・スキルをエンジンの版に更新

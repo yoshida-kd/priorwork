@@ -13,6 +13,7 @@ RQ・識別戦略などの記入内容はそのまま残す。比較マトリク
 """
 
 import json
+import os
 import re
 import unicodedata
 from datetime import date, datetime
@@ -34,6 +35,12 @@ SCHEMA_VERSION = 3
 DEPTHS = {"quick": "Quick (a narrow topic; get an overview fast)",
           "full": "Full (a broad topic; aim for coverage)"}
 DEFAULT_DEPTH = "full"
+# 進め方（エージェントがどこで止まってユーザーを待つか）。standard: 範囲の確定と、カードの記入の前（Zotero への
+# 取り込み）で止まる。auto: 止まらずに最後まで。manual: 工程ごとに止まる。mode を持たないサーベイは standard
+MODES = ("standard", "auto", "manual")
+DEFAULT_MODE = "standard"
+# 原稿から始めるサーベイの目的。draft: 原稿の 1〜3 章の下書き。advice: 出来上がった原稿への助言
+PURPOSES = ("draft", "advice")
 # 検索で残す分野。social: S2 の分野が社会科学に無い論文（医学・計算機科学など）を落とす。
 # 分野の付いていない論文は残す。search_field を持たない既存サーベイは all
 SEARCH_FIELDS = {"social": "social sciences only (papers with no field are kept)", "all": "all fields"}
@@ -261,14 +268,20 @@ class Survey:
     def create(cls, topic: str, slug: str, scope: Dict[str, str], today: Optional[date] = None,
                reports_dir: Optional[Path] = None, state_dir: Optional[Path] = None,
                template: Optional[Path] = None, depth: str = DEFAULT_DEPTH, lang: Optional[str] = None,
-               manuscript: Optional[str] = None) -> "Survey":
+               manuscript: Optional[str] = None, purpose: Optional[str] = None) -> "Survey":
         if depth not in DEPTHS:
             raise SurveyError(t("depth is one of {choices}: {depth}", choices=" / ".join(DEPTHS), depth=depth))
         lang = i18n.normalize(lang or workspace_lang(ROOT))
         today = today or date.today()
         reports_dir = reports_dir or REPORTS_DIR
         state_dir = state_dir or STATE_DIR
-        template = template or template_path(lang, manuscript=bool(manuscript))
+        if purpose and not manuscript:
+            raise SurveyError(t("--purpose is for a survey made from a manuscript (give --manuscript)"))
+        if purpose and purpose not in PURPOSES:
+            raise SurveyError(t("the purpose is one of {choices}: {purpose}", choices=" / ".join(PURPOSES),
+                                purpose=purpose))
+        purpose = (purpose or PURPOSES[0]) if manuscript else None
+        template = template or template_path(lang, manuscript=bool(manuscript), purpose=purpose)
         slug = sanitize_slug(slug) or "survey"
         # やり直し（同じ slug がある）なら版を振る: 20261012_v2_<slug>。日付の直後に置き、一覧で版が見えるようにする
         slug = name_parts(f"00000000_{slug}")[2]   # エージェントが付けた末尾の _v2 は外して数え直す
@@ -293,6 +306,7 @@ class Survey:
         }
         if manuscript:
             data["manuscript"] = manuscript_ref(manuscript, reports_dir.parent)
+            data["purpose"] = purpose
         survey = cls(md_path, data, json_path)
         values = {"topic": topic, "topic_yaml": topic.replace("\\", "\\\\").replace('"', '\\"'),
                   "date": today.isoformat()}
@@ -475,6 +489,16 @@ class Survey:
         """quick / full。depth を持たない既存サーベイは full として扱う。"""
         return self.data.get("depth", DEFAULT_DEPTH)
 
+    @property
+    def mode(self) -> str:
+        """進め方（standard / auto / manual）。mode を持たない既存サーベイは standard として扱う。"""
+        return self.data.get("mode") or DEFAULT_MODE
+
+    def set_mode(self, mode: str):
+        if mode not in MODES:
+            raise SurveyError(t("the mode is one of {choices}: {mode}", choices=" / ".join(MODES), mode=mode))
+        self.data["mode"] = mode
+
     def set_depth(self, depth: str):
         if depth not in DEPTHS:
             raise SurveyError(t("depth is one of {choices}: {depth}", choices=" / ".join(DEPTHS), depth=depth))
@@ -500,6 +524,57 @@ class Survey:
     def manuscript(self) -> str:
         """原稿のパス（ワークスペースからの相対。外ならそのまま）。原稿から始めるサーベイでなければ空。"""
         return self.data.get("manuscript") or ""
+
+    @property
+    def purpose(self) -> str:
+        """原稿から始めるサーベイの目的（draft / advice）。原稿が無ければ空。purpose を持たないものは draft。"""
+        return (self.data.get("purpose") or PURPOSES[0]) if self.manuscript else ""
+
+    @property
+    def octavo(self) -> Optional[Dict[str, Any]]:
+        """原稿が Octavo のプロジェクトの中にあれば、その根・.bib・Zotero のコレクション。"""
+        if not self.manuscript:
+            return None
+        from . import octavo
+        path = self.root / self.manuscript
+        found = octavo.find_project(path) if path.exists() else None
+        return octavo.project_info(found) if found else None
+
+    @property
+    def octavo_projects(self) -> List[Dict[str, Any]]:
+        """このサーベイを使う Octavo のプロジェクト: 原稿のあるプロジェクト（manuscript: True）と、
+        `scope --octavo` で結び付けたもの（1つのテーマのサーベイを、いくつもの論文で使う）。"""
+        from . import octavo
+        out: List[Dict[str, Any]] = []
+        own = self.octavo
+        if own:
+            out.append({**own, "manuscript": True})
+        for rel in self.data.get("octavo", []):
+            path = self.root / rel
+            found = octavo.find_project(path) if path.exists() else None
+            info = octavo.project_info(found) if found else {"root": str(path), "name": Path(rel).name, "bib": "",
+                                                             "bib_exists": False, "zotero_collections": [],
+                                                             "missing": True}
+            if all(info["root"] != o["root"] for o in out):
+                out.append({**info, "manuscript": False})
+        return out
+
+    def link_octavo(self, path: str, unlink: bool = False):
+        """Octavo のプロジェクトを結び付ける（外す）。プロジェクトの中のどこを指してもよく、根を記録する。"""
+        from . import octavo
+        p = Path(path).expanduser()
+        p = (p if p.is_absolute() else Path.cwd() / p).resolve()
+        found = octavo.find_project(p) if p.exists() else None
+        if found is None and not unlink:
+            raise SurveyError(t("Not an Octavo project (no octavo.config.py): {path}", path=path))
+        ref = manuscript_ref(str(found or p), self.root) if (found or p.exists()) else path
+        links = [r for r in self.data.get("octavo", []) if (self.root / r).resolve() != (found or p).resolve()]
+        if not unlink:
+            links.append(ref)
+        if links:
+            self.data["octavo"] = links
+        else:
+            self.data.pop("octavo", None)
 
     def set_manuscript(self, path: str):
         """原稿を結び付ける（キーは任意。無い状態ファイルもそのまま読める）。"""
@@ -679,8 +754,9 @@ class Survey:
 
 
 def manuscript_ref(path: str, root: Path) -> str:
-    """原稿（ファイル、または原稿と結果の表・図を入れたフォルダ）のパスを確かめ、
-    ワークスペースからの相対パス（外なら絶対パス）にする。"""
+    """原稿（ファイル、または原稿と結果の表・図を入れたフォルダ）のパスを確かめ、ワークスペースからの相対パスにする。
+    ワークスペースの外（別のリポジトリの Octavo のプロジェクトなど）も `../make_or_buy/papers/x` のように相対で持つ
+    （リポジトリを同じフォルダに並べて clone すれば、別のマシンでもそのまま動く）。"""
     p = Path(path).expanduser()
     p = (p if p.is_absolute() else Path.cwd() / p).resolve()
     if not p.exists():
@@ -688,7 +764,10 @@ def manuscript_ref(path: str, root: Path) -> str:
     try:
         return p.relative_to(root.resolve()).as_posix()
     except ValueError:
-        return str(p)
+        try:
+            return Path(os.path.relpath(p, root.resolve())).as_posix()
+        except ValueError:   # Windows で別のドライブ
+            return str(p)
 
 
 def _chronological(e: Dict[str, Any]):

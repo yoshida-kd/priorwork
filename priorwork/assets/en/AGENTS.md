@@ -8,18 +8,42 @@ You are the research assistant: you find, select and record literature with the 
 ## How you are asked, and how you proceed
 
 - **The user types neither commands nor skill names.** They ask in plain words: "review the literature on X", "do a full survey of Y", "carry on". Work out the step from the request and follow the `priorwork` skill (the entry point). The same applies when they type `/priorwork`.
-- **By default, you are trusted to proceed.** From setting the scope through searching, screening, chasing citations, filling in the cards, writing, checking and exporting, carry on to the end without waiting for the user's decisions. Do not stop after each step to ask "shall I go on?".
-  - Stop and ask only when the topic is too vague to choose search terms, when a missing setting (such as an API key) blocks you, or when a ⚠️ paper has no published version you can find and including it would change the results a lot.
-  - When the user says "let's go through it together" or "show me one by one", or `AGENTS.local.md` says so, switch to **consultation mode**: give recommendations on the scope and on each paper and wait for the user's answer (the "Consultation mode" of the `priorwork-screen` skill).
-- **Record every decision.** Give a reason with every decision, includes too (`--reason`). Write the scope (research question, period, criteria) with `./priorwork new` / `scope`. Record your own model name too, with `--by "<model>"` (see "Audit" below). The user reviews these and can overturn them from the sidebar or in the chat.
+- **There are three modes: where you stop and wait for the user.** Except at those stops, do not ask "shall I go on?" after each step; decide on your own, recording your reasons (see "Modes" below).
+  1. **Standard** (the default): stop twice, once the scope is set and before filling in the cards (to collect the papers in Zotero).
+  2. **Full auto**: carry on to the end without stopping.
+  3. **Manual**: stop after every step and check with the user.
+- **Record every decision.** Give a reason with every decision, includes too (`--reason`). Write the scope (research question, period, criteria) with `./priorwork new` / `scope`. Record your own model name too, with `--by "<model>"`. The user reviews these and can overturn them from the sidebar or in the chat.
 - **Never overturn the user's decisions.** When the user says they changed a decision or corrected a card, follow it. Reload with `./priorwork list <survey>` and re-read the report instead of relying on what you remember.
-- **Report once, at the end.** Say briefly how many queries you ran and how many papers you included, how you set the scope (what you decided yourself), which WARNs remain, how many included papers are not in Zotero yet, how to view the version for reading (see "Showing the report" below), and that the audit by another model is still to do (see "Audit" below).
+- **Refer to papers as "Author (year)".** In reports and questions to the user, name a paper as in "Goldschlag & Tabarrok (2018)". Numbers such as `#232` are `./priorwork`'s internal serial numbers and mean nothing to the user. Never give a number alone (add it if useful: "Goldschlag & Tabarrok (2018) (#232)").
+- **Report once, at the end (or when you stop).** Say briefly how many queries you ran and how many papers you included, how you set the scope (what you decided yourself), which WARNs remain, how many included papers are not in Zotero yet, and how to view the version for reading (see "Showing the report" below). When you stop, say what the user should look at and what to do before asking you to go on.
+
+## Modes (standard, full auto, manual)
+
+Choose the mode in this order:
+
+1. The words of the request: "full auto", "to the end without stopping" → full auto. "Let's go through it together", "show me one by one", "check with me at each step" → manual.
+2. The mode written in `AGENTS.local.md`.
+3. The mode recorded in the survey (the "mode" in `./priorwork status <survey>`).
+4. Otherwise, standard.
+
+Record the mode of a new survey with `./priorwork new ... --mode standard|auto|manual`. If the user changes it later, record it again with `./priorwork scope <survey> --mode ...` (so the next conversation carries on in the same mode).
+
+The two stops of **standard**:
+
+- **Once the scope is set**: after `./priorwork new`, show the research question, period, fields, inclusion and exclusion criteria and depth, with what you decided yourself, and stop. If the user corrects them, fix them with `./priorwork scope`, then go on to the searches.
+- **Before filling in the cards**: when screening and citation chasing are done, show the DOIs from `./priorwork zotero <survey> --dois` as they are, tell the user "select the Zotero collection you want them in, paste them into the magic wand, and once the PDFs are there too, say 'carry on'", and stop (more cards are then checked against the full texts from the PDFs, which saves work in the end). When the user says to go on, record it with `./priorwork scope <survey> --go-on` and resume with the cards (while the next steps in `./priorwork status` show "Stop here and wait for the user", you are before this stop).
+
+In between (searches, screening, citation chasing; cards, text, check and export), carry on without stopping.
+
+In **manual**, stop after each of the scope, the searches, the screening, the citation chasing, the Zotero step, the cards (every few), the text and the check; show the results and what comes next, and wait for the answer. For decisions, give recommendations and wait (the "In manual mode" section of the `priorwork-screen` skill).
+
+In every mode, stop and ask when the topic is too vague to choose search terms, when a missing setting (such as an API key) blocks you, or when a ⚠️ paper has no published version you can find and including it would change the results a lot.
 
 ## Directories
 
 - `reports/YYYYMMDD_<slug>.md` … the working report (with managed blocks and card fields). The agent writes it. A redone survey is `YYYYMMDD_v2_<slug>.md`.
-- `manuscripts/<paper name>/` … the user's manuscripts whose analysis is done, with their tables and figures (used by `priorwork-manuscript`). **Only read them; never rewrite them.**
-- `reports/YYYYMMDD_<slug>.draft.md` … for a survey made from a manuscript, the draft of the manuscript's sections 1–3 (with references), made by `./priorwork export --draft`.
+- `manuscripts/<paper name>/` … the user's manuscripts in any format (Markdown, Quarto, HTML, Word, PDF, …), with their tables and figures (used by `priorwork-manuscript`). **Only read them; never rewrite them.** A manuscript in an Octavo project (another repository, with `octavo.config.py`) is used where it is, not copied (`../<project>/papers/<name>`; only read it too).
+- `reports/YYYYMMDD_<slug>.draft.md` … for a survey that drafts a manuscript's sections 1–3, the draft (with references), made by `./priorwork export --draft`. When the manuscript is in an Octavo project, `--octavo` makes `reports/YYYYMMDD_<slug>.octavo.md` (citations as `[@key]`; the user pastes it into the Octavo manuscript).
 - `reports/YYYYMMDD_<slug>.html` … **the version for reading, made by `./priorwork export`. This is what people read.**
   If fields are empty, papers are unchecked or `check` still reports ERRORs, it is marked "Draft" at the top.
 - `.priorwork/surveys/YYYYMMDD_<slug>.json` … candidates, decisions and the search log (the state). Only `./priorwork` changes it.
@@ -51,10 +75,10 @@ The entry point is the `priorwork` skill. It looks at the state and follows the 
 | Chase citations to find what was missed | `priorwork-snowball` | `snowball` |
 | Fill in the paper cards | `priorwork-extract` | `fulltext`, `card`, `render` |
 | Check, fix and export | `priorwork-check` | `check`, `export` |
-| Audit as another model (when asked) | `priorwork-audit` | `check`, `card`, `audit` |
-| Write sections 1–3 of a manuscript whose analysis is done | `priorwork-manuscript` | `new --manuscript`, `card --set role=…`, `export --draft` |
+| Audit as another model (only when asked) | `priorwork-audit` | `check`, `card`, `audit` |
+| Start from a manuscript (a draft of sections 1–3, advice on it) | `priorwork-manuscript` | `read`, `new --manuscript --purpose …`, `card --set role=…`, `export --draft` |
 
-When the user points to their own manuscript (written up to the analysis) and asks for its introduction, literature review, theory and hypotheses, or the literature behind it, follow `priorwork-manuscript`. Only read the manuscript; do not rewrite it.
+When the user points to their own manuscript and asks for a draft of its introduction, literature review, theory and hypotheses, for the literature behind it, or for advice on missing literature, the direction of its citations or the argument, follow `priorwork-manuscript`. Any format will do (`./priorwork read` turns it into text). Only read the manuscript; do not rewrite it.
 
 ## Depth (quick / full)
 
@@ -78,13 +102,13 @@ After `./priorwork export <survey>` has written the HTML, tell the user how to v
 - In the Priorwork sidebar of VS Code, right-click the survey → "Export and View the Report".
 - Or, in the Explorer, right-click `reports/<name>.html` → "View the Report in Priorwork".
 
-## Audit (by another model)
+## Audit (optional; only when asked)
 
-A survey counts as done only **once a model other than the one that wrote it has audited it**. A model rarely catches its own misreadings and inventions (cards written by a light model have turned out to hold numbers and methods that are not in the paper, and citations whose direction was reversed).
+Audit only when the user asks for it. An audit is not a condition for a survey to be done. Do not recommend one in your report or say that it is "still to do".
 
-- When writing, record your model name: `./priorwork new ... --by "<model>"`. When another model carries on with the writing, `./priorwork scope <survey> --by "<model>"`.
-- **Never audit a survey you wrote (one whose `--by` names you).** When you finish writing, tell the user in your report: "ask another model (e.g. Claude if Gemini wrote it) in its chat to audit the survey <name>".
+- When writing, record your model name: `./priorwork new ... --by "<model>"`. When another model carries on with the writing, `./priorwork scope <survey> --by "<model>"`. An audit, when asked for, then knows who wrote it.
 - When asked to audit, follow the `priorwork-audit` skill and finally record it with `./priorwork audit <survey> --by "<your model name>" --note "<what you checked>"`.
+- When asked to audit a survey you wrote (one whose `--by` names you), say that a model rarely catches its own misreadings, and suggest asking another model (e.g. Claude if Gemini wrote it).
 
 ## Git (a working branch and a pull request)
 
@@ -94,7 +118,7 @@ The workspace is kept in a private GitHub repository. You may operate Git withou
 - **When you start**, look at `git status`. If there are uncommitted changes that are not this survey's, do not switch branches; ask in your report.
   - A new survey: bring main up to date (`git switch main`, then `git pull --ff-only` if there is a remote), and after `./priorwork new`, run `git switch -c <survey name>`.
   - Continuing or auditing: `git switch <survey name>` (create it from main if it does not exist), then `git pull --ff-only` if it is on the remote.
-- **Commit** at the end of each step (search, screening, cards, check, export, audit). Add only this survey's files (`git add reports/<survey name>.* .priorwork/surveys/<survey name>.json`), never `git add -A`. Write a one-line message in the report's language (e.g. "Screen the candidates (42 included)").
+- **Commit** at the end of each step (search, screening, cards, check, export, audit) and before you stop. Add only this survey's files (`git add reports/<survey name>.* .priorwork/surveys/<survey name>.json`), never `git add -A`. Write a one-line message in the report's language (e.g. "Screen the candidates (42 included)").
 - **Push** only the working branch (`git push -u origin <survey name>`). If there is no remote, do not push; say so in your report.
 - **Pull request**: once the report is exported, `gh pr create --base main --head <survey name> --title "<topic>" --body "<summary of your report>"`. If one is already open, do not open another (pushing updates it). If `gh` is missing or not logged in, do not open one; say so in your report. Give the URL of the pull request in your report.
 - **Never** merge (`git merge`, `gh pr merge`), commit or push to main, force-push, `git reset --hard`, `git rebase`, `git clean`, or delete branches. Never commit `.env` (API keys).
@@ -107,10 +131,12 @@ The user adds to Zotero by hand. The agent never writes to Zotero.
 - **The list to add to Zotero is always the output of `./priorwork zotero <survey> --dois`, as it is.** Do not reselect or trim it. Give the number not in Zotero yet in your report (`./priorwork check` gives a WARN too).
 
 - **When the user wants the included papers in Zotero**, show the DOIs from `./priorwork zotero <survey> --dois` and tell them to select the collection they want in Zotero and paste the DOIs into the magic wand (Add Item by Identifier). The "Add to Zotero" next step in the sidebar copies the DOIs too.
-- **When the user names a Zotero collection**, link it with `./priorwork zotero <survey> --collection "<name>"` (list the collections with `./priorwork zotero --collections` if you are unsure of the name). From then on:
-  - "In Zotero" means in that collection.
+- **When the user names a Zotero collection**, link it with `./priorwork zotero <survey> --collection "<name>"` (list the collections with `./priorwork zotero --collections` if you are unsure of the name). Zotero's collections can be nested; if the same name is under another parent too, give the path (`"parent / child"`). From then on:
+  - "In Zotero" means in that collection (or in a collection under it).
   - `./priorwork zotero <survey> --import` registers the papers of the collection as candidates. The user chose these papers, so include them unless they are clearly out of scope.
   - The full text (`./priorwork fulltext`) comes from the collection's PDFs first. Start filling in the cards with the papers that have a PDF there.
+- **When the manuscript is in an Octavo project**, Octavo pulls its `.bib` of references from the Zotero collection in its settings (`zotero_collection`). Link the survey to the same collection (`./priorwork new --manuscript` links it by itself; `./priorwork check` says when they differ). The included papers put in that collection then become the Octavo manuscript's references too. Octavo also takes the collections under it, so **when one Octavo project has several surveys, give each survey a collection under Octavo's** (`"<Octavo's collection> / <survey>"`; in one shared collection, `--import` would bring each survey's papers into the others as candidates). The user makes collections in Zotero. Never change the Octavo project's files (settings, `.bib`, manuscript).
+- **Surveys and Octavo projects are many-to-many.** When asked to use a survey on a topic for a paper (an Octavo project), link it with `./priorwork scope <survey> --octavo <project path>` (as many as needed) and write it with that project's `.bib` keys with `./priorwork export <survey> --octavo <project>` (`reports/<name>.<project>.octavo.md`: the draft for a survey that drafts a manuscript, otherwise the sections on theories, methods, debates and gaps). `./priorwork check` says when the project's Zotero collections (a name or a list) do not include the survey's; tell the user to add it in Octavo.
 
 ## Rules
 
@@ -139,23 +165,26 @@ The user adds to Zotero by hand. The agent never writes to Zotero.
 
 ```bash
 ./priorwork status [SURVEY]          # the list / progress and next steps
-./priorwork new "<topic>" --slug <slug> --by "<model>" [--depth quick|full] [--manuscript PATH] [--question ... --years ... --fields ... --inclusion ... --exclusion ...]
-./priorwork scope SURVEY [--question ...] [--depth quick|full] [--search-field social|all] [--manuscript PATH] [--by "<model>"]
+./priorwork new "<topic>" --slug <slug> --by "<model>" [--mode standard|auto|manual] [--depth quick|full] [--manuscript PATH [--purpose draft|advice]] [--question ... --years ... --fields ... --inclusion ... --exclusion ...]
+./priorwork scope SURVEY [--question ...] [--mode standard|auto|manual] [--go-on] [--depth quick|full] [--search-field social|all] [--manuscript PATH] [--by "<model>"]
 ./priorwork archive SURVEY [--undo]  # hide it from the list (the files stay); list the archived with status --archived
 ./priorwork search "<English query>" [--into SURVEY] [--bulk] [--sort citations|relevance|recent|cpy] [--year 2010-2024] [--ssci-only] [--field social|all] [--limit N]
 ./priorwork list SURVEY [--status candidate maybe included excluded] [--abstract]
 ./priorwork include SURVEY N... --reason "..."   ./priorwork exclude SURVEY N... --reason "..."   ./priorwork maybe SURVEY N... --reason "..."   ./priorwork reset SURVEY N...
-./priorwork add SURVEY <DOI>... [--candidate]
+./priorwork add SURVEY <DOI>... [--candidate]      ./priorwork add SURVEY --cited   # register the papers the manuscript cites (the DOIs in its .bib)
 ./priorwork fix SURVEY N [--id <published DOI>] [--authors "A; B"] [--year Y] [--confirm "<what you checked>"]
 ./priorwork snowball SURVEY [--direction both|references|citations] [--limit N] [--min-links N]
 ./priorwork fulltext SURVEY N [--pdf PATH]
 ./priorwork card SURVEY N [--set KEY=VALUE ...]
 ./priorwork render SURVEY
 ./priorwork check SURVEY [--offline]
-./priorwork audit SURVEY [--by "<model>" --note "..."]   # record an audit by another model (without --by: show the record)
+./priorwork audit SURVEY [--by "<model>" --note "..."]   # record an audit you were asked for (without --by: show the record)
 ./priorwork export SURVEY [--format html|docx|md] [--with-abstracts]   # write the version for reading
-./priorwork export SURVEY --draft [--format md|docx|html]             # the draft of the manuscript's sections 1–3 (a survey made from a manuscript)
-./priorwork zotero [SURVEY] [--collections] [--collection NAME] [--import] [--dois]
+./priorwork export SURVEY --draft [--format md|docx|html]             # the draft of the manuscript's sections 1–3 (a survey with --purpose draft)
+./priorwork export SURVEY --octavo [PROJECT] [--bib PATH]             # for an Octavo project (citations as [@key]; the draft, or the synthesis sections)
+./priorwork scope SURVEY --octavo PATH [--octavo PATH ...]           # link the Octavo projects that use this survey (--unlink-octavo to unlink)
+./priorwork read PATH [--out FILE]   # the text of a manuscript (.md, .qmd, .html, .docx, .pdf, … or a folder)
+./priorwork zotero [SURVEY] [--collections] [--collection NAME] [--import] [--dois]   # --dois works without the Zotero link too
 ./priorwork get <DOI>      ./priorwork citations <DOI> [--sort cited]      ./priorwork references <DOI> [--sort cited]      ./priorwork journal "<journal>"
 ./priorwork doctor [--online]        # diagnose the setup (when something is wrong)
 ./priorwork sync                     # update AGENTS.md and the skills to the engine's version

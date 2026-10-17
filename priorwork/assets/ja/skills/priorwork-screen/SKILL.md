@@ -3,14 +3,14 @@ name: priorwork-screen
 description: >-
   Screens the candidate papers of a literature survey against its inclusion and exclusion criteria and
   records include/exclude/maybe with a reason for each (`./priorwork include|exclude|maybe`). Decides on its
-  own by default; in consultation mode, presents recommendations and waits. Use when a survey has unscreened candidates.
+  own in the standard and full-auto modes; in the manual mode, presents recommendations and waits. Use when a survey has unscreened candidates.
 ---
 
 # 候補を選別する
 
 ルールは [AGENTS.md](../../../AGENTS.md) に従う。
 
-## 手順（既定: 任せて進める）
+## 手順（標準・全自動: 自分で判断して進める）
 
 1. 候補を要旨つきで表示する。
 
@@ -34,13 +34,13 @@ description: >-
    - WP・プレプリント・書評・コメントは除外（AGENTS.md ルール 1）。⚠️ 付きは下の手順。
    - **ユーザーが下した採否は変えない。** 候補（candidate）だけを判断する。
 
-3. 候補がなくなるまで繰り返す。終わったら採用・保留・除外の件数を控え、次の工程（`priorwork-snowball` または `priorwork-extract`）に進む。
+3. 候補がなくなるまで繰り返す。終わったら採用・保留・除外の件数を控え、次の工程（`priorwork-snowball`、それも済んでいれば Zotero への取り込み）に進む。標準と手動では、カードの記入の前で止まる（AGENTS.md「進め方」）。
 
-## 相談モード
+## 手動のとき
 
-ユーザーが相談しながら進めたいと言ったとき（または `AGENTS.local.md` にそうあるとき）は、記録する前に答えを待つ。
+進め方が手動のとき（ユーザーが相談しながら進めたいと言ったとき、または `AGENTS.local.md` にそうあるとき）は、記録する前に答えを待つ。
 
-1. 5〜10 件ずつ、次の形で示す（番号は `#` の番号をそのまま使う）。
+1. 5〜10 件ずつ、次の形で示す（ユーザーが番号で答えられるよう `#` の番号を添えるが、論文は著者 (年) とタイトルで分かるようにする）。
 
    | # | 著者 (年) | 掲載誌 | 推薦 | 理由（採用・除外基準に照らして 1 行） |
    | :--- | :--- | :--- | :--- | :--- |

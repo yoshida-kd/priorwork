@@ -15,6 +15,7 @@ import {
     CheckReport, CliError, DoctorReport, Entry, ExportReport, runJson, runText, SearchReport, Status, SurveySummary,
     ZoteroCollections, ZoteroReport,
 } from './cli';
+import { browseCollections } from './collections';
 import { Model } from './model';
 import { doiUrl, PaperPanel } from './paper';
 import { SettingsPanel } from './settings';
@@ -22,7 +23,7 @@ import { Setup } from './setup';
 import { Node, SurveyTree } from './tree';
 
 /** エージェントに頼める仕事（文面は askAgent）。 */
-type AgentTask = 'survey' | 'search' | 'screen' | 'snowball' | 'fill' | 'write' | 'check' | 'audit';
+type AgentTask = 'survey' | 'auto' | 'search' | 'screen' | 'snowball' | 'fill' | 'write' | 'check' | 'audit';
 
 /** エージェントのチャットを開くコマンド（入っているものだけ出す）。 */
 const AGENT_CHATS: { command: string; label: string }[] = [
@@ -141,12 +142,15 @@ export function activate(context: vscode.ExtensionContext): void {
         const L = vscode.l10n;
         const which = numbers.length ? numbers.map((n) => `#${n}`).join(', ') : L.t('the unfilled ones');
         const text = {
-            survey: L.t('Carry on with the survey "{0}" ({1}) with Priorwork, to the end: search, screen, chase citations, fill in the cards, write the text, check and export. Decide on your own with reasons, and report at the end.', s.topic, s.name),
+            survey: L.t('Carry on with the survey "{0}" ({1}) with Priorwork in its mode (./priorwork status shows it): search, screen, chase citations, fill in the cards, write the text, check and export, deciding on your own with reasons. If you stopped to wait for me, I am done: go on.', s.topic, s.name),
+            auto: L.t('Carry on with the survey "{0}" ({1}) with Priorwork to the end without stopping (full auto from now on): search, screen, chase citations, fill in the cards, write the text, check and export. Decide on your own with reasons, and report at the end.', s.topic, s.name),
             search: L.t('Search more for the survey "{0}" ({1}) with Priorwork, from subtopics not searched yet, then screen the new candidates.', s.topic, s.name),
             screen: L.t('Screen the candidates of the survey "{0}" ({1}) with Priorwork against its criteria, recording a reason for each decision.', s.topic, s.name),
             snowball: L.t('Chase the citations of the included papers of the survey "{0}" ({1}) with Priorwork and screen the new candidates.', s.topic, s.name),
             fill: L.t('Fill in the paper cards of the survey "{0}" ({1}) with Priorwork: {2}. Write only what the abstract or the full text says, and update the evidence level.', s.topic, s.name, which),
-            write: s.manuscript
+            write: s.purpose === 'advice'
+                ? L.t('Write the advice on my manuscript ({0}) from the survey "{1}" ({2}): how it cites the literature (the direction of each citation), the literature it is missing, and comments on the argument, most important first. Cite only papers included in the survey, keep the literature apart from my own claims, and run ./priorwork check at the end. Do not rewrite the manuscript.', s.manuscript ?? '', s.topic, s.name)
+                : s.manuscript
                 ? L.t('Write the draft of the introduction, literature review and theory and hypotheses of my manuscript ({0}) from the survey "{1}" ({2}), in the language of the manuscript. Cite only papers included in the survey, show where the literature disagrees with my results, run ./priorwork check and export the draft with ./priorwork export {2} --draft.', s.manuscript, s.topic, s.name)
                 : L.t('Write the text of the report of the survey "{0}" ({1}) from the paper cards: the background, the sections on the literature (theories, methods, debates, gaps), citing included papers for each claim, and the hypotheses of this study kept apart from the literature. Run ./priorwork check at the end.', s.topic, s.name),
             check: L.t('Check the survey "{0}" ({1}) with Priorwork, fix what it finds and export the report.', s.topic, s.name),
@@ -163,7 +167,7 @@ export function activate(context: vscode.ExtensionContext): void {
         const L = vscode.l10n;
         const dir = path.join(r, 'manuscripts');
         const picked = await vscode.window.showOpenDialog({
-            title: L.t('Choose the manuscript, or its folder in manuscripts/'),
+            title: L.t('Choose the manuscript, its folder in manuscripts/, or a paper in an Octavo project'),
             defaultUri: vscode.Uri.file(fs.existsSync(dir) ? dir : r),
             canSelectFiles: true, canSelectFolders: true, canSelectMany: false, openLabel: L.t('Use This'),
         });
@@ -171,6 +175,13 @@ export function activate(context: vscode.ExtensionContext): void {
             return;
         }
         let file = picked[0].fsPath;
+        const octavo = octavoProject(file);
+        if (octavo) {
+            // Octavo のプロジェクト（別のリポジトリ）の原稿は、写さずにその場で読む（.bib と分析の結果もそこにある）
+            const rel = path.relative(r, file).split(path.sep).join('/');
+            await copyForAgent(L.t('My manuscript is in {0}, in an Octavo project. With Priorwork, read it (./priorwork read reads the project\'s results and the literature it cites too), then propose what to make from it and wait for my answer: what for (a draft of its introduction, literature review and theory and hypotheses, advice on it such as missing literature, the direction of its citations and the argument, or both as separate reports), which parts of the manuscript to cover, and the scope of the searches. Write drafts for Octavo (./priorwork export --draft --octavo). Do not rewrite the manuscript.', rel));
+            return;
+        }
         if (path.relative(r, file).startsWith('..') || path.isAbsolute(path.relative(r, file))) {
             const copy = L.t('Copy It into manuscripts/');
             const choice = await vscode.window.showWarningMessage(
@@ -189,7 +200,124 @@ export function activate(context: vscode.ExtensionContext): void {
             file = dest;
         }
         const rel = path.relative(r, file).split(path.sep).join('/');
-        await copyForAgent(L.t('The analysis of my manuscript in {0} is done. With Priorwork, make a survey from it, gather the literature that supports and conflicts with it, and draft its introduction, literature review and theory and hypotheses in the language of the manuscript, without stopping. Do not rewrite the manuscript. Report at the end.', rel));
+        await copyForAgent(L.t('My manuscript is in {0}. With Priorwork, read it, then propose what to make from it and wait for my answer: what for (a draft of its introduction, literature review and theory and hypotheses, advice on it such as missing literature, the direction of its citations and the argument, or both as separate reports), which parts of the manuscript to cover, and the scope of the searches. Do not rewrite the manuscript.', rel));
+    }
+
+    /**
+     * サーベイを Octavo のプロジェクトに結び付ける（外す）。1つのテーマのサーベイを、いくつもの論文で使う。
+     * Octavo のプロジェクトは別のリポジトリなので、フォルダを選んでもらう。
+     */
+    async function linkOctavo(s: SurveySummary): Promise<void> {
+        const L = vscode.l10n;
+        const r = model.root;
+        if (!r) {
+            return;
+        }
+        const linked = (await model.detail(s.name).catch(() => undefined))?.octavo_projects ?? [];
+        type Item = vscode.QuickPickItem & { root?: string; manuscript?: boolean };
+        const items: Item[] = [
+            ...linked.map((p) => ({ label: '$(close) ' + L.t('Unlink {0}', p.name), description: p.root, root: p.root,
+                                    manuscript: p.manuscript })),
+            { label: '$(add) ' + L.t('Link an Octavo project…'), description: L.t('choose its folder') },
+        ];
+        const picked = linked.length ? await vscode.window.showQuickPick(items, { title: L.t('Octavo projects for {0}', s.topic) })
+            : items[items.length - 1];
+        if (!picked) {
+            return;
+        }
+        let args: string[];
+        if (picked.root) {
+            if (picked.manuscript) {
+                void vscode.window.showInformationMessage(L.t('{0} holds the manuscript of this survey, so it stays linked.', picked.root));
+                return;
+            }
+            args = ['scope', s.name, '--unlink-octavo', picked.root, '--json'];
+        } else {
+            const dir = await vscode.window.showOpenDialog({
+                title: L.t('Choose the folder of the Octavo project (with octavo.config.py)'),
+                defaultUri: vscode.Uri.file(path.dirname(r)), canSelectFiles: false, canSelectFolders: true, canSelectMany: false,
+                openLabel: L.t('Use This'),
+            });
+            if (!dir?.length) {
+                return;
+            }
+            if (!octavoProject(dir[0].fsPath)) {
+                void vscode.window.showErrorMessage(L.t('{0} is not an Octavo project (no octavo.config.py).', dir[0].fsPath));
+                return;
+            }
+            args = ['scope', s.name, '--octavo', dir[0].fsPath, '--json'];
+        }
+        try {
+            await runJson(r, args);
+        } catch (e) {
+            fail(e);
+            return;
+        }
+        model.refresh();
+        void vscode.window.showInformationMessage(picked.root ? L.t('Priorwork: unlinked the Octavo project.')
+            : L.t('Priorwork: linked the Octavo project. Export for it from the survey\'s menu; ./priorwork check tells you if its Zotero collections miss the survey\'s.'));
+    }
+
+    /** Octavo のプロジェクト用に書き出す（引用をそのプロジェクトの .bib のキーで [@key] に）。 */
+    async function exportOctavo(s: SurveySummary): Promise<void> {
+        const L = vscode.l10n;
+        const linked = ((await model.detail(s.name).catch(() => undefined))?.octavo_projects ?? []).filter((p) => !p.missing);
+        if (!linked.length) {
+            const link = L.t('Link an Octavo project…');
+            if (await vscode.window.showInformationMessage(L.t('This survey is not linked to an Octavo project yet.'), link) === link) {
+                await linkOctavo(s);
+            }
+            return;
+        }
+        const project = linked.length === 1 ? linked[0] : (await vscode.window.showQuickPick(
+            linked.map((p) => ({ label: p.name, description: p.root, p })), { title: L.t('Export for which Octavo project?') }))?.p;
+        if (!project) {
+            return;
+        }
+        let got: { path: string; missing: { doi: string; title: string }[] };
+        try {
+            got = await busy(L.t('writing for Octavo'), (o) => runJson(model.root, ['export', s.name, '--octavo', project.root, '--json'], o));
+        } catch (e) {
+            fail(e);
+            return;
+        }
+        await vscode.window.showTextDocument(vscode.Uri.file(got.path));
+        if (got.missing.length) {
+            const copy = L.t('Copy the DOIs');
+            if (await vscode.window.showWarningMessage(
+                L.t('{0} papers are not in the .bib of {1}, so they are written as [@PRIORWORK:…]. Add them to its Zotero collection, run octavo bib pull, then export again.',
+                    got.missing.length, project.name), copy) === copy) {
+                await vscode.env.clipboard.writeText(got.missing.map((m) => m.doi).filter(Boolean).join('\n'));
+            }
+        }
+    }
+
+    /** Zotero のコレクションのパス（"親 / 子"）が同じか。大文字小文字と区切りの空白は問わない。 */
+    function samePath(a: string, b: string): boolean {
+        const norm = (p: string): string => p.split('/').map((x) => x.trim().toLowerCase()).join('/');
+        return norm(a) === norm(b);
+    }
+
+    /** コレクション ours が theirs そのものか、その下にあるか（priorwork/check.py の within_collection と同じ）。 */
+    function withinCollection(ours: string, theirs: string): boolean {
+        const po = ours.split('/').map((x) => x.trim().toLowerCase());
+        const pt = theirs.split('/').map((x) => x.trim().toLowerCase());
+        return pt.length === 1 ? po.includes(pt[0]) : pt.every((x, i) => po[i] === x);
+    }
+
+    /** file を含む Octavo のプロジェクトの根（octavo.config.py のあるフォルダ）。無ければ undefined。 */
+    function octavoProject(file: string): string | undefined {
+        let dir = fs.existsSync(file) && fs.statSync(file).isDirectory() ? file : path.dirname(file);
+        for (;;) {
+            if (fs.existsSync(path.join(dir, 'octavo.config.py'))) {
+                return dir;
+            }
+            const up = path.dirname(dir);
+            if (up === dir) {
+                return undefined;
+            }
+            dir = up;
+        }
     }
 
     /** 依頼文をコピーし、入っているエージェントのチャットを開けるようにする。 */
@@ -208,6 +336,37 @@ export function activate(context: vscode.ExtensionContext): void {
     }
 
     /** Zotero に無い採用論文。DOI をまとめてコピーし（Zotero の「識別子でアイテムを追加」に貼れる）、読み直す。 */
+    /**
+     * 標準の進め方で、カードの記入の前に止まっているとき。採用論文を Zotero に集め（PDF も）、
+     * それからエージェントに続きを頼む（本文で確かめたカードが増える）。
+     */
+    async function beforeCards(s: SurveySummary): Promise<void> {
+        const L = vscode.l10n;
+        const copy = L.t('Copy the DOIs');
+        const goOn = L.t('Ask the Agent to Go On');
+        for (;;) {
+            const picked = await vscode.window.showInformationMessage(
+                L.t('The agent stops here so that you can collect the included papers of "{0}" and their PDFs in Zotero: the cards are then read from the full texts. Copy the DOIs, paste them into Zotero\'s "Add Item by Identifier" (the magic wand), then ask the agent to go on.', s.topic),
+                copy, goOn);
+            if (picked === copy) {
+                try {
+                    const dois = (await runText(model.root, ['zotero', s.name, '--dois'])).trim();
+                    await vscode.env.clipboard.writeText(dois);
+                    void vscode.window.showInformationMessage(
+                        L.t('Copied {0} DOIs. In Zotero, click the magic wand, paste them and press Enter.', dois ? dois.split('\n').length : 0));
+                } catch (e) {
+                    fail(e);
+                    return;
+                }
+                continue;
+            }
+            if (picked === goOn) {
+                await askAgent(s, 'survey');
+            }
+            return;
+        }
+    }
+
     async function zoteroMissing(s: SurveySummary): Promise<void> {
         const L = vscode.l10n;
         const reload = L.t('Reload from Zotero');
@@ -262,34 +421,67 @@ export function activate(context: vscode.ExtensionContext): void {
     }
 
     /** Zotero のコレクションをサーベイに結び付ける。Zotero には書き込まない（コレクションを作るのはユーザー）。 */
+    /**
+     * サーベイに Zotero のコレクションを結び付ける。Priorwork は Zotero に書き込まないので、コレクションは Zotero で
+     * 作ってもらい、ここで読み直す。原稿が Octavo のプロジェクトにあれば、Octavo が .bib を取るコレクションを先頭に出す
+     * （同じコレクションに集めれば、Octavo の参考文献にもなる）。
+     */
     async function zoteroCollection(s: SurveySummary): Promise<void> {
         const L = vscode.l10n;
-        let list: ZoteroCollections;
-        try {
-            list = await busy(L.t('reading the Zotero collections'),
-                (o) => runJson<ZoteroCollections>(model.root, ['zotero', '--collections', '--json'], o));
-        } catch (e) {
-            fail(e);
-            return;
+        const detail = await model.detail(s.name).catch(() => undefined);
+        const current = detail?.zotero_collection;
+        // このサーベイを使う Octavo のプロジェクトが .bib を取るコレクション（その下のものも候補）
+        const octavoNames = (detail?.octavo_projects ?? []).flatMap((p) => p.zotero_collections ?? []);
+        const underOctavo = (c: { path: string }): boolean => octavoNames.some((n) => withinCollection(c.path, n));
+        let refresh = false;
+        let picked: { kind: 'pick'; key: string } | { kind: 'unlink' } | undefined;
+        for (;;) {
+            let list: ZoteroCollections;
+            try {
+                list = await busy(L.t('reading the Zotero collections'),
+                    (o) => runJson<ZoteroCollections>(model.root, ['zotero', '--collections', '--json', ...(refresh ? ['--refresh'] : [])], o));
+            } catch (e) {
+                fail(e);
+                return;
+            }
+            const suggested = list.collections.filter((c) => octavoNames.some((n) => samePath(c.path, n)
+                || (!n.includes('/') && c.name.toLowerCase() === n.toLowerCase())));
+            const r = await browseCollections({
+                cols: list.collections,
+                title: L.t('Zotero collection for {0}', s.topic),
+                current: current?.key,
+                suggested: suggested.map((c) => c.key),
+                hint: octavoNames.length && !suggested.length
+                    ? L.t('The Octavo project uses "{0}", which is not in Zotero yet. Make it in Zotero, then reload.', octavoNames.join('", "'))
+                    : L.t('Choose a folder to open it; the included papers go into the collection you use'),
+                note: (c) => octavoNames.length && underOctavo(c) ? L.t('under the Octavo project\'s collection') : '',
+            });
+            if (!r) {
+                return;
+            }
+            if (r.kind === 'reload') {
+                refresh = true;
+                continue;
+            }
+            if (r.kind === 'howto') {
+                const reload = L.t('Reload the list');
+                const again = await vscode.window.showInformationMessage(
+                    L.t('Priorwork never writes to Zotero, so make the collection there: in Zotero, right-click "My Library" (or a collection) → New Collection… and name it{0}. Then come back and reload the list.',
+                        octavoNames.length ? ' ' + L.t('"{0}" (the name the Octavo project uses)', octavoNames[0]) : ''),
+                    { modal: false }, reload);
+                if (again !== reload) {
+                    return;
+                }
+                refresh = true;
+                continue;
+            }
+            picked = r;
+            break;
         }
-        const current = (await model.detail(s.name).catch(() => undefined))?.zotero_collection;
-        const none = { label: L.t('(none)'), description: L.t('do not link a collection'), key: '' };
-        const picked = await vscode.window.showQuickPick([
-            ...list.collections.map((c) => ({
-                label: c.path, description: L.t('{0} items', c.items) + (current?.key === c.key ? ' ✓' : ''), key: c.key,
-            })),
-            ...(current ? [none] : []),
-        ], {
-            title: L.t('Zotero collection for {0}', s.topic),
-            placeHolder: list.collections.length ? L.t('Make the collection in Zotero first if it is not here')
-                : L.t('The Zotero library has no collections. Make one in Zotero first.'),
-        });
-        if (!picked) {
-            return;
-        }
+        const key = picked.kind === 'pick' ? picked.key : '';
         let r: ZoteroReport;
         try {
-            r = await runJson<ZoteroReport>(model.root, ['zotero', s.name, '--collection', picked.key, '--json']);
+            r = await runJson<ZoteroReport>(model.root, ['zotero', s.name, '--collection', key, '--json']);
         } catch (e) {
             fail(e);
             return;
@@ -298,6 +490,20 @@ export function activate(context: vscode.ExtensionContext): void {
         if (!r.collection) {
             void vscode.window.showInformationMessage(L.t('Priorwork: unlinked the Zotero collection.'));
             return;
+        }
+        // このサーベイを使う Octavo のプロジェクトのうち、このコレクションを取らないもの（Octavo 側に足すコマンドを渡す。
+        // Octavo のプロジェクトは別のウィンドウなので）
+        const linkedName = r.collection.name;
+        const notPulled = (detail?.octavo_projects ?? []).filter((p) => !p.missing
+            && !(p.zotero_collections ?? []).some((n) => withinCollection(linkedName, n)));
+        if (notPulled.length) {
+            const copy = L.t('Copy the Command');
+            const picked2 = await vscode.window.showInformationMessage(
+                L.t('The Octavo projects {0} do not pull their .bib from this collection. In Octavo, add it with Choose the Zotero Collection.',
+                    notPulled.map((p) => p.name).join(', ')), copy);
+            if (picked2 === copy) {
+                await vscode.env.clipboard.writeText(`octavo config set zotero_collection "${linkedName}"`);
+            }
         }
         const add = L.t('Register them');
         const choice = await vscode.window.showInformationMessage(
@@ -387,13 +593,27 @@ export function activate(context: vscode.ExtensionContext): void {
 
     /**
      * 書き出した HTML に CSP を足す。動かしてよいスクリプトは Mermaid の図を描くもの
-     * （priorwork/export.py の MERMAID_JS）だけで、レポートに紛れ込んだスクリプトは動かさない。
+     * （priorwork/export.py の MERMAID_JS）と、ここで足すコピーの補助だけで、レポートに紛れ込んだスクリプトは動かさない。
+     * 文章は選択してコピーできる（エディターによってはコピーのキーが webview に届かないので、選択を拡張機能に送って
+     * クリップボードに書く）。ページ内の検索（Ctrl+F）は webview の検索ウィジェットで行う（showHtml の enableFindWidget）。
      */
     function reportHtml(file: string): string {
+        const nonce = [...Array(24)].map(() => Math.floor(Math.random() * 36).toString(36)).join('');
         const csp = '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; '
             + 'style-src \'unsafe-inline\'; img-src https: data:; font-src https: data:; '
-            + 'script-src https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js;">';
-        return fs.readFileSync(file, 'utf-8').replace(/<head>/i, `<head>\n${csp}`);
+            + `script-src 'nonce-${nonce}' https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js;">`;
+        const select = '<style>html, body, main { -webkit-user-select: text; user-select: text; }</style>';
+        const copy = `<script nonce="${nonce}">(() => {
+    const vscode = acquireVsCodeApi();
+    document.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 'c' || e.key === 'C' || e.key === 'Insert')) {
+            const text = String(window.getSelection() || '');
+            if (text) { vscode.postMessage({ type: 'copy', text }); }
+        }
+    });
+})();</script>`;
+        return fs.readFileSync(file, 'utf-8').replace(/<head>/i, `<head>\n${csp}\n${select}`)
+            .replace(/<\/body>/i, `${copy}\n</body>`);
     }
 
     /**
@@ -403,8 +623,14 @@ export function activate(context: vscode.ExtensionContext): void {
     function showHtml(file: string, title: string): void {
         if (!reportPanel) {
             reportPanel = vscode.window.createWebviewPanel('priorwork.report', title, vscode.ViewColumn.Active,
-                                                           { enableScripts: true });
+                                                           { enableScripts: true, enableFindWidget: true,
+                                                             retainContextWhenHidden: true });
             reportPanel.onDidDispose(() => { reportPanel = undefined; reportFile = undefined; });
+            reportPanel.webview.onDidReceiveMessage((m: { type?: string; text?: string }) => {
+                if (m.type === 'copy' && typeof m.text === 'string') {
+                    void vscode.env.clipboard.writeText(m.text);
+                }
+            });
         }
         reportPanel.title = title;
         reportPanel.webview.html = reportHtml(file);
@@ -473,16 +699,19 @@ export function activate(context: vscode.ExtensionContext): void {
             if (!task) {
                 const L = vscode.l10n;
                 const items: { label: string; description: string; task: AgentTask }[] = [
-                    { label: L.t('Carry on to the end'), description: L.t('the whole survey, without stopping'), task: 'survey' },
+                    { label: L.t('Carry on'), description: L.t('in the survey\'s mode (standard: stops before the cards for Zotero)'), task: 'survey' },
+                    { label: L.t('Carry on to the end'), description: L.t('the whole survey, without stopping'), task: 'auto' },
                     { label: L.t('Search more'), description: L.t('more queries, then screening'), task: 'search' },
                     { label: L.t('Screen the candidates'), description: L.t('decisions with reasons'), task: 'screen' },
                     { label: L.t('Chase citations'), description: L.t('snowball, then screening'), task: 'snowball' },
                     { label: L.t('Fill in the paper cards'), description: L.t('from the abstracts or full texts'), task: 'fill' },
-                    s.manuscript
+                    s.purpose === 'advice'
+                        ? { label: L.t('Write the advice on the manuscript'), description: L.t('citations, missing literature, the argument'), task: 'write' }
+                        : s.manuscript
                         ? { label: L.t('Write the draft of the manuscript'), description: L.t('introduction, literature review, hypotheses'), task: 'write' }
                         : { label: L.t('Write the text of the report'), description: L.t('background, literature, hypotheses'), task: 'write' },
                     { label: L.t('Check and fix'), description: L.t('then export the report'), task: 'check' },
-                    { label: L.t('Audit as another model'), description: L.t('paste into a model other than the one that wrote it'), task: 'audit' },
+                    { label: L.t('Audit as another model'), description: L.t('optional; paste into a model other than the one that wrote it'), task: 'audit' },
                 ];
                 task = (await vscode.window.showQuickPick(items, { placeHolder: L.t('What should your agent do?') }))?.task;
                 if (!task) {
@@ -504,7 +733,7 @@ export function activate(context: vscode.ExtensionContext): void {
             const L = vscode.l10n;
             const how = await vscode.window.showQuickPick([
                 { label: L.t('Ask your agent to do it'), detail: L.t('Recommended. Give the topic; the agent sets the scope, searches, screens, fills in the cards and writes the report.'), agent: true },
-                { label: L.t('Start from my manuscript'), detail: L.t('The analysis is written; the agent gathers the literature behind it and drafts the introduction, literature review and hypotheses.'), agent: true, manuscript: true },
+                { label: L.t('Start from my manuscript'), detail: L.t('Any format (Markdown, Quarto HTML, Word, PDF). The agent proposes what to make with you: a draft of its introduction, literature review and hypotheses, advice on it, or both.'), agent: true, manuscript: true },
                 { label: L.t('Set it up myself'), detail: L.t('Give the topic, slug, depth and question, then search and screen in the sidebar.'), agent: false },
             ], { title: L.t('New survey'), placeHolder: L.t('How do you want to make it?') });
             if (!how) {
@@ -532,10 +761,23 @@ export function activate(context: vscode.ExtensionContext): void {
                 if (!deep) {
                     return;
                 }
-                const text = deep.label === 'full' || deep.label === 'quick'
-                    ? L.t('Make a literature survey with Priorwork (depth: {0}) on: {1}. Set the scope yourself, then search, screen, chase citations, fill in the cards, write the text, check and export without stopping, and report at the end.', deep.label, about.trim())
-                    : L.t('Make a literature survey with Priorwork on: {0}. Choose the depth and set the scope yourself, then search, screen, chase citations, fill in the cards, write the text, check and export without stopping, and report at the end.', about.trim());
-                await copyForAgent(text);
+                const mode = await vscode.window.showQuickPick([
+                    { label: L.t('Standard'), description: L.t('Recommended'), detail: L.t('Stops twice: once the scope is set, and before the paper cards, showing the DOIs to collect in Zotero (cards read from the PDFs are better).'), mode: 'standard' },
+                    { label: L.t('Full auto'), description: '', detail: L.t('To the end without stopping.'), mode: 'auto' },
+                    { label: L.t('Step by step'), description: '', detail: L.t('Stops after every step for you to check.'), mode: 'manual' },
+                ], { title: L.t('New survey'), placeHolder: L.t('Where should the agent stop for you?') });
+                if (!mode) {
+                    return;
+                }
+                const what = deep.label === 'full' || deep.label === 'quick'
+                    ? L.t('Make a literature survey with Priorwork (depth: {0}) on: {1}.', deep.label, about.trim())
+                    : L.t('Make a literature survey with Priorwork on: {0}. Choose the depth yourself.', about.trim());
+                const how = {
+                    standard: L.t('Go in the standard mode: set the scope and stop to show it to me; then search, screen and chase citations, and stop again before the paper cards, showing me the DOIs to collect in Zotero. Decide on your own with reasons in between.'),
+                    auto: L.t('Go in full auto: set the scope yourself, then search, screen, chase citations, fill in the cards, write the text, check and export without stopping, and report at the end.'),
+                    manual: L.t('Go step by step: stop after each step (scope, searches, screening, citations, cards, text, check) and wait for me.'),
+                }[mode.mode];
+                await copyForAgent(`${what} ${how}`);
                 return;
             }
             const topic = await vscode.window.showInputBox({
@@ -843,6 +1085,20 @@ export function activate(context: vscode.ExtensionContext): void {
             model.refresh();
         },
 
+        'priorwork.linkOctavo': async (arg?: unknown) => {
+            const s = await surveyOf(arg);
+            if (s) {
+                await linkOctavo(s);
+            }
+        },
+
+        'priorwork.exportOctavo': async (arg?: unknown) => {
+            const s = await surveyOf(arg);
+            if (s) {
+                await exportOctavo(s);
+            }
+        },
+
         'priorwork.zoteroCollection': async (arg?: unknown) => {
             const s = await surveyOf(arg);
             if (s) {
@@ -1003,6 +1259,9 @@ export function activate(context: vscode.ExtensionContext): void {
                 case 'draft':
                     return vscode.commands.executeCommand('priorwork.askAgent', { name: s.name, task: 'write' });
                 case 'zotero': return zoteroMissing(s);
+                case 'wait_zotero': return beforeCards(s);
+                case 'advice':
+                    return vscode.commands.executeCommand('priorwork.askAgent', { name: s.name, task: 'write' });
                 case 'audit':
                     return vscode.commands.executeCommand('priorwork.askAgent', { name: s.name, task: 'audit' });
                 default:   // 拡張機能がまだ知らない工程（CLI のほうが新しいとき）。ターミナルは開かず、出力パネルに出す

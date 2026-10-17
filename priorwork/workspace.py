@@ -82,9 +82,11 @@ def assets_dir(lang: str) -> Path:
     return ASSETS_DIR / i18n.normalize(lang)
 
 
-def template_path(lang: str, manuscript: bool = False) -> Path:
-    """レポートのひな形。原稿から始めるサーベイ（`new --manuscript`）は、原稿の 1〜3 章の下書きを持つ別の形。"""
-    name = "manuscript_review.md" if manuscript else "literature_review.md"
+def template_path(lang: str, manuscript: bool = False, purpose: Optional[str] = None) -> Path:
+    """レポートのひな形。原稿から始めるサーベイ（`new --manuscript`）は別の形: 原稿の 1〜3 章の下書き（draft）か、
+    出来上がった原稿への助言（advice）。"""
+    name = ("manuscript_advice.md" if purpose == "advice" else "manuscript_review.md") if manuscript \
+        else "literature_review.md"
     return assets_dir(lang) / "templates" / name
 
 

@@ -1,4 +1,4 @@
-"""カードの書き方（言語・本文の根拠）、まとめの節の引用、手で書いた採用数、監査の検査。"""
+"""カードの書き方（言語・本文の根拠）、まとめの節の引用、手で書いた採用数の検査と、監査の記録。"""
 from priorwork.check import SYNTHESIS_MARK, WARN, check_survey
 from priorwork.survey import INCLUDED, Survey
 
@@ -70,9 +70,9 @@ def test_synthesis_sections_must_cite_and_counts_must_match(s2_record, tmp_path)
     assert any("採用が 57 本" in m and "実際は 1 本" in m for m in found), found
 
 
-def test_audit_is_asked_for_once_the_cards_are_filled(s2_record, tmp_path):
+def test_audit_is_optional_and_recorded_in_the_report(s2_record, tmp_path):
     s = survey_with_card(s2_record, tmp_path, GOOD)
-    assert any("監査" in m for m in messages(s))
+    assert not any("監査" in m for m in messages(s))      # 監査は頼まれたときだけ。無くても未了にしない
     s.add_audit("Claude Opus 5.5")
     s.save()
     s.render()

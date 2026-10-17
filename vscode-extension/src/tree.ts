@@ -9,7 +9,7 @@ import { Model } from './model';
 export type Node =
     | { kind: 'survey'; survey: SurveySummary; dup?: boolean }
     | { kind: 'steps'; survey: SurveySummary }
-    | { kind: 'zotero'; survey: SurveySummary }
+    | { kind: 'zotero'; survey: SurveySummary; ready?: boolean }
     | { kind: 'archive'; surveys: SurveySummary[] }
     | { kind: 'archived'; survey: SurveySummary }
     | { kind: 'step'; survey: SurveySummary; step: NextStep }
@@ -39,7 +39,8 @@ export function statusIcon(status: Status): vscode.ThemeIcon {
 
 const STEP_ICON: Record<string, string> = {
     scope: 'settings', search: 'search', screen: 'checklist', snowball: 'references', zotero: 'library',
-    fill: 'edit', draft: 'book', check: 'pass', export: 'open-preview', audit: 'verified',
+    fill: 'edit', draft: 'book', advice: 'comment-discussion', wait_zotero: 'debug-pause', check: 'pass',
+    export: 'open-preview', audit: 'verified',
 };
 
 /** 'Card & Krueger (1994)' の形。 */
@@ -140,10 +141,8 @@ export class SurveyTree implements vscode.TreeDataProvider<Node>, vscode.Disposa
             return node.surveys.map((s): Node => ({ kind: 'archived', survey: s }));
         }
         if (node.kind === 'survey') {
-            const rows: Node[] = [{ kind: 'steps', survey: node.survey }];
-            if ((await this.model.workspace())?.zotero) {
-                rows.push({ kind: 'zotero', survey: node.survey });
-            }
+            const rows: Node[] = [{ kind: 'steps', survey: node.survey },
+                { kind: 'zotero', survey: node.survey, ready: !!(await this.model.workspace())?.zotero }];
             for (const status of GROUP_ORDER) {
                 const count = node.survey.counts[status];
                 if (count) {
@@ -204,6 +203,16 @@ export class SurveyTree implements vscode.TreeDataProvider<Node>, vscode.Disposa
             }
             case 'zotero': {
                 const coll = node.survey.zotero_collection;
+                if (node.ready === false) {
+                    // Zotero の連携が無いと結び付けられない。行は出して、設定へ案内する
+                    const it = new vscode.TreeItem(vscode.l10n.t('Zotero: not set up'), C.None);
+                    it.id = `zotero:${node.survey.name}`;
+                    it.iconPath = new vscode.ThemeIcon('library');
+                    it.description = coll ? coll.name : '';
+                    it.tooltip = vscode.l10n.t('Set up Zotero to link a collection: the agent then reads its PDFs first, and checks that every included paper is in it');
+                    it.command = { command: 'priorwork.openSettings', title: '' };
+                    return it;
+                }
                 const it = new vscode.TreeItem(coll ? `Zotero: ${coll.name}` : vscode.l10n.t('Link a Zotero collection…'), C.None);
                 it.id = `zotero:${node.survey.name}`;
                 it.iconPath = new vscode.ThemeIcon('library');

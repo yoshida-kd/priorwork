@@ -251,6 +251,8 @@ def check_survey(survey: Survey, client: Optional[Any] = None) -> List[Finding]:
         findings.append((WARN, t("The manuscript {path} is not found. If it moved, set it again with "
                                  "`priorwork scope {name} --manuscript <path>`", path=survey.manuscript, name=survey.name)))
 
+    findings += _check_octavo(survey, md)
+
     # 6. 進捗
     pending = survey.by_status(CANDIDATE, MAYBE)
     if pending:
@@ -282,12 +284,6 @@ def check_survey(survey: Survey, client: Optional[Any] = None) -> List[Finding]:
             findings.append((INFO, t("No full text could be found for {numbers}, so {n|its card is|their cards are} "
                                      "\"{abstract}\". Attach the PDF in Zotero (or give it with `--pdf`) to read it",
                                      n=len(failed), abstract=abstract, numbers=_numbers(failed))))
-
-    # 7b. 書いたのと別のモデルによる監査（同じモデルは自分の誤読に気付きにくい）
-    if included and not survey.unfilled() and not survey.audits:
-        findings.append((WARN if survey.depth == "full" else INFO,
-                         t("Not audited by another AI model yet. Ask a model other than the one that wrote it to audit "
-                           "the survey, then record it with `priorwork audit {name} --by \"<model>\"`", name=survey.name)))
 
     # 8. 原稿の下書きで引用する論文は、深さによらず本文で確かめる
     if survey.manuscript:
@@ -461,3 +457,59 @@ def re_blocks_removed(md: str) -> str:
     text = strip_blocks(md)
     text = re.sub(r"\A---\n.*?\n---\n", "", text, flags=re.S)
     return re.sub(r"<!--.*?-->", "", text, flags=re.S)
+
+
+def _check_octavo(survey: Survey, md: str) -> List[Finding]:
+    """このサーベイを使う Octavo のプロジェクトごとに: サーベイの Zotero のコレクションが、プロジェクトが .bib を
+    取るコレクションのどれか（またはその下）か、書き出す文章が引く論文が .bib にあるか。"""
+    findings: List[Finding] = []
+    for info in survey.octavo_projects:
+        findings += _check_one_octavo(survey, md, info)
+    return findings
+
+
+def _check_one_octavo(survey: Survey, md: str, info: dict) -> List[Finding]:
+    from .octavo import match_entry, read_bib, within_collection
+    findings: List[Finding] = []
+    project = info["name"]
+    if info.get("missing"):
+        return [(WARN, t("The Octavo project {path} is not found. If it moved, link it again with "
+                         "`priorwork scope {name} --octavo <path>`", path=info["root"], name=survey.name))]
+    theirs = info["zotero_collections"]
+    ours = survey.zotero_collection.get("name", "")
+    shown = ", ".join(f'"{c}"' for c in theirs)
+    if theirs and ours and not any(within_collection(ours, c) for c in theirs):
+        findings.append((WARN, t("The Zotero collection of the survey (\"{ours}\") is not among those the Octavo "
+                                 "project {project} pulls its .bib from ({theirs}), nor under them, so its papers will "
+                                 "not reach the .bib. Add it in Octavo (Choose the Zotero Collection), or link the "
+                                 "survey to one of them (`priorwork zotero {name} --collection \"<path>\"`)",
+                                 ours=ours, project=project, theirs=shown, name=survey.name)))
+    elif theirs and not ours:
+        findings.append((INFO, t("The Octavo project {project} pulls its .bib from the Zotero collections {theirs}. "
+                                 "Link the survey to one of them, or to a collection under one: `priorwork zotero "
+                                 "{name} --collection \"<path>\"`", project=project, theirs=shown, name=survey.name)))
+    elif ours and not theirs:
+        findings.append((INFO, t("The Octavo project {project} does not name its Zotero collections. To pull its .bib "
+                                 "from the survey's (\"{ours}\"), add it in Octavo (Choose the Zotero Collection, or "
+                                 "`octavo config set zotero_collection \"{ours}\"`)", project=project, ours=ours)))
+    if not info["bib_exists"]:
+        findings.append((INFO, t("The Octavo project {project} has no .bib yet ({path}). Pull it from Zotero with "
+                                 "`octavo bib pull`", project=project, path=info["bib"])))
+        return findings
+    entries = read_bib(Path(info["bib"]))
+    absent = [e for e in survey.by_status(INCLUDED) if match_entry(e["record"], entries) is None]
+    from .export import cited_papers, octavo_text
+    try:
+        cited = {e["key"] for e in cited_papers(survey, octavo_text(survey, md))}
+    except RuntimeError:
+        cited = set()
+    in_text = [e for e in absent if e["key"] in cited]
+    if in_text:
+        findings.append((WARN, t("The text written for the Octavo project {project} cites {n|# paper|# papers} not in "
+                                 "its .bib: {numbers}. Add {n|it|them} to its Zotero collection, then `octavo bib pull`",
+                                 project=project, n=len(in_text), numbers=_numbers(in_text))))
+    rest = [e for e in absent if e["key"] not in cited]
+    if rest:
+        findings.append((INFO, t("{n|# included paper is|# included papers are} not in the .bib of the Octavo project "
+                                 "{project}: {numbers}", n=len(rest), project=project, numbers=_numbers(rest))))
+    return findings

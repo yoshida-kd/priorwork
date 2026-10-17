@@ -49,5 +49,7 @@
   "command.viewHtml": "View the Report in Priorwork",
   "command.zoteroCollection": "Link a Zotero Collection…",
   "command.archive": "Archive the Survey…",
-  "command.unarchive": "Bring Back from the Archive"
+  "command.unarchive": "Bring Back from the Archive",
+  "command.linkOctavo": "Link to an Octavo Project…",
+  "command.exportOctavo": "Export for an Octavo Project…"
 }

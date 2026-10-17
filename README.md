@@ -65,7 +65,8 @@ code, so updates never conflict.
 4. **Publish it to GitHub** from the row in the sidebar, as a **private** repository. The agent
    commits and pushes on a branch named after the survey and opens a pull request; you merge it.
 5. **New Survey** → **Ask your agent to do it**: give the topic and paste the copied request into
-   the agent's chat (or just ask in the chat). The agent works through to the exported report.
+   the agent's chat (or just ask in the chat). The agent works through it; in the standard mode it
+   stops once the scope is set and before the cards (for you to collect the papers in Zotero).
 6. Read the report (**Export and View the Report**, or right-click `reports/*.html` → **View the
    Report in Priorwork**; this works over SSH too), then check decisions and cards on each paper's
    page and correct what you disagree with.
@@ -209,7 +210,7 @@ major journals.
 Open the workspace with your agent and ask in plain words, for example "do a full review of the
 employment effects of minimum wages". The agent follows `AGENTS.md` and the skills
 (`.agent/skills/`, also under `.claude/skills/`): the entry point `priorwork` looks at the state and
-takes the next step, through to the exported report. You never need to type a skill name (typing
+takes the next step, through to the exported report (where it stops: "Modes" below). You never need to type a skill name (typing
 `/priorwork` works too). In VS Code, **New Survey → Ask your agent to do it** and **Ask Your Agent…**
 on a survey copy ready-made requests.
 
@@ -217,36 +218,65 @@ on a survey copy ready-made requests.
 | :--- | :--- |
 | `priorwork` | the entry point: looks at the state and runs the whole survey, step by step |
 | `priorwork-new` | sets the scope, creates the survey and runs enough searches for the depth |
-| `priorwork-screen` | decides each candidate against the criteria, with a reason (in consultation mode, recommends and waits) |
+| `priorwork-screen` | decides each candidate against the criteria, with a reason (in the manual mode, recommends and waits) |
 | `priorwork-snowball` | chases the references and citations of the included papers |
 | `priorwork-extract` | gets the full texts and fills in the paper cards (RQ, identification, …) |
 | `priorwork-check` | checks the survey, fixes what it finds and exports the report |
-| `priorwork-audit` | audits a survey another model wrote: checks the cards against the full text, the direction of citations, hypotheses mixed into the literature, mechanical exclusions and the SSCI status, fixes them and records it with `./priorwork audit` |
-| `priorwork-manuscript` | reads a manuscript whose analysis is done, gathers the literature that supports and conflicts with it, and drafts its sections 1–3 (introduction, literature review, theory and hypotheses) |
+| `priorwork-audit` | (only when asked) audits a survey another model wrote: checks the cards against the full text, the direction of citations, hypotheses mixed into the literature, mechanical exclusions and the SSCI status, fixes them and records it with `./priorwork audit` |
+| `priorwork-manuscript` | reads a manuscript in any format, agrees with you what to make, and writes a draft of its sections 1–3 (introduction, literature review, theory and hypotheses) or advice on it (missing literature, the direction of its citations, the argument) |
 
-### From a manuscript whose analysis is done
+### Modes (where the agent stops)
 
-If you have a manuscript with the data and methods and the analysis written, put it with its tables in
-`manuscripts/<paper name>/` in the workspace and ask "write the introduction, literature review and
-hypotheses of the manuscript in manuscripts/<paper name>" (**New Survey → Start from my manuscript** in
-the sidebar writes the request too). The agent works
-out from the manuscript which claims need literature (why it matters, lines of research, mechanisms,
-precedents for the methods), searches claim by claim, including findings that conflict with your
-results, fills in each card's "Role in the manuscript", and drafts sections 1–3 in the language of the
-manuscript (`./priorwork new … --manuscript manuscripts/<paper name>`). `./priorwork export SURVEY --draft` writes
-the draft to `reports/<name>.draft.md`, with the references it cites. So that the hypotheses are not
-written after the fact, the report records separately the literature behind each hypothesis and which
-results to treat as exploratory. The manuscript itself is never rewritten.
+There are three modes for where the agent stops and waits for you. Choose one in your request ("full
+auto", "let's go through it together", …) or in `AGENTS.local.md`; otherwise it is standard. The mode is
+recorded in the survey (`--mode`), so the next conversation carries on in the same mode.
 
-A survey is **done only once a model other than the one that wrote it has audited it**. The writing
-agent records its model name with `--by`, and when it finishes it asks you to have another model (e.g.
-Claude if Gemini wrote it) "audit the survey <name>" in its chat. The audit is recorded with
-`./priorwork audit SURVEY --by "<model>"` (refused for the model that wrote it); until then
-`./priorwork check` reminds you.
+| Mode | Where it stops |
+| :--- | :--- |
+| **Standard** (default) | Twice: once the scope is set, and before filling in the cards. Before the cards it shows the DOIs to add to Zotero; collect the papers and their PDFs in Zotero, then say "carry on". More cards are then checked against the full texts, which saves work in the end |
+| **Full auto** | Never: it carries on to the end |
+| **Manual** | After every step, for you to check (decisions too: it recommends and waits) |
 
-The agent decides on its own by default. To decide the scope and each paper yourself, ask it to go
-through it together with you, or write that in `AGENTS.local.md`. When you come back, say "let's
-continue"; the agent looks at `./priorwork status` for progress and the next steps.
+Between the stops, the agent decides on its own, recording its reasons. When you come back, say "let's
+continue"; the agent looks at `./priorwork status` for progress and the next steps. In its reports it
+names papers as "Author (year)", not by numbers such as `#232`.
+
+### From a manuscript
+
+If you have a manuscript of your own, put it with its tables in `manuscripts/<paper name>/` in the
+workspace and ask "write the introduction, literature review and hypotheses of the manuscript in
+manuscripts/<paper name>" or "what literature is this manuscript missing?" (**New Survey → Start from my
+manuscript** in the sidebar writes the request too). Any format will do (Markdown, Quarto, HTML, Word,
+PDF; `./priorwork read` turns it into text). The agent reads it, then proposes what to make, which parts
+of the manuscript to cover, the scope of the searches and how many reports, and agrees them with you.
+There are two kinds of report, and one manuscript can have both as separate reports
+(`./priorwork new … --manuscript manuscripts/<paper name> --purpose draft|advice`):
+
+- **A draft of sections 1–3** (`draft`): from a manuscript whose analysis is done, the agent works out
+  which claims need literature (why it matters, lines of research, mechanisms, precedents for the
+  methods), searches claim by claim, including findings that conflict with your results, fills in each
+  card's "Role in the manuscript", and drafts sections 1–3 in the language of the manuscript.
+  `./priorwork export SURVEY --draft` writes the draft to `reports/<name>.draft.md`, with the references
+  it cites. So that the hypotheses are not written after the fact, the report records separately the
+  literature behind each hypothesis and which results to treat as exploratory.
+- **Advice on the manuscript** (`advice`): for a finished (or unfinished) manuscript, a check of how it
+  cites the literature (the direction of each cited finding, overstatements), the literature it is
+  missing, and comments on the argument, with a summary of the most important points first.
+
+The manuscript itself is never rewritten.
+
+**Octavo manuscripts.** A manuscript in an [Octavo](https://github.com/yoshida-kd/octavo) project (another
+repository) is used where it is, not copied (**Ask Priorwork for the Literature** in Octavo's sidebar
+copies the request). The link is a Zotero collection: the survey is linked to the one Octavo pulls its
+`.bib` from (`zotero_collection` in its settings). The agent registers the literature the manuscript
+cites (`./priorwork add SURVEY --cited`) and exports the draft in Octavo's form
+(`./priorwork export SURVEY --draft --octavo`: citations as `[@key]` from the `.bib`, and papers not in the
+`.bib` yet as `[@PRIORWORK:…]` with a list of their DOIs).
+
+An audit is optional. To have another model check a survey too, ask that model (e.g. Claude if Gemini
+wrote it) in its chat to "audit the survey <name>" (**Ask Your Agent… → Audit as another model** in
+the sidebar writes the request). The writing agent records its model name with `--by`, and the audit is
+recorded with `./priorwork audit SURVEY --by "<model>"` (refused for the model that wrote it).
 
 ### Depth (quick / full)
 
@@ -303,8 +333,11 @@ The numbers are guides, not limits. The rules and `priorwork check` are the same
 
 # Surveys
 ./priorwork status [SURVEY]                                    # the list / progress and next steps
-./priorwork new "<topic>" --slug <slug> [--by "<model>"] [--depth quick|full] [--question ... --years ... --fields ... --inclusion ... --exclusion ...]
-./priorwork scope SURVEY --question "..." [--depth quick|full] [--search-field social|all] [--by "<model>"]  # change the scope
+./priorwork new "<topic>" --slug <slug> [--by "<model>"] [--mode standard|auto|manual] [--depth quick|full] [--manuscript PATH [--purpose draft|advice]] [--question ... --years ... --fields ... --inclusion ... --exclusion ...]
+./priorwork scope SURVEY --question "..." [--mode standard|auto|manual] [--go-on] [--depth quick|full] [--search-field social|all] [--by "<model>"]  # change the scope or the mode
+./priorwork read PATH [--out FILE]                             # the text of a manuscript (.md, .qmd, .html, .docx, .pdf, … or a folder)
+./priorwork add SURVEY --cited                                 # register the papers the manuscript cites (the DOIs in its .bib)
+./priorwork export SURVEY --draft [--octavo]                   # the draft of sections 1–3 (--octavo: Octavo's form, [@key])
 ./priorwork archive SURVEY [--undo]                          # hide it from the list (the files stay)
 ./priorwork list SURVEY [--status candidate maybe] [--abstract]
 ./priorwork include SURVEY 2 5 7
@@ -315,7 +348,7 @@ The numbers are guides, not limits. The rules and `priorwork check` are the same
 ./priorwork card SURVEY 3 [--set rq="..." evidence=abstract]   # show or fill in a card
 ./priorwork render SURVEY
 ./priorwork check SURVEY [--offline]
-./priorwork audit SURVEY [--by "<model>" --note "..."]       # record an audit by another model / show the record
+./priorwork audit SURVEY [--by "<model>" --note "..."]       # record an (optional) audit by another model / show the record
 ./priorwork export SURVEY [--format html|docx|md] [-o PATH] [--with-abstracts]
 ./priorwork fulltext SURVEY <number> [--pdf <path>]
 ./priorwork zotero [SURVEY] [--refresh]

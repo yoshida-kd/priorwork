@@ -111,13 +111,15 @@ def test_the_extension_reads_only_keys_the_cli_writes():
     expected = {
         "WorkspaceStatus": {"version", "root", "workspace", "lang", "git", "sync", "zotero", "surveys", "archived"},
         "GitInfo": {"repo", "remote", "branch", "other_surveys"},
-        "SurveySummary": {"name", "topic", "created", "version", "depth", "lang", "report", "manuscript", "zotero_collection",
-                          "archived", "counts", "searches"},
-        "SurveyDetail": {"scope", "unfilled", "zotero_missing", "written_by", "audits", "sync", "next"},
+        "SurveySummary": {"name", "topic", "created", "version", "depth", "mode", "lang", "report", "manuscript", "purpose",
+                          "zotero_collection", "archived", "counts", "searches"},
+        "SurveyDetail": {"scope", "unfilled", "zotero_missing", "written_by", "audits", "octavo", "octavo_projects",
+                         "sync", "next"},
+        "OctavoProject": {"root", "name", "bib", "bib_exists", "zotero_collections", "manuscript", "missing"},
         "Audit": {"at", "by", "note", "included"},
         "ZoteroCollectionLink": {"key", "name"},
         "ZoteroCollections": {"collections"},
-        "ZoteroCollection": {"key", "name", "path", "items"},
+        "ZoteroCollection": {"key", "name", "path", "parent", "depth", "items", "total"},
         "ZoteroReport": {"survey", "collection", "papers", "missing_dois", "to_import", "imported", "no_doi"},
         "NextStep": {"id", "text", "args"},
         "Entry": {"number", "key", "status", "reason", "found_by", "history", "record", "fulltext"},
@@ -216,3 +218,49 @@ def test_surveys_on_other_branches_are_shown(ws, tmp_path, capsys):
     assert top["git"]["other_surveys"] == ["20261001_statutes"] and top["git"]["branch"]
     with pytest.raises(SystemExit, match="git switch 20261001_statutes"):
         cli.main(["status", "statutes"])
+
+
+def test_standard_mode_stops_before_the_cards_until_the_user_says_go_on(ws):
+    ws("new", "t", "--slug", "md", "--json")
+    ws("search", "minimum wage", "--into", "md", "--limit", "2", "--json")
+    ws("include", "md", "1", "2", "--json")
+    detail = ws("status", "md", "--json")
+    ids = [s["id"] for s in detail["next"]]
+    assert detail["mode"] == "standard" and ids.index("wait_zotero") < ids.index("fill")
+    assert ws("scope", "md", "--go-on", "--json")["mode"] == "standard"
+    assert "wait_zotero" not in [s["id"] for s in ws("status", "md", "--json")["next"]]
+
+    ws("new", "t2", "--slug", "au", "--mode", "auto", "--json")
+    ws("search", "minimum wage", "--into", "au", "--limit", "1", "--json")
+    ws("include", "au", "1", "--json")
+    detail = ws("status", "au", "--json")
+    assert detail["mode"] == "auto" and "wait_zotero" not in [s["id"] for s in detail["next"]]
+    assert "audit" not in [s["id"] for s in detail["next"]]          # 監査は任意（次にやることに出さない）
+    assert ws("scope", "au", "--mode", "manual", "--json")["mode"] == "manual"
+
+
+def test_a_survey_that_advises_on_a_manuscript(ws, tmp_path):
+    (tmp_path / "paper.md").write_text("# Paper\n")
+    made = ws("new", "t", "--slug", "adv", "--manuscript", str(tmp_path / "paper.md"), "--purpose", "advice", "--json")
+    assert made["purpose"] == "advice"
+    report = Path(made["report"]).read_text(encoding="utf-8")
+    assert "原稿への助言" in report and "priorwork:draft" not in report
+    ws("search", "minimum wage", "--into", "adv", "--limit", "1", "--json")
+    ws("include", "adv", "1", "--json")
+    ids = [s["id"] for s in ws("status", "adv", "--json")["next"]]
+    assert "advice" in ids and "draft" not in ids
+    # 同じ原稿から、下書きのサーベイも別に作れる
+    draft = ws("new", "t", "--slug", "drf", "--manuscript", str(tmp_path / "paper.md"), "--json")
+    assert draft["purpose"] == "draft" and draft["manuscript"] == made["manuscript"]
+    with pytest.raises(SystemExit):
+        cli.main(["new", "t", "--slug", "x", "--purpose", "advice"])          # 原稿が無い
+
+
+def test_zotero_dois_without_zotero_lists_every_included_paper(ws, capsys):
+    ws("new", "t", "--slug", "zd", "--json")
+    ws("search", "minimum wage", "--into", "zd", "--limit", "2", "--json")
+    ws("include", "zd", "1", "--json")
+    capsys.readouterr()
+    cli.main(["zotero", "zd", "--dois"])
+    out = capsys.readouterr().out.split()
+    assert len(out) == 1 and out[0].startswith("10.")

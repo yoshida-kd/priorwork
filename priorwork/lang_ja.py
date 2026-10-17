@@ -519,8 +519,10 @@ MESSAGES = {
         "  status [SURVEY]            サーベイ一覧 / 進捗と次にやること",
     "  new TOPIC --slug SLUG      create a survey (reports/YYYYMMDD_<slug>.md and .priorwork/surveys/*.json)":
         "  new TOPIC --slug SLUG      サーベイを作成（reports/YYYYMMDD_<slug>.md と .priorwork/surveys/*.json）",
-    "  new ... --manuscript PATH  start from a manuscript whose analysis is done (drafts its sections 1–3)":
-        "  new ... --manuscript PATH  分析まで済んだ原稿から始める（1〜3 章を下書きする）",
+    "  new ... --manuscript PATH  start from your manuscript (--purpose draft: its sections 1–3; advice: advice on it)":
+        "  new ... --manuscript PATH  原稿から始める（--purpose draft: 1〜3 章の下書き、advice: 原稿への助言）",
+    "  read PATH                  print the text of a manuscript (.md, .qmd, .html, .docx, .pdf, … or a folder)":
+        "  read PATH                  原稿をテキストにして出す（.md・.qmd・.html・.docx・.pdf など。フォルダも可）",
     "  scope SURVEY ...           set the scope (research question, period, criteria)":
         "  scope SURVEY ...           調査範囲（RQ・期間・採否基準）を設定",
     "  archive SURVEY [--undo]    hide a survey from the list, keeping its files (e.g. one that was redone)":
@@ -610,10 +612,48 @@ MESSAGES = {
     "also include each paper's abstract": "各論文の要旨も載せる",
     "write only the draft of the manuscript's sections 1–3, with its references (a survey made with --manuscript)":
         "原稿の 1〜3 章の下書きだけを、参考文献つきで書き出す（--manuscript で作ったサーベイ）",
-    "your manuscript whose analysis is done (a file, or a folder under manuscripts/ with the manuscript and its "
-    "tables): the survey then backs it up and drafts its introduction, literature review and hypotheses":
-        "分析まで済んだ原稿（ファイル、または原稿と結果の表を入れた manuscripts/ の下のフォルダ）。"
-        "サーベイはそれを補強する文献を集め、イントロ・先行研究・理論と仮説を下書きする",
+    "your manuscript (a file in any format, or a folder under manuscripts/ with the manuscript and its tables): "
+    "the survey then drafts its sections 1–3 or advises on it (--purpose)":
+        "原稿（形式は問わない。ファイル、または原稿と結果の表を入れた manuscripts/ の下のフォルダ）。"
+        "サーベイは、その 1〜3 章を下書きするか、原稿に助言する（--purpose）",
+    "with --manuscript, what the report is for (draft: a draft of the manuscript's sections 1–3, the default; "
+    "advice: advice on a finished manuscript — missing literature, the direction of its citations, the argument)":
+        "--manuscript のとき、レポートの目的（draft: 原稿の 1〜3 章の下書き。既定。advice: 出来上がった原稿への助言"
+        "（足りない先行研究・引用の向き・論の組み立て））",
+    "--purpose is for a survey made from a manuscript (give --manuscript)":
+        "--purpose は原稿から作るサーベイのためのものです（--manuscript を指定してください）",
+    "the purpose is one of {choices}: {purpose}": "目的は {choices} のどれかです: {purpose}",
+    "purpose: a draft of its sections 1–3": "目的: 1〜3 章の下書き",
+    "purpose: advice on the manuscript": "目的: 原稿への助言",
+    "Write the advice on the manuscript (missing literature, the direction of its citations, the argument)":
+        "原稿への助言を書く（足りない先行研究・引用の向き・論の組み立て）",
+    "print the text of a manuscript (.md, .qmd, .tex, .html, .docx, .pdf, … or a folder)":
+        "原稿をテキストにして出す（.md・.qmd・.tex・.html・.docx・.pdf など。フォルダも可）",
+    "the manuscript file, or its folder": "原稿のファイル、またはそのフォルダ",
+    "write the text to a file instead": "テキストを画面ではなくファイルに書く",
+    "Wrote the text of {n|# file|# files} to {path}": "{n} 個のファイルのテキストを {path} に書きました",
+    "(not text: a figure or another kind of file)": "（テキストではない: 図など）",
+    "Cannot read this kind of file as text: {path}": "この種類のファイルはテキストにできません: {path}",
+    "Not a Word (.docx) file: {path} ({error})": "Word（.docx）のファイルではありません: {path}（{error}）",
+    # 進め方（どこで止まるか）
+    "where the agent stops for you (standard: after the scope and before the cards, so you can collect the papers in "
+    "Zotero, the default; auto: never; manual: after every step)":
+        "エージェントがどこで止まって待つか（standard: 範囲を決めたあとと、カードの記入の前（Zotero に論文を集めて"
+        "もらうため）。既定。auto: 止まらない。manual: 工程ごと）",
+    "the mode is one of {choices}: {mode}": "進め方は {choices} のどれかです: {mode}",
+    "mode: {mode}": "進め方: {mode}",
+    "(default)": "（既定）",
+    "standard (stops after the scope and before the cards)": "標準（範囲を決めたあとと、カードの前で止まる）",
+    "full auto": "全自動",
+    "manual (stops after every step)": "手動（工程ごとに止まる）",
+    "record that the user said to go on to the cards (standard mode stops before them)":
+        "ユーザーがカードの記入に進んでよいと言ったことを記録する（標準の進め方はその前で止まる）",
+    "Stop here and wait for the user (standard mode): show the DOIs to add to Zotero (`priorwork zotero {name} --dois`), "
+    "and when the user says to go on, record it with `priorwork scope {name} --go-on` and fill in the cards":
+        "ここで止まってユーザーを待つ（標準の進め方）: Zotero に入れる DOI（`priorwork zotero {name} --dois`）を示し、"
+        "ユーザーが続きを頼んだら `priorwork scope {name} --go-on` で記録してカードの記入に進む",
+    "Zotero is not set up, so these are the DOIs of all the papers, whether in Zotero or not":
+        "Zotero の連携が設定されていないので、Zotero にあるかどうかによらず、すべての論文の DOI を出します",
     "get the full text": "本文テキストを取得",
     "the paper number": "論文番号",
     "the path of the PDF": "PDF のパスを直接指定",
@@ -685,12 +725,12 @@ MESSAGES = {
         "Zotero に無い論文の DOI だけを出す（魔法の杖に貼る用）",
 
     # 監査（書いたのと別のモデル）
-    "  audit SURVEY --by MODEL    record an audit by an AI model other than the one that wrote the survey":
-        "  audit SURVEY --by MODEL    サーベイを書いたのと別の AI モデルによる監査を記録する",
+    "  audit SURVEY --by MODEL    record an audit by another AI model (optional; when you ask for one)":
+        "  audit SURVEY --by MODEL    別の AI モデルによる監査を記録する（任意。頼んだときだけ）",
     "record an audit by an AI model other than the one that wrote the survey":
         "サーベイを書いたのと別の AI モデルによる監査を記録する",
-    "the AI model writing the survey (e.g. \"Gemini 3.1 Pro\"); the audit must then be by another model":
-        "サーベイを書く AI モデル（例: \"Gemini 3.1 Pro\"）。監査はこれと別のモデルで行う",
+    "the AI model writing the survey (e.g. \"Gemini 3.1 Pro\"); an audit, if you ask for one, is then by another model":
+        "サーベイを書く AI モデル（例: \"Gemini 3.1 Pro\"）。監査を頼むときは、これと別のモデルで行う",
     "the model that audited it (e.g. \"Claude Opus 5.5\")": "監査したモデル（例: \"Claude Opus 5.5\"）",
     "what was checked and fixed, in one line": "確かめたこと・直したこと（1 行）",
     "Give the model that audited the survey with --by": "監査したモデルを --by で指定してください",
@@ -702,15 +742,11 @@ MESSAGES = {
     "Written by: {writers}": "書いたモデル: {writers}",
     "(not recorded)": "（記録なし）",
     "audited by {models}": "監査: {models}",
-    "not audited yet": "監査はまだ",
-    "Not audited yet. Ask another AI model to audit it, then record it with `priorwork audit {name} --by \"<model>\"`":
-        "まだ監査されていません。別の AI モデルに監査を頼み、`priorwork audit {name} --by \"<モデル>\"` で記録してください",
-    "Have another AI model audit it (not the one that wrote it), then record the audit":
-        "書いたのと別の AI モデルに監査を頼み、記録する",
-    "Not audited by another AI model yet. Ask a model other than the one that wrote it to audit the survey, "
-    "then record it with `priorwork audit {name} --by \"<model>\"`":
-        "書いたのと別の AI モデルによる監査がまだです。別のモデルに監査を頼み、"
-        "`priorwork audit {name} --by \"<モデル>\"` で記録してください",
+    "no audit (optional)": "監査なし（任意）",
+    "No audit recorded. An audit is optional: when you want one, ask another AI model to audit it, and it records it "
+    "with `priorwork audit {name} --by \"<model>\"`":
+        "監査の記録はありません。監査は任意です。頼むときは別の AI モデルに頼み、そのモデルが "
+        "`priorwork audit {name} --by \"<モデル>\"` で記録します",
     # カードと本文の検査
     "(page not checked)": "（ページ未確認）",
     "Japanese": "日本語",
@@ -736,4 +772,85 @@ MESSAGES = {
     "The text says {n|# paper is|# papers are} included, but {included} are. Do not write the count by hand "
     "(the appendix gives it)":
         "本文では採用が {n} 本とありますが、実際は {included} 本です。本数は手で書かないでください（付録の記録にあります）",
+    # Octavo のプロジェクト
+    " (the collection \"{name}\")": "（コレクション「{name}」）",
+    "(not there yet)": "（まだ無い）",
+    "(too large to read: {size} MB)": "（大きすぎて読みません: {size} MB）",
+    "Give the DOIs to register, or --cited": "登録する DOI か、--cited を指定してください",
+    "Linked the Zotero collection \"{name}\" that the Octavo project uses":
+        "Octavo のプロジェクトが使う Zotero のコレクション「{name}」を結び付けました",
+    "Literature the manuscript cites ({bib}): {n}": "原稿が引いている文献（{bib}）: {n} 件",
+    "No .bib was found for the manuscript {path}": "原稿 {path} の .bib が見つかりません",
+    "No entries in {path}. Pull it from Zotero first (`octavo bib pull`)":
+        "{path} に文献がありません。先に Zotero から取ってきてください（`octavo bib pull`）",
+    "The Octavo project pulls its .bib from the Zotero collection \"{name}\". Set up Zotero and link the survey to it too":
+        "Octavo のプロジェクトは Zotero のコレクション「{name}」から .bib を取ります。Zotero の連携を設定して、"
+        "サーベイにも同じコレクションを結び付けてください",
+    "The manuscript cites {n|# work|# works} in {bib} ({doi} with a DOI)":
+        "原稿は {bib} の文献を {n} 件引いています（DOI があるもの {doi} 件）",
+    "cited by the manuscript": "原稿が引いている文献",
+    "no DOI in the .bib (search it by title): [@{key}] {title}": ".bib に DOI が無い（タイトルで検索してください）: [@{key}] {title}",
+    "not found in the databases: {doi}": "データベースに見つからない: {doi}",
+    "register the papers the survey's manuscript cites (the DOIs in its .bib)":
+        "サーベイの原稿が引いている論文を登録する（.bib の DOI から）",
+    "the .bib to take the keys from (default: the Octavo project's)": "キーを取る .bib（既定: Octavo のプロジェクトのもの）",
+    "{name} has no manuscript (`priorwork scope {name} --manuscript <path>`)":
+        "{name} には原稿がありません（`priorwork scope {name} --manuscript <パス>`）",
+    "{n|# paper cited in the draft is|# papers cited in the draft are} not in {bib}, so {n|it is|they are} written as "
+    "[@{prefix}…] (Octavo shows ?? until it is there). Add {n|it|them} to Zotero{where}, run `octavo bib pull` in the "
+    "Octavo project, then export again:":
+        "下書きで引いた論文のうち {n} 本が {bib} に無いので、[@{prefix}…] と書きました（.bib に入るまで Octavo では ?? "
+        "になります）。Zotero{where}に入れ、Octavo のプロジェクトで `octavo bib pull` を実行してから、もう一度書き出してください:",
+    # Octavo のプロジェクト（多対多）
+    ", and other surveys use it too ({names})": "。ほかのサーベイ（{names}）も使っています",
+    "Not an Octavo project (no octavo.config.py): {path}": "Octavo のプロジェクトではありません（octavo.config.py が無い）: {path}",
+    "Octavo project: {root} | .bib: {bib} | Zotero collections: {collections}":
+        "Octavo のプロジェクト: {root} | .bib: {bib} | Zotero のコレクション: {collections}",
+    "Other surveys for these Octavo projects: {names}": "同じ Octavo のプロジェクトのサーベイ: {names}",
+    "The Octavo project pulls its .bib from {names}{others}. Make a collection for this survey under one of them in "
+    "Zotero, and link it: `priorwork zotero {survey} --collection \"<path>\"` (Octavo pulls the collections under them too)":
+        "Octavo のプロジェクトは {names} から .bib を取ります{others}。Zotero でそのどれかの下にこのサーベイのコレクションを作り、"
+        "結び付けてください: `priorwork zotero {survey} --collection \"<パス>\"`（Octavo はその下のコレクションの文献も取ります）",
+    "The Octavo project {path} is not found. If it moved, link it again with `priorwork scope {name} --octavo <path>`":
+        "Octavo のプロジェクト {path} が見つかりません。移したなら `priorwork scope {name} --octavo <パス>` で結び付け直してください",
+    "The Octavo project {project} does not name its Zotero collections. To pull its .bib from the survey's (\"{ours}\"), "
+    "add it in Octavo (Choose the Zotero Collection, or `octavo config set zotero_collection \"{ours}\"`)":
+        "Octavo のプロジェクト {project} には Zotero のコレクションが設定されていません。サーベイのコレクション（「{ours}」）から "
+        ".bib を取るには、Octavo で足してください（「Zotero のコレクションを選ぶ」、または `octavo config set zotero_collection \"{ours}\"`）",
+    "The Octavo project {project} has no .bib yet ({path}). Pull it from Zotero with `octavo bib pull`":
+        "Octavo のプロジェクト {project} に .bib がまだありません（{path}）。`octavo bib pull` で Zotero から取ってきてください",
+    "The Octavo project {project} pulls its .bib from the Zotero collections {theirs}. Link the survey to one of them, "
+    "or to a collection under one: `priorwork zotero {name} --collection \"<path>\"`":
+        "Octavo のプロジェクト {project} は Zotero のコレクション {theirs} から .bib を取ります。サーベイをそのどれかか、"
+        "その下のコレクションに結び付けてください: `priorwork zotero {name} --collection \"<パス>\"`",
+    "The Zotero collection of the survey (\"{ours}\") is not among those the Octavo project {project} pulls its .bib from "
+    "({theirs}), nor under them, so its papers will not reach the .bib. Add it in Octavo (Choose the Zotero Collection), "
+    "or link the survey to one of them (`priorwork zotero {name} --collection \"<path>\"`)":
+        "サーベイの Zotero のコレクション（「{ours}」）は、Octavo のプロジェクト {project} が .bib を取るコレクション（{theirs}）"
+        "のどれでも、その下でもないので、論文が .bib に入りません。Octavo で足すか（「Zotero のコレクションを選ぶ」）、"
+        "サーベイをそのどれかに結び付けてください（`priorwork zotero {name} --collection \"<パス>\"`）",
+    "The sections on the literature (theories, methods, debates, gaps) are not written yet":
+        "先行研究のまとめの節（学説・手法・論争・空白）がまだ書かれていません",
+    "The text written for the Octavo project {project} cites {n|# paper|# papers} not in its .bib: {numbers}. Add "
+    "{n|it|them} to its Zotero collection, then `octavo bib pull`":
+        "Octavo のプロジェクト {project} 用の文章が、その .bib に無い論文を {n} 本引いています: {numbers}。"
+        "そのプロジェクトの Zotero のコレクションに入れてから `octavo bib pull` を実行してください",
+    "Write the sections on the literature for the Octavo {n|project|projects} {names}":
+        "Octavo のプロジェクト（{n} 個: {names}）用に、先行研究のまとめの節を書き出す",
+    "link an Octavo project that uses this survey (repeatable; a survey can serve several papers)":
+        "このサーベイを使う Octavo のプロジェクトを結び付ける（繰り返せる。1 つのサーベイをいくつもの論文で使える）",
+    "unlink an Octavo project": "Octavo のプロジェクトの結び付けを外す",
+    "write for an Octavo project, with citations as [@key] from its .bib: the draft of the manuscript, or the sections "
+    "on the literature (reports/<name>.<project>.octavo.md). Name the project (path or folder name) when the survey is "
+    "linked to several":
+        "Octavo のプロジェクト用に、引用をその .bib のキーで [@key] にして書き出す: 原稿の下書きか、先行研究のまとめの節"
+        "（reports/<名前>.<プロジェクト>.octavo.md）。複数のプロジェクトに結び付けていれば、プロジェクト（パスかフォルダの名前）を指定する",
+    "{name} is linked to several Octavo projects; name one: {projects}":
+        "{name} は複数の Octavo のプロジェクトに結び付いています。どれかを指定してください: {projects}",
+    "{name} is not linked to an Octavo project. Link one with `priorwork scope {name} --octavo <path>`":
+        "{name} は Octavo のプロジェクトに結び付いていません。`priorwork scope {name} --octavo <パス>` で結び付けてください",
+    "{name} is not linked to the Octavo project {project}. The linked ones: {projects}":
+        "{name} は Octavo のプロジェクト {project} に結び付いていません。結び付いているもの: {projects}",
+    "{n|# included paper is|# included papers are} not in the .bib of the Octavo project {project}: {numbers}":
+        "Octavo のプロジェクト {project} の .bib に無い採用論文が {n} 本あります: {numbers}",
 }

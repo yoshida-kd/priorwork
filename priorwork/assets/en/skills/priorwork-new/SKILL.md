@@ -12,7 +12,7 @@ Follow the rules in [AGENTS.md](../../../AGENTS.md).
 
 ## 1. Set the scope
 
-Settle these from the request. For anything the request does not say, decide something sensible from the topic yourself, go on, and say what you decided in your final report. Ask the user only when the topic is too vague to choose search terms (in consultation mode, propose the scope and wait).
+Settle these from the request. For anything the request does not say, decide something sensible from the topic yourself. In standard and manual mode, show the scope once the survey is made and stop (1b below); in full auto, go on and say what you decided in your final report.
 
 - The research question (one sentence)
 - The period (e.g. 1990-2025; may be left empty)
@@ -21,12 +21,17 @@ Settle these from the request. For anything the request does not say, decide som
 - Exclusion criteria (e.g. theory only, working papers)
 - An English slug (e.g. `minimum_wage_employment`). For a redo, use the old slug (the engine numbers the version as `20261012_v2_<slug>`; do not add `_v2` yourself)
 - The depth (`quick` / `full`): decide with the table in AGENTS.md, "Depth".
+- The mode (`standard` / `auto` / `manual`): decide as in AGENTS.md, "Modes". If nothing says otherwise, `standard`.
 
 ```bash
-./priorwork new "<topic (any language)>" --slug <slug> --by "<your model name>" --depth quick|full --question "..." --years "..." --fields "..." --inclusion "..." --exclusion "..."
+./priorwork new "<topic (any language)>" --slug <slug> --by "<your model name>" --mode standard|auto|manual --depth quick|full --question "..." --years "..." --fields "..." --inclusion "..." --exclusion "..."
 ```
 
-Give your own model name with `--by` (e.g. `"Gemini 3.1 Pro"`, `"Claude Opus 5.5"`). The audit is then done by another model (AGENTS.md, "Audit").
+Give your own model name with `--by` (e.g. `"Gemini 3.1 Pro"`, `"Claude Opus 5.5"`).
+
+### 1b. Show the scope and stop (standard, manual)
+
+Once it is made, show the research question, period, fields, inclusion and exclusion criteria and depth briefly, listing apart what you decided yourself, and wait for the answer. If the user corrects something, fix it with `./priorwork scope <survey> --question ...` and so on, then go on to 2. If they say "fine" or "go on", go on to 2.
 
 ## 2. Search
 
@@ -50,4 +55,4 @@ While `./priorwork status <survey>` says "Search more", add searches from angles
 
 ## 3. Next
 
-Go on to screening (`priorwork-screen`). Only in consultation mode, tell the user the number of candidates and the notable papers and wait.
+Go on to screening (`priorwork-screen`). Only in manual mode, tell the user the number of candidates and the notable papers and wait.

@@ -5,12 +5,12 @@ description: >-
   the direction of every citation in the text, the separation of the literature from the user's own
   hypotheses, mechanical exclusions in screening and the SSCI status; fixes what is wrong and records the
   audit with `./priorwork audit`. Use when asked to audit, review or double-check a survey that a different
-  model wrote. Never use it on a survey you wrote yourself.
+  model wrote. An audit is optional: only when the user asks for one. Never use it on a survey you wrote yourself.
 ---
 
 # Audit a survey written by another model
 
-Follow the rules in [AGENTS.md](../../../AGENTS.md). A survey counts as done only once a model other than the one that wrote it has audited it (AGENTS.md, "Audit").
+Follow the rules in [AGENTS.md](../../../AGENTS.md). An audit is optional: do it only when the user asks for one (AGENTS.md, "Audit").
 
 ## 0. Make sure you may audit it
 
@@ -75,4 +75,4 @@ For included papers marked `✅ SSCI`, check that the ISSN and publisher, not ju
 ./priorwork audit <survey> --by "<your model name>" --note "<what you checked and fixed, in one line>"
 ```
 
-In your report, give the problems found by kind (card errors, direction of citations, mixed-in hypotheses, screening, SSCI) with counts and typical examples, and separate what you fixed from what you could not.
+In your report, give the problems found by kind (card errors, direction of citations, mixed-in hypotheses, screening, SSCI) with counts and typical examples, and separate what you fixed from what you could not. Name the example papers as Author (year).
