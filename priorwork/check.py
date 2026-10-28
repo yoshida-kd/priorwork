@@ -8,13 +8,13 @@ from pathlib import Path
 from typing import Any, Dict, List, NamedTuple, Optional, Set, Tuple
 
 from . import ssci
-from .fulltext import incomplete_fulltext, journal_pages
+from .fulltext import MIN_CHARS_PER_PAGE, content_chars, incomplete_fulltext, journal_pages
 from .i18n import t, tl
 from .survey import (
     CANDIDATE, EVIDENCE_ABSTRACT, EVIDENCE_FULLTEXT, EVIDENCE_KEYS, EVIDENCE_UNCHECKED, INCLUDED, MAYBE, Survey,
     SurveyError,
-    evidence_key, evidence_label, extract_blocks, first_surname, parse_card_fields, parse_cards, strip_blocks, surname,
-    year_labels,
+    HYPHENS, evidence_key, evidence_label, extract_blocks, first_surname, parse_card_fields, parse_cards, strip_blocks,
+    surname, year_labels,
 )
 
 ERROR, WARN, INFO = "ERROR", "WARN", "INFO"
@@ -80,7 +80,7 @@ def _fold(text: str) -> str:
     それ以外の非 ASCII 文字（日本語など）は \x00 にする。日本語を単に削除すると「IV、Dell (2010)」が
     「IVDell (2010)」に、空白にすると「IV（2000年代）」が「IV (2000 )」になり、引用と誤認するため。"""
     chars = []
-    text = text.translate(str.maketrans({"’": "'", "、": ","}))
+    text = text.translate(str.maketrans({"’": "'", "、": ","})).translate(HYPHENS)
     for ch in unicodedata.normalize("NFKD", text):
         if unicodedata.combining(ch):
             continue
@@ -237,6 +237,21 @@ def check_survey(survey: Survey, client: Optional[Any] = None) -> List[Finding]:
                                           "record why with `priorwork fix {name} {number} --confirm \"<reason>\"`",
                                           label=label, title=w.get("title"), name=survey.name, number=e["number"])))
 
+    # 4a. 年がオンライン先行公開の年になっていないか（巻・号のある論文は、掲載号の年で引く）
+    if client is not None and hasattr(client, "issue_years"):
+        dated = [e for e in included if e["record"].get("doi") and e["record"].get("volume")
+                 and e["record"].get("year") and "year" not in (e.get("fixed") or {})]
+        years = client.issue_years([e["record"]["doi"] for e in dated])
+        for e in dated:
+            issue = years.get(e["record"]["doi"].lower())
+            if issue and issue != e["record"]["year"]:
+                findings.append((WARN, t("#{number} {title}: registered as {year}, but the journal issue (vol. {volume}) "
+                                         "is {issue} — {year} is probably when it came out online. Cite the issue's "
+                                         "year: `priorwork fix {name} {number} --year {issue}`",
+                                         number=e["number"], title=e["record"]["title"][:50],
+                                         year=e["record"]["year"], volume=e["record"]["volume"], issue=issue,
+                                         name=survey.name)))
+
     # 4b. カードの書き方: サーベイの言語・本文の根拠
     findings += _check_cards(survey, included, cards)
 
@@ -250,6 +265,12 @@ def check_survey(survey: Survey, client: Optional[Any] = None) -> List[Finding]:
     if survey.manuscript and not (survey.root / survey.manuscript).exists():
         findings.append((WARN, t("The manuscript {path} is not found. If it moved, set it again with "
                                  "`priorwork scope {name} --manuscript <path>`", path=survey.manuscript, name=survey.name)))
+
+    elif survey.manuscript_changed():
+        findings.append((WARN, t("The manuscript has changed since it was read ({date}): read it again with "
+                                 "`priorwork read {path} --for {name}` and update what it made stale",
+                                 date=survey.manuscript_read.get("at", "")[:10], path=survey.manuscript,
+                                 name=survey.name)))
 
     findings += _check_octavo(survey, md)
 
@@ -269,8 +290,9 @@ def check_survey(survey: Survey, client: Optional[Any] = None) -> List[Finding]:
                                      name=survey.name)))
         # full では採用論文すべての本文を読む。要旨のみでよいのは、本文が取れなかった論文だけ
         abstract = evidence_label(EVIDENCE_ABSTRACT, survey.lang)
-        fetched = [e for e in abstract_only if e.get("fulltext")]
-        failed = [e for e in abstract_only if not e.get("fulltext") and e.get("fulltext_failed")]
+        fetched = [e for e in abstract_only if e.get("fulltext") and not _unusable_fulltext(survey, e)]
+        failed = [e for e in abstract_only if (not e.get("fulltext") and e.get("fulltext_failed"))
+                  or (e.get("fulltext") and _unusable_fulltext(survey, e))]
         untried = [e for e in abstract_only if not e.get("fulltext") and not e.get("fulltext_failed")]
         if untried:
             findings.append((WARN, t("The depth is full, but {n|# card is|# cards are} \"{abstract}\" without trying the "
@@ -297,6 +319,25 @@ def check_survey(survey: Survey, client: Optional[Any] = None) -> List[Finding]:
         if shallow:
             findings.append((WARN, t("The draft of the manuscript cites {n|# paper|# papers} not checked against the "
                                      "full text: {numbers}", n=len(shallow), numbers=_numbers(shallow))))
+
+    # 8b. 補完の一覧: どの項目にも、原稿のどこに足すか（場所）が要る（無いと原稿に取り込めない）
+    if survey.purpose == "complete":
+        from .export import draft_section
+        try:
+            items = re.split(r"(?m)^## ", draft_section(md))[1:]
+        except RuntimeError:
+            items = []
+        where = re.compile(r"(?m)^\s*[-*]\s*\*\*(?:場所|Where)\*\*\s*[:：]\s*\S")
+        nowhere = [it.splitlines()[0].strip() for it in items
+                   if re.search(r"(?m)^(?![-*#\s]).*\S", it.split("\n", 1)[-1]) and not where.search(it)]
+        if nowhere:
+            findings.append((WARN, t("{n|# item|# items} in what to add to the manuscript {n|does|do} not say where "
+                                     "(\"Where\": the section and the sentence quoted): {items}", n=len(nowhere),
+                                     items="; ".join(nowhere))))
+
+    # 9. サーベイから派生した文章（講義資料・読書メモなど。priorwork derive）
+    from . import derived   # derived が check を読むので、ここで読む
+    findings += derived.check(survey)
     return findings
 
 
@@ -367,6 +408,18 @@ def _wrong_language(values: List[str], lang: str) -> bool:
         return False
     wrong = [v for v in texts if japanese(v) != (lang == "ja")]
     return len(wrong) * 2 > len(texts)
+
+
+def _unusable_fulltext(survey: Survey, entry: dict) -> bool:
+    """取得した本文が、カードを本文で書けるものでない（出版社のプレビュー・文字の無いスキャン）。
+    そういう論文に「本文を取得したのに要旨のみ」と言い続けても、直しようがない。"""
+    if incomplete_fulltext(entry):
+        return True
+    text = _fulltext(survey, entry)
+    if not text or not (entry.get("fulltext") or {}).get("page_markers"):
+        return False
+    pages, chars = content_chars(text)
+    return pages >= 2 and chars < MIN_CHARS_PER_PAGE * pages
 
 
 def _fulltext(survey: Survey, entry: dict) -> Optional[str]:

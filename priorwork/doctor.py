@@ -109,7 +109,8 @@ def run_checks(root: Path, client: Optional[Any] = None) -> List[Check]:
                                        "Import Clarivate's CSV in the settings (`priorwork settings --import-ssci CSV`)")))
 
     zotero = ZoteroClient.from_env()
-    out.append((OK, "Zotero", t("Set")) if zotero
+    out.append((OK, "Zotero", t("Set") + (" | " + t("may add the included papers to the survey's collection "
+                                                   "(ZOTERO_WRITE=1)") if zotero.write else "")) if zotero
                else (OK, "Zotero", t("Not set (optional; with it, priorwork can see what is in Zotero and fetch full texts)")))
 
     if shutil.which("pandoc"):
@@ -135,4 +136,10 @@ def _online_checks(client: Any, zotero: Optional[ZoteroClient]) -> List[Check]:
             out.append((OK, t("Zotero connection"), t("WebDAV: {status}", status=zotero.check_webdav())))
         except ZoteroError as e:
             out.append((NG, t("Zotero connection"), str(e)))
+        if zotero.write:
+            try:
+                zotero.check_write_access()
+                out.append((OK, t("Zotero writing"), t("The API key can write to the library")))
+            except ZoteroError as e:
+                out.append((NG, t("Zotero writing"), str(e)))
     return out

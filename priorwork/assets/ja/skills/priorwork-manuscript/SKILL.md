@@ -2,19 +2,22 @@
 name: priorwork-manuscript
 description: >-
   Works from the user's own manuscript in any format (Markdown, Quarto, HTML, Word, PDF): reads it with
-  `./priorwork read`, agrees with the user what to make (a draft of its introduction, literature review and
-  theory and hypotheses; advice on missing literature, the direction of its citations and the argument; or
-  both as separate reports) and which parts to cover, then searches, screens, fills in the cards and writes
-  each report (`./priorwork new --manuscript … --purpose draft|advice`). Use when the user points to their
-  manuscript, finished or not, and asks for its sections 1–3, the literature behind it, or advice on it.
+  `./priorwork read`, agrees with the user what to make (what to add where a manuscript in progress lacks
+  something, the author's marks first; a draft of its introduction, literature review and theory and
+  hypotheses; advice on missing literature, the direction of its citations and the argument; or several as
+  separate reports) and which parts to cover, then searches, screens, fills in the cards and writes each
+  report (`./priorwork new --manuscript … --purpose complete|draft|advice`). Use when the user points to
+  their manuscript, finished or not, and asks to fill it in, for its sections 1–3, the literature behind it,
+  or advice on it.
 ---
 
-# 原稿から始める（1〜3 章の下書き・原稿への助言）
+# 原稿から始める（欠けの補完・1〜3 章の下書き・原稿への助言）
 
-ルールは [AGENTS.md](../../../AGENTS.md) に従う。ユーザーは自分の原稿を持っていて、それを補強する先行研究を求めている。作るものは 2 種類あり、1 つの原稿から両方を別々のレポートとして作ってもよい。
+ルールは [AGENTS.md](../../../AGENTS.md) に従う。ユーザーは自分の原稿を持っていて、それを補強する先行研究を求めている。作るものは 3 種類あり、1 つの原稿からいくつかを別々のレポートとして作ってもよい。
 
 | 目的（`--purpose`） | 向いている原稿 | レポート |
 | :--- | :--- | :--- |
+| `complete`（欠けの補完。既定） | 書きかけの原稿（節が無い・見出しだけ・薄い・引用が無い）。作者が印（`[cite]`・`[@?]`・`TODO(priorwork): …`）を残していることもある | 欠けの地図、文献で支える主張、原稿のどこに何を足すかの一覧（場所は前後の一文の引用で示す。`export --draft`）、引用の点検、仮説の後付けの点検、カード |
 | `draft`（1〜3 章の下書き） | 分析（データと方法・結果）まで書けていて、イントロ・先行研究・理論と仮説がまだ | 文献で支える主張、カード、原稿に貼れる下書き（`export --draft`）、仮説の後付けの点検 |
 | `advice`（原稿への助言） | 出来上がった、または書きかけの論文 | 助言のまとめ、引用の点検（向き・言い過ぎ）、足りない先行研究、論の組み立てへのコメント、カード |
 
@@ -33,13 +36,14 @@ description: >-
   ./priorwork read manuscripts/<論文名> --out /tmp/<論文名>.txt   # 長いときは書き出して分けて読む
   ```
 
+- サーベイを作った後に読み直すときは、`--for <survey>` を付ける（`./priorwork read manuscripts/<論文名> --for <survey>`）。今の原稿を読んだと記録され、その後にユーザーが原稿を直すと、`./priorwork status` の次にやることに「原稿が変わった」と出る。そう出たら読み直し、何が変わったかをユーザーに伝えて、古くなったところ（欠けの地図と補完の一覧・下書き・助言。新しい主張に文献が要れば検索も）を直す。
 - **Octavo のプロジェクト**（別のリポジトリ。`octavo.config.py` がある）の原稿は、`manuscripts/` に写さず、その場所を指す（例: `../make_or_buy/papers/main`）。`./priorwork read` は、原稿のほかにプロジェクトの分析の結果（`results/*.json`）・表・分析（`.qmd`）・図の名前と、原稿が引いている文献（`.bib` の `[@key]`）も出す。下の「Octavo のプロジェクトの原稿」も守る。
 
 ## 2. 何を作るかを相談して決める
 
 原稿を読んだら、次を提案して**ユーザーの答えを待つ**（進め方によらない。依頼で目的・対象・本数がすべてはっきりしているときだけ、待たずに進めて、報告でどう決めたかを伝える）。
 
-- **目的**: `draft`・`advice`、またはその両方（別々のレポート）。原稿の状態からどれが向いているかを理由とともに勧める。
+- **目的**: `complete`・`draft`・`advice`、またはいくつか（別々のレポート）。原稿の状態からどれが向いているかを理由とともに勧める。書きかけで、どこが欠けているかが節ごとに違う原稿や、作者の印がある原稿は `complete`。分析まで済んで 1〜3 章だけが無い原稿は `draft`。出来上がった原稿は `advice`。
 - **対象**: 原稿のどこを対象にするか（例: 「2 章の先行研究と 3 章の仮説」「論文全体」）。
 - **検索の範囲**: リサーチクエスチョン（原稿のもの）、分野、期間、採用・除外の基準、深さ（既定は full）。
 - **本数と順番**: 何本のレポートを作るか。両方作るなら、どちらを先にするか（先に作ったサーベイの採用論文を、後のサーベイに `add` で引き継げる）。
@@ -47,7 +51,7 @@ description: >-
 答えを受けたら、レポートごとにサーベイを作る。slug はレポートごとに変える（例: `make_or_buy_draft`、`make_or_buy_advice`）。
 
 ```bash
-./priorwork new "<テーマ>" --slug <slug> --by "<自分のモデル名>" --manuscript manuscripts/<論文名> --purpose draft|advice --mode standard|auto|manual --depth full --question "..." --fields "..." --inclusion "..." --exclusion "..."
+./priorwork new "<テーマ>" --slug <slug> --by "<自分のモデル名>" --manuscript manuscripts/<論文名> --purpose complete|draft|advice --mode standard|auto|manual --depth full --question "..." --fields "..." --inclusion "..." --exclusion "..."
 ```
 
 原稿が Octavo のプロジェクトにあれば、`new` がプロジェクトの Zotero のコレクションをサーベイに結び付ける（`./priorwork status <survey>` に「Octavo のプロジェクト」と出る）。
@@ -76,6 +80,8 @@ description: >-
 
 **`advice`**: レポートの 3 章の表に、原稿が先行研究を引いている主な箇所を ID（R1, R2, …）つきで並べる（原稿の場所・原稿の記述・引かれた文献）。あわせて、原稿の問い・理論・方法・結果のそれぞれについて、触れられていない研究の流れが無いかを考え、4 章の候補にする。
 
+**`complete`**: レポートの 2 章の表に、原稿の節ごとの状態（書けている / 薄い / 見出しだけ / 無い）と、そこにある作者の印（`./priorwork read` の最後の「作者の印」）と、補う方針を書く。作者の印は、作者がそこに文献を求めている印なので、すべて表に載せる。次に、補うときに文献で支える主張を 3 章の表に ID（C1, C2, …）つきで並べる（`draft` の表の種類を参考に。主な結果と食い違う知見も主張として立てる）。原稿がすでに引いている箇所は、`advice` と同じく 5 章の表に R で並べる。
+
 ## 5. 検索・選別する
 
 `priorwork-new` の 2（検索）、`priorwork-screen`（選別）、`priorwork-snowball`（引用の追跡）の手順で進める。サブテーマの代わりに、4 の主張（C）や引用の箇所（R）を切り口にする。
@@ -93,10 +99,12 @@ description: >-
 ```bash
 ./priorwork card <survey> N --set "role=C2 支持; 方法の先例"        # draft
 ./priorwork card <survey> N --set "role=R2 原稿が引用; 向きが違う"   # advice
+./priorwork card <survey> N --set "role=K2・C1 支持"                 # complete
 ```
 
 - `draft`: 2 章の主張の ID と関係（支持 / 食い違い / 理論の出どころ / 方法の先例 / 背景）。書いたら、2 章の表の「支える文献」「食い違う・限定する文献」の列を、カードに合わせて著者 (年) で埋める。文献が 1 本も無い主張が残ったら、その主張で検索を足す。それでも見つからなければ、主張を弱めるか削る案を 6 章に書く。
 - `advice`: 3 章の ID と、原稿が引用しているか足す候補か、原稿にとっての意味（支持 / 食い違い / 理論の出どころ / 方法の先例 / 背景）。
+- `complete`: 4 章の項目（K）・3 章の主張（C）・5 章の引用（R）の ID と関係。3 章の表の文献の列もカードに合わせて埋める。
 - 原稿の主張の根拠になる論文（`draft` で下書きに引く論文、`advice` で引用の向きを判定する論文）は、深さによらず本文で確かめる（本文確認済）。
 
 ## 7a. 下書きを書く（`draft`）
@@ -126,12 +134,23 @@ description: >-
 
 引用するのはサーベイに採用した論文だけ。原稿を書き換えた文（直した版の文章）を勧めるときは、原稿の言語で短く示す。
 
+## 7c. 補完を書く（`complete`）
+
+まず、4 で作った地図（2 章）に沿って、**原稿の順に** 4 章（`<!-- priorwork:draft -->` の後ろ）の項目を書く。
+
+- 見出しは `### K1 種類 — 節`。種類は「節を書く」（無い節・見出しだけの節）、「差し込む」（薄い節に段落を足す）、「引用を足す」（引用の無い主張・`[cite]`・`[@?]` に、引く論文と、引用を入れた文を示す）。
+- 各項目に **場所**（節の見出しと、足す場所の前か後の一文を、原稿からそのまま引用）と **理由**（2 章の欠け・作者の印・3 章の主張の ID）を書き、その下に**原稿の言語で**本文を書く。場所が無い項目は `./priorwork check` が WARN にする。
+- **作者の印を先に埋める。** `./priorwork read` の「作者の印」の一つ一つに、項目か、埋めない理由（文献で支えられない・範囲の外）を 2 章に書く。
+- 補うのは文献で支える部分だけ。方法・結果の中身（データ・推定値・解釈）は書かない（方法の選び方を支える文献を示すのはよい）。
+- 7a の「守ること」（採用論文だけを引く・仮説の後付けをしない・食い違う先行研究を隠さない）を守る。原稿の書いてある部分と食い違うことを足すときは、その旨を理由に書く。
+- 5 章（引用の点検）と 6 章（仮説の根拠と後付けの点検）は、7a・7b と同じ要領で書く。
+
 ## 8. 検査して書き出す
 
 `priorwork-check` の手順で ERROR を 0 にしてから書き出す。
 
 ```bash
-./priorwork export <survey> --draft          # draft: reports/<名前>.draft.md（下書きと、引用した論文の参考文献）
+./priorwork export <survey> --draft          # draft・complete: reports/<名前>.draft.md（下書き・補完の一覧と、引用した論文の参考文献）
 ./priorwork export <survey>                  # reports/<名前>.html（全体）
 ```
 
@@ -142,19 +161,20 @@ description: >-
 - 下書きは、ほかの原稿と同じく「著者 (年)」で書く。Octavo の形への書き換えはエンジンがする:
 
   ```bash
-  ./priorwork export <survey> --octavo    # reports/<名前>.<プロジェクト>.octavo.md（引用は [@key]、参考文献の節は無い）
+  ./priorwork export <survey> --octavo    # <プロジェクト>/literature/priorwork/<サーベイ>.md と .json（引用は [@key]、参考文献の節は無い）
   ```
 
   キーは Octavo のプロジェクトの `.bib`（Zotero から書き出したもの）から DOI で引く。キーを自分で作らない。
-- `.bib` に無い採用論文は `[@PRIORWORK:…]` と書かれ、DOI の一覧が出る。報告でその DOI をそのまま示し、「Zotero のコレクション（`./priorwork status` の「Octavo のプロジェクト」に出る名前）に入れ、Octavo のプロジェクトで `octavo bib pull` を実行してから、もう一度書き出す」と伝える（Octavo は `[@PRIORWORK:…]` を「無いキー」として知らせる）。
+- `.bib` に無い採用論文は `[@PRIORWORK:<DOI>]` と書かれ、DOI の一覧が出る。報告でその DOI をそのまま示し、「Zotero のコレクション（`./priorwork status` の「Octavo のプロジェクト」に出る名前）に入れ、Octavo のプロジェクトで `octavo bib pull` と `octavo priorwork resolve` を実行する」と伝える。resolve が印を `.bib` のキーに置き換える（それまで Octavo は「無いキー」として知らせる。Octavo 0.6.6 まででは、`octavo bib pull` の後にもう一度書き出す）。Priorwork が Zotero に書き込めるなら、`./priorwork zotero <survey> --add` で入れられる（AGENTS.md「Zotero」）。
 - `./priorwork check` は、サーベイと Octavo の Zotero のコレクションが違うとき（WARN）、下書きが `.bib` に無い論文を引いているとき（WARN）を知らせる。コレクションが違えば、どちらに合わせるかをユーザーに聞く。
-- 下書きの `.octavo.md` は、ユーザーが読んで Octavo の原稿（`paper.md`）に移す。Octavo のプロジェクトのファイルは書き換えない。
+- 書き出したものは、Octavo のプロジェクトの受け取り場所（`literature/priorwork/`）に置かれる。原稿への取り込みは Octavo の側でする: ユーザーに、Octavo のプロジェクトのエージェントに「受け取った下書きを原稿に反映して」と頼むよう伝える。受け取り場所の外の Octavo のファイル（設定・`.bib`・原稿）は書き換えない。
 
 ## 9. 報告する
 
 入口のスキル `priorwork` の「4. 終わったら報告する」に加えて、次を伝える。論文は著者 (年) で示す。
 
-- Octavo のプロジェクトの原稿なら、`.octavo.md` のファイルと、`.bib` に無かった論文の DOI（Zotero に入れてから書き出し直すこと）
+- Octavo のプロジェクトの原稿なら、受け取り場所に置いたファイルと、`.bib` に無かった論文の DOI（Zotero に入れて `octavo bib pull` すること）
 - `draft`: 2 章の主張と、文献の付き方（支える文献しかない主張・食い違う文献がある主張・文献が見つからなかった主張）、6 章の点検でユーザーが判断すべき点、下書きのファイル（`reports/<名前>.draft.md`。原稿へは、ユーザーが読んで直してから移すこと）
 - `advice`: 助言のまとめ（2 章）の要点と、引用の点検で「向きが違う」「言い過ぎ」とした箇所の数
+- `complete`: 欠けの地図（2 章）の要点、足す項目の数と種類、作者の印のうち埋めたもの・埋めなかったもの（とその理由）、書き出したファイル（原稿へは、ユーザーが読んでから取り込むこと）
 - 1 つの原稿から複数のレポートを作ったときは、それぞれの名前と、まだ作っていないもの

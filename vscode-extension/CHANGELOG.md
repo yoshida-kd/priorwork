@@ -3,6 +3,86 @@
 Priorwork's command-line tool (`priorwork` on PyPI) and this extension are
 released together, under one version number.
 
+## 0.1.10
+
+- **Notes for the agent when you ask it to make a survey.** After the mode, an
+  optional box takes the research question, criteria, years or papers to start
+  from, and adds them to the request.
+- **Priorwork can put the included papers into Zotero, if you let it.** Check
+  *Let Priorwork add the included papers to the survey's collection* in the
+  settings (`ZOTERO_WRITE=1`) and give the API key write access. Then
+  `priorwork zotero SURVEY --add` (or *Add to Zotero…* in the sidebar, which
+  shows the list first) puts them into the collection linked to the survey:
+  items already in the library are added to it, the rest are made from the
+  bibliographic data. It never changes or deletes your items, never touches
+  other collections and makes no collections. The agent follows the mode: in
+  standard it shows you the list at the stop before the cards and adds it
+  when you agree; in full auto it adds without stopping. `--dry-run` shows
+  what it would do, and `--undo` takes back only what Priorwork wrote (items
+  it made go to the trash unless you changed them since). Off by default:
+  without the setting, Zotero stays read only.
+- The surveys in the sidebar start collapsed; the ones you open stay open.
+- **Text for Octavo goes into the project's inbox.** `export --octavo` now
+  writes `literature/priorwork/<survey>.md` in the Octavo project, with a
+  `.json` manifest (the survey, the kind of text, its hash, the Zotero
+  collection and every cited paper with its key or DOI); before, it wrote
+  `reports/<name>.<project>.octavo.md` in the Priorwork workspace. The inbox
+  is the only place in an Octavo project Priorwork writes to; working the text
+  into the manuscript is left to Octavo's agent (the sidebar copies a request
+  for it). Papers not in the `.bib` yet are written as `[@PRIORWORK:<DOI>]`,
+  so that Octavo can replace them by their keys after `octavo bib pull`
+  (`octavo priorwork resolve`, in Octavo releases after 0.6.6; Octavo's side
+  of the inbox, the cards and the requests comes with those releases too).
+- **Fill in a manuscript in progress** (`--purpose complete`, now the default
+  for a survey made from a manuscript). The report maps what each section
+  lacks and lists what to add, where: "Write the section", "Insert" or "Add
+  citations", each quoting the sentence it goes before or after, with the text
+  in the manuscript's language. Leave `[cite]`, `[@?]` or
+  `TODO(priorwork): …` in the manuscript where you want help: `priorwork read`
+  lists these marks and the agent fills them in first. `check` warns about
+  additions that do not say where. `draft` and `advice` stay as they were.
+- **A changed manuscript is noticed.** The survey records the manuscript as it
+  was read (at `new --manuscript`, and with `priorwork read PATH --for
+  SURVEY`). When you change it later, the next steps and `check` say so, and
+  the sidebar's button asks the agent to read it again and update what it made
+  stale.
+- The inbox for Octavo also gets `<survey>.cards.json`: the card of every
+  included paper (its key, Author (year), evidence level and fields), for
+  Octavo to show over `[@key]` in the manuscript.
+- **Requests from Octavo without the clipboard.** Octavo can put a request in
+  the workspace's `.priorwork/requests/`; it shows under *Requests from
+  Octavo* in the sidebar, where you ask your agent to carry it out or decline
+  it. `priorwork requests [ID]` lists and shows them, and `--done --survey` /
+  `--decline --note` record the outcome for Octavo to read.
+- **Short texts from a survey: `priorwork derive`.** Lecture handouts, reading
+  notes and summaries now have a place and a procedure (skill
+  `priorwork-derive`): `reports/<survey>.<name>.md`, with its purpose, target
+  length (citations in parentheses counted or not) and structure recorded, and
+  its references made from the papers it cites. `priorwork check` reports
+  citations that are not included papers, citations from cards not checked
+  against the full text, numbers in a citing sentence that are not in the card,
+  and a length off the target. `priorwork export SURVEY --derived NAME` writes
+  it for reading (HTML or Word).
+- **Hyphenated surnames match.** "Fernández‐i‐Marín et al. (2024a)" (with the
+  Unicode hyphen the database uses) and "Fernandez-i-Marin et al. (2024a)" both
+  find the registered paper; before, the check took "Marin" for the surname.
+- **`priorwork add` keeps what it registered when a rate limit stops it.** Each
+  paper is saved as it is registered, it stops trying after the retries run out,
+  and it prints the command that adds the rest. A failed search says the survey
+  is unchanged and to run it again.
+- **Zotero changes that have not arrived yet are explained.** Priorwork reads
+  the library on zotero.org, so a change in the Zotero app shows once the app
+  has synced; `priorwork zotero` and `fulltext` now say so (with when the
+  library was read) where a paper or PDF looks missing.
+- **A PDF with no text is not taken for the full text.** Pages that carry only
+  a line repeated on every page ("Downloaded from …") count as a scanned image:
+  `fulltext` fails and says to give a PDF with text, and `check` no longer asks
+  to fill in a card from such a text (or from a publisher's preview).
+- **The year of the journal issue, not of the online version.** Papers added by
+  DOI take the issue's year from Crossref (keeping the online year), and
+  `priorwork check` names included papers whose year is the online one, with
+  the `fix --year` to run.
+
 ## 0.1.9
 
 - **Modes: where the agent stops for you.** *Standard* (the new default)

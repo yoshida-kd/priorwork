@@ -51,5 +51,6 @@
   "command.archive": "サーベイをアーカイブする…",
   "command.unarchive": "アーカイブから戻す",
   "command.linkOctavo": "Octavo のプロジェクトに結び付ける…",
-  "command.exportOctavo": "Octavo のプロジェクト用に書き出す…"
+  "command.exportOctavo": "Octavo のプロジェクト用に書き出す…",
+  "command.openRequest": "Octavo からの依頼を開く"
 }

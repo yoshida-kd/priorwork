@@ -51,5 +51,6 @@
   "command.archive": "Archive the Survey…",
   "command.unarchive": "Bring Back from the Archive",
   "command.linkOctavo": "Link to an Octavo Project…",
-  "command.exportOctavo": "Export for an Octavo Project…"
+  "command.exportOctavo": "Export for an Octavo Project…",
+  "command.openRequest": "Open the Request from Octavo"
 }

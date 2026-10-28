@@ -118,7 +118,7 @@ manuscripts/
 
 GITIGNORE_BEGIN = "# BEGIN priorwork (managed by `priorwork sync`)"
 GITIGNORE_END = "# END priorwork"
-GITIGNORE_LINES = [".env", ".venv/", "__pycache__/", ".priorwork/cache/", ".priorwork/data/",
+GITIGNORE_LINES = [".env", ".venv/", "__pycache__/", ".priorwork/cache/", ".priorwork/data/", ".priorwork/requests/",
                    "reports/*.html", "reports/*.docx", "reports/*.clean.md"]  # priorwork export の出力（再生成できる）
 
 

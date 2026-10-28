@@ -301,6 +301,15 @@ def from_openalex(w: Dict[str, Any]) -> Dict[str, Any]:
     )
 
 
+def _date_year(part: Any) -> Optional[int]:
+    """Crossref の日付（{"date-parts": [[2024, 5]]}）の年。"""
+    try:
+        y = int(((part or {}).get("date-parts") or [[None]])[0][0])
+    except (TypeError, ValueError, IndexError):
+        return None
+    return y if 1800 < y < 2200 else None
+
+
 # ---------------- Client ----------------
 
 class LiteratureClient:
@@ -396,6 +405,36 @@ class LiteratureClient:
         except ApiError as e:
             print("[Notice] " + t("{error} → abstracts are not filled in from Crossref", error=e), file=sys.stderr)
         return records
+
+    def issue_years(self, dois: List[str]) -> Dict[str, int]:
+        """DOI ごとの、掲載号の年（Crossref の journal-issue / published-print）。分からない DOI は入らない。
+
+        S2・OpenAlex の年はオンラインで先に公開された年のことが多く（巻・号に載るのは翌年など）、
+        参照文献の年と食い違う。失敗しても止めない（空のまま返す）。"""
+        years: Dict[str, int] = {}
+        dois = [d.lower() for d in dois if d]
+        try:
+            for i in range(0, len(dois), CROSSREF_BATCH):
+                chunk = dois[i:i + CROSSREF_BATCH]
+                data = self._crossref("/works", {"filter": ",".join(f"doi:{d}" for d in chunk),
+                                                 "rows": CROSSREF_BATCH,
+                                                 "select": "DOI,published-print,journal-issue"})
+                for item in (data.get("message") or {}).get("items") or []:
+                    year = _date_year((item.get("journal-issue") or {}).get("published-print")) \
+                        or _date_year(item.get("published-print"))
+                    if year:
+                        years[(item.get("DOI") or "").lower()] = year
+        except ApiError as e:
+            print("[Notice] " + t("{error} → the years of the journal issues are not checked", error=e), file=sys.stderr)
+        return years
+
+    def use_issue_year(self, record: Dict[str, Any]) -> Dict[str, Any]:
+        """巻のある論文の年を、オンライン先行公開の年から掲載号の年に直す（元の年は online_year に残す）。"""
+        if record.get("doi") and record.get("volume"):
+            year = self.issue_years([record["doi"]]).get(record["doi"].lower())
+            if year and record.get("year") and year > record["year"]:
+                record["online_year"], record["year"] = record["year"], year
+        return record
 
     # ---- Semantic Scholar ----
 
@@ -509,14 +548,15 @@ class LiteratureClient:
         ident = parse_identifier(identifier)
         if ident["s2_id"]:
             try:
-                return self.complete_abstracts(self._verify_with_openalex([self._get_paper_s2(ident["s2_id"])]))[0]
+                return self.use_issue_year(
+                    self.complete_abstracts(self._verify_with_openalex([self._get_paper_s2(ident["s2_id"])]))[0])
             except ApiError as e:
                 if e.status != 404:
                     raise
                 print("[Notice] " + t("Not in Semantic Scholar; fetching it from OpenAlex: {id}", id=ident["value"]),
                       file=sys.stderr)
         try:
-            return self.complete_abstracts([self._get_paper_openalex(ident)])[0]
+            return self.use_issue_year(self.complete_abstracts([self._get_paper_openalex(ident)])[0])
         except ApiError as e:
             if e.status != 404:
                 raise

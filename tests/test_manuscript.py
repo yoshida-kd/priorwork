@@ -17,7 +17,7 @@ def manuscript(tmp_path):
 
 @pytest.fixture
 def ms(manuscript, s2_record):
-    s = Survey.create("最低賃金と雇用", "mw_paper", {"question": "雇用は減るか"}, manuscript=str(manuscript))
+    s = Survey.create("最低賃金と雇用", "mw_paper", {"question": "雇用は減るか"}, manuscript=str(manuscript), purpose="draft")
     for i, (doi, title, authors, year) in enumerate([
         ("10.1/a", "Minimum wages and employment in New Jersey", ("David Card", "Alan B. Krueger"), 1994),
         ("10.1/b", "The effect of minimum wages on low-wage jobs", ("Doruk Cengiz", "Arindrajit Dube"), 2019),
@@ -110,3 +110,59 @@ def test_the_draft_must_cite_papers_read_in_full(ms):
     assert shallow and "#1" in shallow[0]
     ms.set_card(1, {"evidence": "fulltext"})
     assert not [m for level, m in check_survey(ms) if "本文で確かめていない" in m]
+
+
+# ---------------- 書きかけの原稿の補完（--purpose complete） ----------------
+
+def test_the_authors_marks_are_found(tmp_path):
+    from priorwork import manuscript
+    paper = tmp_path / "paper.md"
+    paper.write_text("# 1. Introduction\nWages rose [cite].\n\n## 2.1 Theory\nMonopsony [@?] explains it.\n"
+                     "TODO(priorwork): add the literature on institutions\n")
+    marks = manuscript.find_marks(manuscript.read(paper))
+    assert [(m["line"], m["heading"], m["mark"], m["note"]) for m in marks] == [
+        (2, "1. Introduction", "[cite]", ""), (5, "2.1 Theory", "[@?]", ""),
+        (6, "2.1 Theory", "TODO(priorwork)", "add the literature on institutions")]
+
+
+def test_a_survey_that_fills_in_a_manuscript(manuscript, s2_record):
+    s = Survey.create("最低賃金と雇用", "mw_fill", {"question": "雇用は減るか"}, manuscript=str(manuscript))
+    assert s.purpose == "complete"
+    e, _ = s.upsert(s2_record(doi="10.1/a", title="Minimum wages and employment in New Jersey",
+                              authors=("David Card", "Alan B. Krueger"), year=1994), "search")
+    s.set_status([e["number"]], INCLUDED)
+    s.render()
+    from priorwork import cli
+    assert "complete" in {step["id"] for step in cli.next_steps(s, [])}
+    with pytest.raises(RuntimeError, match="補完の一覧"):              # まだ何も書いていない
+        export_draft(s, "md")
+
+    md = s.md_path.read_text()
+    md = md.replace("### K1 差し込む — \n\n- **場所**: \n- **理由**: \n",
+                    "### K1 差し込む — 1. Introduction\n\n- **理由**: [cite] の印\n\n"
+                    "Card and Krueger (1994) は雇用の減少を見いだしていない。\n")
+    s.md_path.write_text(md)
+    found = [m for lvl, m in check_survey(s, None) if lvl == WARN]
+    assert any("場所" in m and "K1" in m for m in found), found       # どこに足すかが無い
+
+    s.md_path.write_text(md.replace("- **理由**:", "- **場所**: 1. Introduction の「Wages rose」の後\n- **理由**:"))
+    assert not any("場所" in m and "K1" in m for lvl, m in check_survey(s, None))
+    out, _ = export_draft(s, "md")
+    text = out.read_text()
+    assert "## K1 差し込む — 1. Introduction" in text and "場所" in text
+    assert "Krueger" in text.rsplit("\n## ", 1)[1]                     # 最後の節（参照文献）に引いた論文
+
+
+def test_a_changed_manuscript_is_noticed(ms, manuscript, capsys):
+    from priorwork import cli
+    assert ms.manuscript_read["sha256"] and not ms.manuscript_changed()
+    assert "manuscript_changed" not in {step["id"] for step in cli.next_steps(ms, [])}
+    manuscript.write_text(manuscript.read_text() + "\n# 6. Discussion\nTODO(priorwork): the literature on X\n")
+    s = Survey.load("mw_paper")
+    assert s.manuscript_changed()
+    step = next(st for st in cli.next_steps(s, []) if st["id"] == "manuscript_changed")
+    assert step["args"] == ["read", s.manuscript, "--for", s.name]
+    assert any("読み直し" in m for lvl, m in check_survey(s, None) if lvl == WARN)
+    cli.main(["read", str(manuscript), "--for", s.name])                 # 読み直したと記録する
+    assert "TODO(priorwork)" in capsys.readouterr().out
+    assert not Survey.load("mw_paper").manuscript_changed()

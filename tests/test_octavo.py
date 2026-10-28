@@ -1,4 +1,7 @@
 """Octavo のプロジェクトとのつなぎ: 設定と .bib を読む、原稿の引用を登録する、下書きを [@key] で書き出す。"""
+
+import hashlib
+import json
 from pathlib import Path
 
 import pytest
@@ -88,7 +91,7 @@ def fake_get(monkeypatch):
 
 def test_add_cited_and_export_for_octavo(ws, tmp_path, fake_get, capsys):  # noqa: F811
     paper = make_project(tmp_path / "proj")
-    made = ws("new", "mw", "--slug", "mw", "--manuscript", str(paper.parent), "--json")
+    made = ws("new", "mw", "--slug", "mw", "--manuscript", str(paper.parent), "--purpose", "draft", "--json")
     added = ws("add", "mw", "--cited", "--json")
     assert len(added["added"]) == 2 and added["no_doi"] == []
     ws("add", "mw", "10.1/neum", "--json")                       # .bib にまだ無い論文
@@ -106,8 +109,22 @@ def test_add_cited_and_export_for_octavo(ws, tmp_path, fake_get, capsys):  # noq
     cli.main(["export", "mw", "--draft", "--octavo"])
     out = capsys.readouterr().out
     assert "10.1/neum" in out and "Minimum wages" in out
-    text = Path(made["report"]).with_name(Path(made["report"]).stem + ".proj.octavo.md").read_text(encoding="utf-8")
-    assert "@card1994 found no fall, unlike @PRIORWORK:Neumark2007 [p. 5]" in text
+    inbox = tmp_path / "proj" / "literature" / "priorwork"
+    text = (inbox / f"{made['name']}.md").read_text(encoding="utf-8")
+    assert "@card1994 found no fall, unlike @PRIORWORK:10.1/neum [p. 5]" in text   # Octavo が DOI でキーに置き換える
+    manifest = json.loads((inbox / f"{made['name']}.json").read_text(encoding="utf-8"))
+    assert manifest["kind"] == "draft" and manifest["text"] == f"{made['name']}.md"
+    assert {(c["key"], c["in_bib"]) for c in manifest["citations"]} == {
+        ("card1994", True), ("dube2010", True), ("PRIORWORK:10.1/neum", False)}
+    assert manifest["sha256"] == hashlib.sha256(text.encode("utf-8")).hexdigest()
+    assert_handoff_shape(manifest)
+    cards = json.loads((inbox / manifest["cards"]).read_text(encoding="utf-8"))
+    assert_cards_shape(cards)
+    by_key = {c["key"]: c for c in cards["papers"]}
+    assert by_key["card1994"]["in_bib"] and by_key["card1994"]["label"].endswith("(1994)")
+    assert not by_key["PRIORWORK:10.1/neum"]["in_bib"] and by_key["PRIORWORK:10.1/neum"]["evidence"] == "unchecked"
+    assert sorted(p.name for p in (tmp_path / "proj").iterdir()) == sorted(   # ほかは書き換えない
+        ["data", "literature", "octavo.config.py", "papers", "refs.bib", "results"])
     assert "[e.g., @dube2010; @card1994]" in text
     assert "Smith (2001)" in text and "(2010年代)" in text           # 採用論文でない・引用でないものは残す
     found = [m for lvl, m in cli.check_survey(Survey.load("mw"), None)]
@@ -180,11 +197,13 @@ def test_one_survey_for_several_octavo_projects(ws, tmp_path, fake_get, capsys):
     ws("export", "mw", "--octavo", "proj_a", "--json")
     got = ws("export", "mw", "--octavo", str(tmp_path / "proj_b"), "--json")
     assert [m["doi"] for m in got["missing"]] == ["10.1/dube"]          # proj_b の .bib には無い
-    stem = Path(made["report"]).stem
-    text_a = Path(made["report"]).with_name(f"{stem}.proj_a.octavo.md").read_text(encoding="utf-8")
-    text_b = Path(made["report"]).with_name(f"{stem}.proj_b.octavo.md").read_text(encoding="utf-8")
+    name = made["name"]
+    text_a = (tmp_path / "proj_a" / "literature" / "priorwork" / f"{name}.md").read_text(encoding="utf-8")
+    text_b = (tmp_path / "proj_b" / "literature" / "priorwork" / f"{name}.md").read_text(encoding="utf-8")
     assert text_a.startswith("## ") and "@card1994 found no fall [@dube2010]." in text_a
-    assert "[@PRIORWORK:Dube2010]" in text_b
+    assert "[@PRIORWORK:10.1/dube]" in text_b
+    manifest = json.loads((tmp_path / "proj_b" / "literature" / "priorwork" / f"{name}.json").read_text())
+    assert manifest["kind"] == "synthesis" and sorted(c["in_bib"] for c in manifest["citations"]) == [False, True]
 
     s = Survey.load("mw")
     s.set_zotero_collection("K", "Paper B / Theory")
@@ -195,3 +214,36 @@ def test_one_survey_for_several_octavo_projects(ws, tmp_path, fake_get, capsys):
     assert any("proj_b" in m and "#2" in m for m in found), found                 # 文章が引く論文が .bib に無い
     left = ws("scope", "mw", "--unlink-octavo", str(tmp_path / "proj_b"), "--json")["octavo_projects"]
     assert [p["name"] for p in left] == ["proj_a"]
+
+
+HANDOFF_SAMPLE = Path(__file__).parent / "fixtures" / "handoff.json"
+
+
+def assert_handoff_shape(manifest: dict):
+    """添え状が見本（tests/fixtures/handoff.json）と同じ形か。見本は Octavo との約束で、Octavo のテストも同じものを見る。
+    形を変えるときは octavo.HANDOFF_VERSION を上げ、見本と Octavo の読み手を一緒に直す。"""
+    sample = json.loads(HANDOFF_SAMPLE.read_text(encoding="utf-8"))
+    assert manifest["format"] == sample["format"] == octavo.HANDOFF_FORMAT
+    assert manifest["version"] == sample["version"] == octavo.HANDOFF_VERSION
+    assert set(manifest) == set(sample)
+    for k, v in sample.items():
+        if v is not None and manifest[k] is not None:
+            assert type(manifest[k]) is type(v), k
+    for c in manifest["citations"]:
+        assert set(c) == set(sample["citations"][0])
+
+
+def test_placeholders_use_the_doi_when_pandoc_can_read_it():
+    assert octavo.placeholder("10.1257/AER.91.5.1369", "Card1994") == "PRIORWORK:10.1257/aer.91.5.1369"
+    assert octavo.placeholder("10.1002/(SICI)1099-1255", "X2001") == "{PRIORWORK:10.1002/(sici)1099-1255}"
+    assert octavo.placeholder("", "Smith2001") == "PRIORWORK:Smith2001"
+
+
+def assert_cards_shape(cards: dict):
+    """カードの一覧が見本（tests/fixtures/handoff-cards.json）と同じ形か。これも Octavo との約束。"""
+    sample = json.loads((HANDOFF_SAMPLE.parent / "handoff-cards.json").read_text(encoding="utf-8"))
+    assert cards["format"] == sample["format"] and cards["version"] == sample["version"] == octavo.HANDOFF_VERSION
+    assert set(cards) == set(sample)
+    for c in cards["papers"]:
+        assert set(c) == set(sample["papers"][0]) and c["evidence"] in ("unchecked", "abstract", "fulltext")
+        assert all(isinstance(v, str) for v in c["fields"].values())

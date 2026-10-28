@@ -163,15 +163,16 @@ on the command line, edit `.env` or pipe JSON into `priorwork settings --stdin`.
 | :--- | :--- |
 | `SEMANTIC_SCHOLAR_API_KEY` | A [Semantic Scholar API key](https://www.semanticscholar.org/product/api#api-key-form) (recommended). Without one, searches often fail on the rate limit |
 | `OPENALEX_API_KEY` / `OPENALEX_MAILTO` | Optional. OpenAlex works without a key, with a daily usage cap |
-| `ZOTERO_API_KEY` / `ZOTERO_USER_ID` | Optional. The Zotero link (read only); see below |
+| `ZOTERO_API_KEY` / `ZOTERO_USER_ID` | Optional. The Zotero link (read only by default); see below |
+| `ZOTERO_WRITE` | Optional. `1` lets priorwork add the included papers to the survey's Zotero collection (`priorwork zotero SURVEY --add`); see below |
 | `ZOTERO_WEBDAV_URL` / `ZOTERO_WEBDAV_USER` / `ZOTERO_WEBDAV_PASSWORD` | Optional. If Zotero syncs files through WebDAV (Nextcloud and the like) |
 | `ZOTERO_DATA_DIR` | Optional. Zotero's data folder when Zotero runs on this machine (default `~/Zotero`) |
 
 ### The Zotero link (optional)
 
 With it, priorwork shows which included papers are in Zotero (`priorwork zotero`, `status`,
-`check`) and gets full texts from the PDFs attached there (`priorwork fulltext`). It never writes
-to Zotero or WebDAV.
+`check`) and gets full texts from the PDFs attached there (`priorwork fulltext`). By default it
+never writes to Zotero or WebDAV.
 
 1. Create an API key at https://www.zotero.org/settings/keys with **only "Allow library access"**
    (no notes, no write access). "Your user ID for use in API calls" on the same page is the user ID.
@@ -179,6 +180,16 @@ to Zotero or WebDAV.
    `zotero/`) and the credentials. With Nextcloud, share the `zotero` folder **read only** with a
    dedicated user and use that user's app password.
 3. Check the connection with `./priorwork zotero` (it shows the size of the library and the WebDAV result).
+
+To let priorwork put the included papers into the Zotero collection linked to a survey, set
+`ZOTERO_WRITE=1` (the settings page has a checkbox) and give the key **"Allow write access"** too
+(`./priorwork doctor --online` checks it). Then `./priorwork zotero SURVEY --add` (see first what it
+does with `--dry-run`) adds each included paper to the collection: an item already in the library (same
+DOI, or the same title) is added to it, otherwise a new item is made from the bibliographic data. It
+never changes or deletes other items, never touches other collections and makes no collections. What it
+wrote is recorded in the survey's state, and `--undo [NUMBER …]` takes back only that: items it made go
+to the Zotero trash (unless they were changed or got attachments since), items that were already there
+just leave the collection. No PDFs come with new items; get them in Zotero (Find Full Text).
 
 If WebDAV reports "folder not found", check the URL. With Nextcloud under a sub-path (such as
 `https://example.com/nextcloud/`), include that path:
@@ -223,6 +234,7 @@ on a survey copy ready-made requests.
 | `priorwork-extract` | gets the full texts and fills in the paper cards (RQ, identification, …) |
 | `priorwork-check` | checks the survey, fixes what it finds and exports the report |
 | `priorwork-audit` | (only when asked) audits a survey another model wrote: checks the cards against the full text, the direction of citations, hypotheses mixed into the literature, mechanical exclusions and the SSCI status, fixes them and records it with `./priorwork audit` |
+| `priorwork-derive` | writes a short text from a survey — a lecture handout, reading notes, a summary — with its purpose, length and structure recorded, citing cards checked against the full text and checking numbers and directions against them |
 | `priorwork-manuscript` | reads a manuscript in any format, agrees with you what to make, and writes a draft of its sections 1–3 (introduction, literature review, theory and hypotheses) or advice on it (missing literature, the direction of its citations, the argument) |
 
 ### Modes (where the agent stops)
@@ -233,7 +245,7 @@ recorded in the survey (`--mode`), so the next conversation carries on in the sa
 
 | Mode | Where it stops |
 | :--- | :--- |
-| **Standard** (default) | Twice: once the scope is set, and before filling in the cards. Before the cards it shows the DOIs to add to Zotero; collect the papers and their PDFs in Zotero, then say "carry on". More cards are then checked against the full texts, which saves work in the end |
+| **Standard** (default) | Twice: once the scope is set, and before filling in the cards. Before the cards it shows the DOIs to add to Zotero (or, if priorwork may write to Zotero, the list to add and asks before adding it); collect the papers and their PDFs in Zotero, then say "carry on". More cards are then checked against the full texts, which saves work in the end |
 | **Full auto** | Never: it carries on to the end |
 | **Manual** | After every step, for you to check (decisions too: it recommends and waits) |
 
@@ -249,9 +261,15 @@ manuscripts/<paper name>" or "what literature is this manuscript missing?" (**Ne
 manuscript** in the sidebar writes the request too). Any format will do (Markdown, Quarto, HTML, Word,
 PDF; `./priorwork read` turns it into text). The agent reads it, then proposes what to make, which parts
 of the manuscript to cover, the scope of the searches and how many reports, and agrees them with you.
-There are two kinds of report, and one manuscript can have both as separate reports
-(`./priorwork new … --manuscript manuscripts/<paper name> --purpose draft|advice`):
+There are three kinds of report, and one manuscript can have several as separate reports
+(`./priorwork new … --manuscript manuscripts/<paper name> --purpose complete|draft|advice`):
 
+- **Filling it in** (`complete`, the default): from a manuscript in progress, the agent maps what each
+  section lacks, takes first the marks you left (`[cite]`, `[@?]`, `TODO(priorwork): …`; `./priorwork
+  read` lists them), searches for the claims that need literature and lists what to add where ("Write
+  the section", "Insert", "Add citations"), each quoting the sentence it goes before or after, with the
+  text in the language of the manuscript. Only what the literature backs; never your methods or results.
+  `./priorwork export SURVEY --draft` writes the list with its references.
 - **A draft of sections 1–3** (`draft`): from a manuscript whose analysis is done, the agent works out
   which claims need literature (why it matters, lines of research, mechanisms, precedents for the
   methods), searches claim by claim, including findings that conflict with your results, fills in each
@@ -271,7 +289,13 @@ copies the request). The link is a Zotero collection: the survey is linked to th
 `.bib` from (`zotero_collection` in its settings). The agent registers the literature the manuscript
 cites (`./priorwork add SURVEY --cited`) and exports the draft in Octavo's form
 (`./priorwork export SURVEY --draft --octavo`: citations as `[@key]` from the `.bib`, and papers not in the
-`.bib` yet as `[@PRIORWORK:…]` with a list of their DOIs).
+`.bib` yet as `[@PRIORWORK:<DOI>]`, which `octavo priorwork resolve` replaces by their keys after `octavo bib pull`). The text
+goes into the project's inbox, `literature/priorwork/<survey>.md`, with a `.json` manifest (the survey,
+the kind of text, a hash of it and the papers it cites, with their keys and DOIs) and
+`<survey>.cards.json` (every included paper's card: key, Author (year), evidence level and fields, for
+Octavo to show over `[@key]` in the manuscript); that folder is the only
+place in an Octavo project that priorwork writes to, and working the text into the manuscript is left to
+Octavo's side.
 
 An audit is optional. To have another model check a survey too, ask that model (e.g. Claude if Gemini
 wrote it) in its chat to "audit the survey <name>" (**Ask Your Agent… → Audit as another model** in
@@ -313,7 +337,7 @@ The numbers are guides, not limits. The rules and `priorwork check` are the same
   cards, run `./priorwork render`. Mermaid diagrams in the Markdown (```` ```mermaid ````) are drawn
   in the HTML.
 - **The references** (section 9) are generated from the included papers, with DOIs (no citation
-  keys; add papers to Zotero by hand). Included papers that would be cited the same way in the
+  keys; add papers to Zotero by hand, or with `priorwork zotero --add`). Included papers that would be cited the same way in the
   text are told apart as 2001a / 2001b, by title (the cards and the matrix use the same labels).
 - **The search log** (appendix) records the searches, the counts, the reasons for exclusion and how
   many decisions were revised. A paper's history (e.g. Maybe → Excluded (theory only) → Included)
@@ -333,8 +357,9 @@ The numbers are guides, not limits. The rules and `priorwork check` are the same
 
 # Surveys
 ./priorwork status [SURVEY]                                    # the list / progress and next steps
-./priorwork new "<topic>" --slug <slug> [--by "<model>"] [--mode standard|auto|manual] [--depth quick|full] [--manuscript PATH [--purpose draft|advice]] [--question ... --years ... --fields ... --inclusion ... --exclusion ...]
+./priorwork new "<topic>" --slug <slug> [--by "<model>"] [--mode standard|auto|manual] [--depth quick|full] [--manuscript PATH [--purpose complete|draft|advice]] [--question ... --years ... --fields ... --inclusion ... --exclusion ...]
 ./priorwork scope SURVEY --question "..." [--mode standard|auto|manual] [--go-on] [--depth quick|full] [--search-field social|all] [--by "<model>"]  # change the scope or the mode
+./priorwork requests [ID] [--all] [--done --survey SURVEY | --decline --note "..."]   # requests Octavo put in .priorwork/requests/
 ./priorwork read PATH [--out FILE]                             # the text of a manuscript (.md, .qmd, .html, .docx, .pdf, … or a folder)
 ./priorwork add SURVEY --cited                                 # register the papers the manuscript cites (the DOIs in its .bib)
 ./priorwork export SURVEY --draft [--octavo]                   # the draft of sections 1–3 (--octavo: Octavo's form, [@key])
@@ -353,6 +378,7 @@ The numbers are guides, not limits. The rules and `priorwork check` are the same
 ./priorwork fulltext SURVEY <number> [--pdf <path>]
 ./priorwork zotero [SURVEY] [--refresh]
 ./priorwork zotero --collections | SURVEY --collection NAME | SURVEY --import | SURVEY --dois
+./priorwork zotero SURVEY --add | --undo [NUMBER ...] [--dry-run]   # only with ZOTERO_WRITE=1
 
 # Finding literature
 ./priorwork search "<English query>" [--into SURVEY] [--bulk] [--sort citations|relevance|recent|cpy] [--year 2010-2024] [--ssci-only] [--field social|all] [--limit N]

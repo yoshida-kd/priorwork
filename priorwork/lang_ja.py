@@ -519,8 +519,8 @@ MESSAGES = {
         "  status [SURVEY]            サーベイ一覧 / 進捗と次にやること",
     "  new TOPIC --slug SLUG      create a survey (reports/YYYYMMDD_<slug>.md and .priorwork/surveys/*.json)":
         "  new TOPIC --slug SLUG      サーベイを作成（reports/YYYYMMDD_<slug>.md と .priorwork/surveys/*.json）",
-    "  new ... --manuscript PATH  start from your manuscript (--purpose draft: its sections 1–3; advice: advice on it)":
-        "  new ... --manuscript PATH  原稿から始める（--purpose draft: 1〜3 章の下書き、advice: 原稿への助言）",
+    "  new ... --manuscript PATH  start from your manuscript (--purpose complete: fill in what it lacks; draft: its sections 1–3; advice: advice on it)":
+        "  new ... --manuscript PATH  原稿から始める（--purpose complete: 欠けを補う、draft: 1〜3 章の下書き、advice: 原稿への助言）",
     "  read PATH                  print the text of a manuscript (.md, .qmd, .html, .docx, .pdf, … or a folder)":
         "  read PATH                  原稿をテキストにして出す（.md・.qmd・.html・.docx・.pdf など。フォルダも可）",
     "  scope SURVEY ...           set the scope (research question, period, criteria)":
@@ -613,18 +613,27 @@ MESSAGES = {
     "write only the draft of the manuscript's sections 1–3, with its references (a survey made with --manuscript)":
         "原稿の 1〜3 章の下書きだけを、参考文献つきで書き出す（--manuscript で作ったサーベイ）",
     "your manuscript (a file in any format, or a folder under manuscripts/ with the manuscript and its tables): "
-    "the survey then drafts its sections 1–3 or advises on it (--purpose)":
+    "the survey then fills in what it lacks, drafts its sections 1–3 or advises on it (--purpose)":
         "原稿（形式は問わない。ファイル、または原稿と結果の表を入れた manuscripts/ の下のフォルダ）。"
-        "サーベイは、その 1〜3 章を下書きするか、原稿に助言する（--purpose）",
-    "with --manuscript, what the report is for (draft: a draft of the manuscript's sections 1–3, the default; "
-    "advice: advice on a finished manuscript — missing literature, the direction of its citations, the argument)":
-        "--manuscript のとき、レポートの目的（draft: 原稿の 1〜3 章の下書き。既定。advice: 出来上がった原稿への助言"
-        "（足りない先行研究・引用の向き・論の組み立て））",
+        "サーベイは、その欠けを補うか、1〜3 章を下書きするか、原稿に助言する（--purpose）",
+    "with --manuscript, what the report is for (complete: fill in what a manuscript in progress lacks, from the "
+    "literature, the default; draft: a draft of the sections 1–3 of a manuscript whose analysis is done; advice: "
+    "advice on a finished manuscript — missing literature, the direction of its citations, the argument)":
+        "--manuscript のとき、レポートの目的（complete: 書きかけの原稿の欠けを先行研究で補う。既定。draft: 分析まで済んだ"
+        "原稿の 1〜3 章の下書き。advice: 出来上がった原稿への助言（足りない先行研究・引用の向き・論の組み立て））",
     "--purpose is for a survey made from a manuscript (give --manuscript)":
         "--purpose は原稿から作るサーベイのためのものです（--manuscript を指定してください）",
     "the purpose is one of {choices}: {purpose}": "目的は {choices} のどれかです: {purpose}",
     "purpose: a draft of its sections 1–3": "目的: 1〜3 章の下書き",
     "purpose: advice on the manuscript": "目的: 原稿への助言",
+    "purpose: filling in what the manuscript lacks": "目的: 原稿の欠けを補う",
+    "Map what the manuscript lacks and write what to add, where (the author's marks first), then export it":
+        "原稿の欠けを地図にし、どこに何を足すかを書いて（作者の印を先に）、書き出す",
+    "What to add to the manuscript is not written yet": "原稿に足すもの（補完の一覧）がまだ書かれていません",
+    "Author's marks for Priorwork: {n}": "作者の印（Priorwork への頼みごと）: {n} 件",
+    "{n|# item|# items} in what to add to the manuscript {n|does|do} not say where (\"Where\": the section and the "
+    "sentence quoted): {items}":
+        "補完の一覧の {n} 項目に、原稿のどこに足すか（「場所」: 節と、前後の一文の引用）がありません: {items}",
     "Write the advice on the manuscript (missing literature, the direction of its citations, the argument)":
         "原稿への助言を書く（足りない先行研究・引用の向き・論の組み立て）",
     "print the text of a manuscript (.md, .qmd, .tex, .html, .docx, .pdf, … or a folder)":
@@ -790,17 +799,23 @@ MESSAGES = {
         "原稿は {bib} の文献を {n} 件引いています（DOI があるもの {doi} 件）",
     "cited by the manuscript": "原稿が引いている文献",
     "no DOI in the .bib (search it by title): [@{key}] {title}": ".bib に DOI が無い（タイトルで検索してください）: [@{key}] {title}",
-    "not found in the databases: {doi}": "データベースに見つからない: {doi}",
+    "not registered: {doi}": "登録できませんでした: {doi}",
     "register the papers the survey's manuscript cites (the DOIs in its .bib)":
         "サーベイの原稿が引いている論文を登録する（.bib の DOI から）",
     "the .bib to take the keys from (default: the Octavo project's)": "キーを取る .bib（既定: Octavo のプロジェクトのもの）",
     "{name} has no manuscript (`priorwork scope {name} --manuscript <path>`)":
         "{name} には原稿がありません（`priorwork scope {name} --manuscript <パス>`）",
-    "{n|# paper cited in the draft is|# papers cited in the draft are} not in {bib}, so {n|it is|they are} written as "
-    "[@{prefix}…] (Octavo shows ?? until it is there). Add {n|it|them} to Zotero{where}, run `octavo bib pull` in the "
-    "Octavo project, then export again:":
-        "下書きで引いた論文のうち {n} 本が {bib} に無いので、[@{prefix}…] と書きました（.bib に入るまで Octavo では ?? "
-        "になります）。Zotero{where}に入れ、Octavo のプロジェクトで `octavo bib pull` を実行してから、もう一度書き出してください:",
+    "{n|# paper cited in the text is|# papers cited in the text are} not in {bib}, so {n|it is|they are} written as "
+    "[@{prefix}<DOI>] (Octavo shows ?? until it is there). Add {n|it|them} to Zotero{where}, then run `octavo bib pull` "
+    "and `octavo priorwork resolve` in the Octavo project to replace the marks by the keys (with Octavo 0.6.6 or "
+    "older, export again after `octavo bib pull` instead):":
+        "文章で引いた論文のうち {n} 本が {bib} に無いので、[@{prefix}<DOI>] と書きました（.bib に入るまで Octavo では ?? "
+        "になります）。Zotero{where}に入れてから、Octavo のプロジェクトで `octavo bib pull` と `octavo priorwork resolve` "
+        "を実行すると、印がキーに置き換わります（Octavo 0.6.6 まででは、`octavo bib pull` の後にもう一度書き出してください）:",
+    "It is in the Octavo project's inbox for Priorwork (with {manifest}). Priorwork does not change the manuscript: "
+    "ask the agent in the Octavo project to work it into the manuscript":
+        "Octavo のプロジェクトの Priorwork の受け取り場所に置きました（添え状 {manifest} つき）。Priorwork は原稿を"
+        "書き換えません。原稿への取り込みは、Octavo のプロジェクトのエージェントに頼んでください",
     # Octavo のプロジェクト（多対多）
     ", and other surveys use it too ({names})": "。ほかのサーベイ（{names}）も使っています",
     "Not an Octavo project (no octavo.config.py): {path}": "Octavo のプロジェクトではありません（octavo.config.py が無い）: {path}",
@@ -841,10 +856,11 @@ MESSAGES = {
         "このサーベイを使う Octavo のプロジェクトを結び付ける（繰り返せる。1 つのサーベイをいくつもの論文で使える）",
     "unlink an Octavo project": "Octavo のプロジェクトの結び付けを外す",
     "write for an Octavo project, with citations as [@key] from its .bib: the draft of the manuscript, or the sections "
-    "on the literature (reports/<name>.<project>.octavo.md). Name the project (path or folder name) when the survey is "
-    "linked to several":
-        "Octavo のプロジェクト用に、引用をその .bib のキーで [@key] にして書き出す: 原稿の下書きか、先行研究のまとめの節"
-        "（reports/<名前>.<プロジェクト>.octavo.md）。複数のプロジェクトに結び付けていれば、プロジェクト（パスかフォルダの名前）を指定する",
+    "on the literature, into the project's inbox (literature/priorwork/<survey>.md, with a .json manifest). Name the "
+    "project (path or folder name) when the survey is linked to several":
+        "Octavo のプロジェクト用に、引用をその .bib のキーで [@key] にして書き出す: 原稿の下書きか、先行研究のまとめの節を、"
+        "プロジェクトの受け取り場所（literature/priorwork/<サーベイ>.md。添え状の .json つき）に置く。複数のプロジェクトに"
+        "結び付けていれば、プロジェクト（パスかフォルダの名前）を指定する",
     "{name} is linked to several Octavo projects; name one: {projects}":
         "{name} は複数の Octavo のプロジェクトに結び付いています。どれかを指定してください: {projects}",
     "{name} is not linked to an Octavo project. Link one with `priorwork scope {name} --octavo <path>`":
@@ -853,4 +869,136 @@ MESSAGES = {
         "{name} は Octavo のプロジェクト {project} に結び付いていません。結び付いているもの: {projects}",
     "{n|# included paper is|# included papers are} not in the .bib of the Octavo project {project}: {numbers}":
         "Octavo のプロジェクト {project} の .bib に無い採用論文が {n} 本あります: {numbers}",
+
+    # -- Zotero への書き込み（zotero --add / --undo。ZOTERO_WRITE=1 のときだけ） --------------------
+    "  zotero SURVEY --add [--dry-run]   add the included papers to the linked collection (only with ZOTERO_WRITE=1; --undo takes it back)":
+        "  zotero SURVEY --add [--dry-run]   採用論文を結び付けたコレクションに入れる（ZOTERO_WRITE=1 のときだけ。--undo で戻す）",
+    "Add {n|# included paper|# included papers} to the Zotero collection \"{name}\" ({numbers})":
+        "採用論文のうち Zotero のコレクション「{name}」に無い {n} 件（{numbers}）をコレクションに入れる",
+    "Added to the Zotero collection \"{name}\":": "Zotero のコレクション「{name}」に入れました:",
+    "Cannot add the items (HTTP {status}): {detail}": "アイテムを追加できません（HTTP {status}）: {detail}",
+    "Cannot change the item {key} (HTTP {status}): {detail}": "アイテム {key} を書き換えられません（HTTP {status}）: {detail}",
+    "Cannot read the item {key} (HTTP {status})": "アイテム {key} を読めません（HTTP {status}）",
+    "Cannot read the key's permissions (HTTP {status})": "API キーの権限を読めません（HTTP {status}）",
+    "Nothing to add: the papers are all in the collection \"{name}\"":
+        "入れる論文はありません（すべてコレクション「{name}」にあります）",
+    "Nothing to undo: Priorwork has not written to Zotero for this survey":
+        "戻すものはありません（このサーベイで Priorwork は Zotero に書き込んでいません）",
+    "Priorwork may not write to Zotero. To let it add the included papers to the collection, set ZOTERO_WRITE=1 in "
+    ".env (on the settings page) and give the API key write access":
+        "Priorwork は Zotero への書き込みを許されていません。採用論文をコレクションに入れさせるには、.env に "
+        "ZOTERO_WRITE=1 を設定し（設定のページでもできます）、API キーに書き込みの権限を与えてください",
+    "Stop here and wait for the user (standard mode): show what goes into the Zotero collection (`priorwork zotero "
+    "{name} --add --dry-run`) and ask whether to add it; add it with `priorwork zotero {name} --add` once the user "
+    "agrees, and ask the user to get the PDFs in Zotero. When the user says to go on, record it with `priorwork scope "
+    "{name} --go-on` and fill in the cards":
+        "ここで止まってユーザーを待つ（標準の進め方）: Zotero のコレクションに入れるもの（`priorwork zotero {name} "
+        "--add --dry-run`）を示して入れてよいか聞き、了解を得たら `priorwork zotero {name} --add` で入れて、Zotero で "
+        "PDF をそろえるよう頼む。ユーザーが続きを頼んだら `priorwork scope {name} --go-on` で記録し、カードを記入する",
+    "The API key cannot write to the library. At https://www.zotero.org/settings/keys, edit the key and check "
+    "\"Allow write access\"":
+        "API キーにライブラリへの書き込みの権限がありません。https://www.zotero.org/settings/keys でキーを編集し、"
+        "「Allow write access」にチェックを入れてください",
+    "The item {key} is no longer in the library": "アイテム {key} はもうライブラリにありません",
+    "The item {key} was changed in Zotero meanwhile; run it again": "アイテム {key} がその間に Zotero で変わりました。もう一度実行してください",
+    "To add them to the collection \"{collection}\": `priorwork zotero {name} --add` (see what it does first with "
+    "--dry-run; --undo takes it back)":
+        "コレクション「{collection}」に入れるには: `priorwork zotero {name} --add`（先に --dry-run で何をするか見られます。"
+        "--undo で戻せます）",
+    "Undid what Priorwork wrote to Zotero:": "Priorwork が Zotero に書いたものを戻しました:",
+    "Would add to the Zotero collection \"{name}\" (nothing written yet):":
+        "Zotero のコレクション「{name}」に次のものを入れます（まだ何も書いていません）:",
+    "Would undo (nothing written yet):": "次のものを戻します（まだ何も書いていません）:",
+    "Writing to Zotero is not allowed (set ZOTERO_WRITE=1 in .env)":
+        "Zotero への書き込みは許されていません（.env に ZOTERO_WRITE=1 を設定してください）",
+    "add the included papers to the linked collection (only with ZOTERO_WRITE=1)":
+        "採用論文を結び付けたコレクションに入れる（ZOTERO_WRITE=1 のときだけ）",
+    "failed: {error}": "失敗: {error}",
+    "kept (changed in Zotero since)": "そのまま（その後 Zotero で手が入っている）",
+    "to the Zotero trash": "Zotero のごみ箱へ",
+    "new item from the bibliographic data": "新規（書誌から作成）",
+    "no longer in Zotero": "もう Zotero に無い",
+    "rejected by Zotero": "Zotero に断られました",
+    "take back what --add wrote (all, or the papers with these numbers)": "--add で書いたものを戻す（すべて、または指定した番号の論文）",
+    "out of the collection": "コレクションから外す",
+    "item already in the library": "ライブラリにあるアイテム",
+    "to the Zotero trash, unless changed in Zotero since": "Zotero のごみ箱へ（その後 Zotero で手が入っていれば残す）",
+    "with --add or --undo: show what would be done, and do nothing": "--add・--undo と一緒に: することを示すだけで、書き込まない",
+    "may add the included papers to the survey's collection (ZOTERO_WRITE=1)":
+        "採用論文をサーベイのコレクションに入れてよい（ZOTERO_WRITE=1）",
+    "Zotero writing": "Zotero への書き込み",
+    "The API key can write to the library": "API キーでライブラリに書き込めます",
+    "#{number} {title}: registered as {year}, but the journal issue (vol. {volume}) is {issue} — {year} is probably when it came out online. Cite the issue's year: `priorwork fix {name} {number} --year {issue}`": '#{number} {title}: {year} 年で登録されていますが、掲載号（{volume} 巻）は {issue} 年です。{year} 年はオンラインで先に公開された年と思われます。掲載号の年で引いてください: `priorwork fix {name} {number} --year {issue}`',
+    'Apart from a line repeated on every page, there are only {chars} characters in {pages} pages. Get a PDF with text (or run OCR on it) and give it with `--pdf <path>`': 'どのページにもある1行を除くと、{pages} ページに {chars} 字しかありません。文字のある PDF を用意し（または OCR をかけて）、`--pdf <パス>` で渡してください',
+    'From the survey': '元のサーベイ',
+    'Length': '字数の目安',
+    "Priorwork reads your library on zotero.org (read at {when}). What you change in the Zotero app shows here once the app has synced it: press the sync button (the green arrows) in Zotero, wait until it stops, and run this again. A PDF also needs Zotero's file syncing (Settings > Sync > File Syncing, or WebDAV); until then, `priorwork fulltext SURVEY N --pdf <path>` reads it.": 'Priorwork が読むのは zotero.org のライブラリです（読んだ時刻: {when}）。Zotero のアプリでの変更は、アプリが同期してから届きます。Zotero の同期のボタン（緑の矢印）を押し、止まるのを待ってから、もう一度実行してください。PDF はファイルの同期も要ります（設定 > 同期 > ファイルの同期、または WebDAV）。それまでは `priorwork fulltext SURVEY N --pdf <パス>` で読めます。',
+    'Purpose': '用途',
+    'Registered {done} of {total}; they are saved. To carry on with the rest, wait a little and run:': '{total} 本のうち {done} 本を登録し、保存しました。残りは少し待ってから、次で続けてください:',
+    'Say what it is for: --purpose "..." (e.g. "a lecture handout in three parts")': '用途を書いてください: --purpose "…"（例: 「3 部構成の講義資料」）',
+    'Structure': '構成',
+    'The derived document {file} is gone (make it again with `priorwork derive`)': '派生文書 {file} がありません（`priorwork derive` で作り直してください）',
+    'The name of a derived document is lower-case letters, digits, - and _ (not {reserved}): {name}': '派生文書の名前は英小文字・数字・-・_ にしてください（{reserved} は使えません）: {name}',
+    'This query gave nothing, and {name} is as it was (earlier searches are kept). Wait a little and run the same command again': 'この検索では何も取れず、{name} は前のままです（前の検索の結果は残っています）。少し待ってから、同じコマンドをもう一度実行してください',
+    'Write the text here': '文章をここに書く',
+    'a short text made from the survey (a lecture handout, reading notes, a summary)': 'サーベイから作る短い文章（講義資料・読書メモ・要点の整理など）',
+    'about': '約',
+    'about how long (characters in Japanese, words in English)': '字数の目安（日本語は文字数、英語は語数）',
+    'about {n}': '約 {n}',
+    'characters': '字',
+    'citations in parentheses counted': '引用の括弧を含める',
+    'citations in parentheses not counted': '引用の括弧を含めない',
+    'cite only included papers, from cards checked against the full text; check each number and the direction of each finding against the card': '引くのは採用論文だけで、本文確認済のカードから。数値と結論の向きはカードと照合する',
+    'count the citations in parentheses in the length (default: not counted)': '引用の括弧も字数に数える（既定は数えない）',
+    'counted': 'を含める',
+    'its name (reports/<survey>.<name>.md); leave out to list them': '名前（reports/<サーベイ>.<名前>.md）。省くと一覧',
+    'its sections, separated by ; (e.g. "background; findings; open questions")': '節の見出しを ; で区切って（例: "背景; 知見; 残る問い"）',
+    'not counted': 'を含めない',
+    'stopped at the rate limit; {n|# more was|# more were} not tried yet': 'レート制限で止めました。残りの {n} 本はまだ試していません',
+    'what it is for, e.g. "lecture handout for public administration"': '用途（例: "行政学の講義資料"）',
+    'words': '語',
+    '{error} → the years of the journal issues are not checked': '{error} → 掲載号の年は確かめていません',
+    '{file} has no text yet': '{file} にはまだ文章がありません',
+    '{file}: the citation "{cite}" is not an included paper of the survey': '{file}: 引用「{cite}」がサーベイの採用論文にありません',
+    '{file}: {got} {unit}, against about {want} (citations in parentheses {rule})': '{file}: {got} {unit}（目安は約 {want}。引用の括弧{rule}）',
+    '{file}: {numbers} in "{sentence}" {n|is|are} not in the card of the paper it cites (check it against the card\'s findings)': '{file}: 「{sentence}」の {numbers} が、引いた論文のカードにありません（{n} 個。カードの主な結果と照合してください）',
+    '{file}: {n|# cited paper is|# cited papers are} not checked against the full text (cite from cards that are): {numbers}': '{file}: 引いた論文のうち {n} 本が本文確認済ではありません（本文確認済のカードから引いてください）: {numbers}',
+    '{name} has no derived documents yet (`priorwork derive {name} NAME --purpose "..."`)': '{name} にはまだ派生文書がありません（`priorwork derive {name} 名前 --purpose "…"`）',
+    '{path}: write the text between the managed blocks (the references at the end follow what you cite)': '{path}: 管理ブロックの間に文章を書いてください（末尾の参考文献は、引いた論文に合わせて作り直されます）',
+    "{name} has no derived document called {derived} (`priorwork derive {name}` lists them)":
+        "{name} に派生文書 {derived} はありません（`priorwork derive {name}` で一覧）",
+    "write a derived document (priorwork derive) for reading: reports/<name>.<NAME>.html":
+        "派生文書（priorwork derive）を読むための版で書き出す: reports/<名前>.<NAME>.html",
+    "The manuscript has changed since it was read ({date}): read it again with `priorwork read {path} --for {name}` "
+    "and update what it made stale":
+        "原稿は読んだとき（{date}）から変わっています。`priorwork read {path} --for {name}` で読み直し、古くなったところを"
+        "直してください",
+    "record that the survey's agent read the manuscript as it is now (a later change is then shown in the next steps)":
+        "サーベイのエージェントが今の原稿を読んだと記録する（後で原稿が変わると、次にやることに出る）",
+    "{name} is not a survey made from a manuscript": "{name} は原稿から始めたサーベイではありません",
+
+    # -- Octavo からの依頼（priorwork requests） --------------------
+    "  requests [ID]              requests from Octavo (--done / --decline records the outcome)":
+        "  requests [ID]              Octavo からの依頼（--done / --decline で結果を記録）",
+    "Give the request: `priorwork requests <id> --done`": "依頼を指定してください: `priorwork requests <id> --done`",
+    "More than one request starts with {id}": "{id} で始まる依頼が複数あります",
+    "No open requests from Octavo": "Octavo からの未処理の依頼はありません",
+    "No request {id}. The open ones: {ids}": "依頼 {id} はありません。未処理のもの: {ids}",
+    "No requests from Octavo": "Octavo からの依頼はありません",
+    "Note": "メモ",
+    "Octavo project": "Octavo のプロジェクト",
+    "Received": "受け取った日時",
+    "Recorded the request {id} as {status}": "依頼 {id} を {status} と記録しました",
+    "Survey": "サーベイ",
+    "The status is one of {choices}: {status}": "状態は {choices} のいずれかです: {status}",
+    "When it is done: `priorwork requests {id} --done --survey <survey>` (or --decline --note \"<why>\")":
+        "終わったら: `priorwork requests {id} --done --survey <サーベイ>`（断るなら --decline --note \"<理由>\"）",
+    "a note for the one who asked": "依頼した側へのメモ",
+    "a request (the start of its id is enough); leave out to list them": "依頼（id の先頭だけでもよい）。省くと一覧",
+    "list the closed ones too": "済んだものも出す",
+    "record that the request is declined (say why with --note)": "依頼を断ったと記録する（理由は --note で）",
+    "record that the request is done": "依頼が済んだと記録する",
+    "requests from Octavo": "Octavo からの依頼",
+    "with --done: the survey that carried it out": "--done と一緒に: 依頼を進めたサーベイ",
+    "{n|# request|# requests} from Octavo waiting: `priorwork requests`": "Octavo からの依頼が {n} 件あります: `priorwork requests`",
 }

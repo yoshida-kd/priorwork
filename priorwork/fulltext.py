@@ -141,6 +141,27 @@ def extract_text(pdf: bytes) -> Tuple[str, int]:
     return "".join(pages).strip(), len(reader.pages)
 
 
+# 本文のある1ページの文字数はふつう 2,000 字を超える。繰り返しの行を除いてこれに満たないなら、
+# 文字を持たない（スキャンした画像の）PDF とみなす
+MIN_CHARS_PER_PAGE = 300
+
+
+def content_chars(text: str) -> Tuple[int, int]:
+    """(ページ数, 本文の文字数)。どのページにも出る行（「Downloaded from …」などの透かし・
+    ヘッダー）は数えない。スキャンした PDF は、その1行しか文字を持たないことがある。"""
+    pages = [p for p in re.split(r"\n*=== page \d+ ===\n*", text) if p is not None]
+    pages = [p for p in pages if p.strip()] or [text]
+    lines = [{ln.strip() for ln in p.split("\n") if ln.strip()} for p in pages]
+    counts: Dict[str, int] = {}
+    for ls in lines:
+        for ln in ls:
+            counts[ln] = counts.get(ln, 0) + 1
+    repeated = {ln for ln, n in counts.items() if len(pages) >= 2 and n * 2 >= len(pages) and len(ln) <= 150}
+    chars = sum(len(re.sub(r"\s+", "", ln)) for ls in lines for ln in ls
+                if ln not in repeated and not re.match(r"(?i)downloaded from\b", ln))
+    return len(pages), chars
+
+
 def oa_pdf_urls(record: Dict[str, Any], client: Any) -> List[Tuple[str, str]]:
     """試す (URL, 版) の順: 記録した OA の PDF → OpenAlex の全所在の PDF（OA のものから）→ OA の所在のランディングページ
     （機関リポジトリなど。`download_pdf` がページ内の PDF のリンクをたどる）。版は OpenAlex の version
@@ -195,6 +216,8 @@ def fetch_fulltext(entry: Dict[str, Any], client: Any, pdf_path: Optional[str] =
                 attempts.append(t("Not in the Zotero library (matched by DOI and title)"))
             elif not attachments:
                 attempts.append(t("In Zotero, but no PDF is attached"))
+            if not item or not attachments:
+                attempts.append(zotero.sync_note())
             for att in attachments:
                 try:
                     pdf, source = zotero.download_pdf(att), f"zotero:{att['key']} ({att['filename']})"
@@ -232,6 +255,13 @@ def fetch_fulltext(entry: Dict[str, Any], client: Any, pdf_path: Optional[str] =
         text, n_pages = extract_text(pdf)
     if len(text) < 500:
         raise FulltextError(t("Could not extract text from the PDF (probably a scanned image): {source}", source=source))
+    if pdf is not None:
+        pages, chars = content_chars(text)
+        if pages >= 2 and chars < MIN_CHARS_PER_PAGE * pages:
+            raise FulltextError(t("Could not extract text from the PDF (probably a scanned image): {source}",
+                                  source=source) + "\n  " + t(
+                "Apart from a line repeated on every page, there are only {chars} characters in {pages} pages. "
+                "Get a PDF with text (or run OCR on it) and give it with `--pdf <path>`", chars=chars, pages=pages))
     out_dir.mkdir(parents=True, exist_ok=True)
     safe_key = re.sub(r"[^\w.-]+", "_", entry["key"])[:80]
     out = out_dir / f"{entry['number']:03d}_{safe_key}.txt"

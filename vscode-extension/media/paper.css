@@ -116,6 +116,9 @@ select { min-width: 12rem; }
 .group h2 { font-size: 1.1rem; margin: 0 0 .3rem; }
 .settings .field input { box-sizing: border-box; width: 100%; }
 .settings .field code { font-weight: normal; font-size: .8em; opacity: .7; margin-left: .3rem; }
+.settings .field.flag { display: flex; gap: .5rem; align-items: baseline; }
+.settings .field.flag input { width: auto; flex: none; }
+.settings .field.flag > span { display: inline; margin: 0; }
 .secret { display: flex; gap: .3rem; }
 .settings .actions { position: sticky; bottom: 0; display: flex; gap: .5rem; align-items: center; padding: .6rem 0;
   background: var(--vscode-editor-background); border-top: 1px solid var(--vscode-panel-border); }

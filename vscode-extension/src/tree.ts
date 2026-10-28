@@ -3,7 +3,7 @@
 // 中身はぜんぶ CLI から取る（model.ts 経由）: 一覧 `priorwork status --json`、
 // 次にやること `priorwork status SURVEY --json`、論文 `priorwork list SURVEY --json`。
 import * as vscode from 'vscode';
-import { Entry, NextStep, Status, SurveySummary } from './cli';
+import { Entry, NextStep, OctavoRequest, Status, SurveySummary } from './cli';
 import { Model } from './model';
 
 export type Node =
@@ -11,6 +11,8 @@ export type Node =
     | { kind: 'steps'; survey: SurveySummary }
     | { kind: 'zotero'; survey: SurveySummary; ready?: boolean }
     | { kind: 'archive'; surveys: SurveySummary[] }
+    | { kind: 'requests'; requests: OctavoRequest[] }
+    | { kind: 'request'; request: OctavoRequest }
     | { kind: 'archived'; survey: SurveySummary }
     | { kind: 'step'; survey: SurveySummary; step: NextStep }
     | { kind: 'group'; survey: SurveySummary; status: Status; count: number }
@@ -39,7 +41,7 @@ export function statusIcon(status: Status): vscode.ThemeIcon {
 
 const STEP_ICON: Record<string, string> = {
     scope: 'settings', search: 'search', screen: 'checklist', snowball: 'references', zotero: 'library',
-    fill: 'edit', draft: 'book', advice: 'comment-discussion', wait_zotero: 'debug-pause', check: 'pass',
+    fill: 'edit', draft: 'book', advice: 'comment-discussion', complete: 'diff-added', manuscript_changed: 'warning', wait_zotero: 'debug-pause', check: 'pass',
     export: 'open-preview', audit: 'verified',
 };
 
@@ -116,6 +118,9 @@ export class SurveyTree implements vscode.TreeDataProvider<Node>, vscode.Disposa
                 rows.push({ kind: 'message', label: vscode.l10n.t('AGENTS.md and the skills are out of date — update them'),
                             icon: 'warning', command: { command: 'priorwork.sync', title: '' } });
             }
+            if (ws.requests?.length) {   // Octavo からの依頼（古い CLI は返さない）
+                rows.push({ kind: 'requests', requests: ws.requests });
+            }
             const topics = new Map<string, number>();
             for (const s of ws.surveys) {
                 topics.set(s.topic.trim(), (topics.get(s.topic.trim()) ?? 0) + 1);
@@ -139,6 +144,9 @@ export class SurveyTree implements vscode.TreeDataProvider<Node>, vscode.Disposa
         }
         if (node.kind === 'archive') {
             return node.surveys.map((s): Node => ({ kind: 'archived', survey: s }));
+        }
+        if (node.kind === 'requests') {
+            return node.requests.map((request): Node => ({ kind: 'request', request }));
         }
         if (node.kind === 'survey') {
             const rows: Node[] = [{ kind: 'steps', survey: node.survey },
@@ -188,7 +196,8 @@ export class SurveyTree implements vscode.TreeDataProvider<Node>, vscode.Disposa
         const C = vscode.TreeItemCollapsibleState;
         switch (node.kind) {
             case 'survey': {
-                const it = new vscode.TreeItem(node.survey.topic, C.Expanded);
+                // 最初はたたんでおく（サーベイが並ぶと見にくい）。開いた・閉じたは id ごとに VS Code が覚える
+                const it = new vscode.TreeItem(node.survey.topic, C.Collapsed);
                 it.id = `survey:${node.survey.name}`;
                 // 同じテーマが並ぶとき（やり直したときなど）は、名前で見分けられるようにする
                 it.description = versionTag(node.survey)
@@ -226,6 +235,24 @@ export class SurveyTree implements vscode.TreeDataProvider<Node>, vscode.Disposa
                 it.id = 'archive';
                 it.description = String(node.surveys.length);
                 it.iconPath = new vscode.ThemeIcon('archive');
+                return it;
+            }
+            case 'requests': {
+                const it = new vscode.TreeItem(vscode.l10n.t('Requests from Octavo'), C.Expanded);
+                it.id = 'requests';
+                it.description = String(node.requests.length);
+                it.iconPath = new vscode.ThemeIcon('inbox', new vscode.ThemeColor('list.warningForeground'));
+                return it;
+            }
+            case 'request': {
+                const r = node.request;
+                const text = (r.text ?? '').replace(/\s+/g, ' ').trim();
+                const it = new vscode.TreeItem(text.length > 60 ? text.slice(0, 59) + '…' : text || r.id, C.None);
+                it.id = `request:${r.id}`;
+                it.description = [r.project?.split(/[\\/]/).pop(), (r.created_at ?? '').slice(0, 10)].filter(Boolean).join(' · ');
+                it.iconPath = new vscode.ThemeIcon('mail');
+                it.tooltip = new vscode.MarkdownString().appendText(`${r.id}\n\n${r.text ?? ''}`);
+                it.command = { command: 'priorwork.openRequest', title: '', arguments: [r] };
                 return it;
             }
             case 'archived': {

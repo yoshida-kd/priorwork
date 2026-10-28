@@ -35,7 +35,7 @@ Work through the next steps from the top. The usual order:
 1. **Search** (`priorwork-new`, part 2): while it says "Search more", add searches on other subtopics.
 2. **Screen** (`priorwork-screen`): sort every candidate into included, excluded or maybe.
 3. **Chase citations** (`priorwork-snowball`): always for full. If new candidates appear, go back to 2.
-4. **Zotero** (standard and manual stop here): show the DOIs from `./priorwork zotero <survey> --dois` as they are, and wait for the user to collect the papers and their PDFs in Zotero and ask you to go on (AGENTS.md, "Modes"). Then record `./priorwork scope <survey> --go-on`. Full auto does not stop; give the number not in Zotero in the final report.
+4. **Zotero** (standard and manual stop here): when Priorwork may write to Zotero (the next step is `zotero <survey> --add`), show the list from `--add --dry-run` and add with `--add` once the user agrees; otherwise show the DOIs from `./priorwork zotero <survey> --dois` as they are. Then wait for the user to collect the papers and their PDFs in Zotero and ask you to go on (AGENTS.md, "Modes" and "Zotero"). When asked to go on, record `./priorwork scope <survey> --go-on`. Full auto does not stop: add with `--add` if Priorwork may write, and give the number not in Zotero in the final report.
 5. **Fill in the cards** (`priorwork-extract`): every included paper.
 6. **Write the text**: 3 below.
 7. **Check and export** (`priorwork-check`): fix until there are no ERRORs, then write the HTML.
@@ -70,7 +70,7 @@ After `priorwork-check` and the export, say briefly (refer to papers as Author (
 - the number of queries, candidates and included papers, and the main reasons for exclusion
 - what in the scope (question, period, criteria, depth) you decided yourself because the request did not say
 - the WARNs left and why it is a "Draft" (if it is)
-- how many included papers are not in Zotero yet (show the DOIs from `./priorwork zotero <survey> --dois` as they are; do not drop papers whose full text you could get yourself)
+- how many included papers are not in Zotero yet (show the DOIs from `./priorwork zotero <survey> --dois` as they are; do not drop papers whose full text you could get yourself). If you added them with `--add`: which items were made new and which were already in the library, and that the user should get the PDFs in Zotero
 - how to view the report (AGENTS.md, "Showing the report")
 - that decisions and cards corrected in the sidebar will be followed in the next round
 

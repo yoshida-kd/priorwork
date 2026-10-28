@@ -133,7 +133,8 @@ Open the gear in the sidebar (**Settings**).
      survey; without the permission it asks each time. The sidebar's buttons and the `./priorwork` you
      type yourself do not need it (they do not go through the agent).
    - **What it allows**: only commands starting with `./priorwork`. Priorwork touches only the workspace
-     (`reports/`, `.priorwork/`) and the literature APIs; it never writes to Zotero and never runs Git.
+     (`reports/`, `.priorwork/`) and the literature APIs; it never runs Git, and it writes to Zotero only
+     if you allow it ([8.2](#82-zotero)).
      Other commands are still checked.
    - **Claude Code**: automatic. Making the workspace (and every `priorwork sync`) adds
      `Bash(./priorwork:*)` to the allowed rules in `.claude/settings.json`, keeping your other settings.
@@ -300,8 +301,8 @@ the next step.
 
 ### 4.7 Collect the papers in Zotero
 
-Priorwork never writes to Zotero; you add the papers. Two things make it easier (for setting up Zotero,
-see [8.2](#82-zotero)).
+You add the papers, unless you let Priorwork do it (below). Two things make it easier (for setting up
+Zotero, see [8.2](#82-zotero)).
 
 **Add the included papers' DOIs to Zotero at once.**
 
@@ -317,9 +318,23 @@ steps in the sidebar show **Stop here and wait for the user** too; click it to c
 request asking the agent to carry on. The list of DOIs works without the Zotero link too (it then lists
 every included paper).
 
+**Or let Priorwork add them.** If you allow it in the settings ([8.2](#82-zotero)) and link a collection
+to the survey (below), Priorwork puts the included papers into that collection itself:
+
+- An item already in your library (same DOI, or the same title) is added to the collection; otherwise a
+  new item is made from the bibliographic data. Priorwork never changes or deletes your items, never
+  touches other collections and does not make collections.
+- **Add … to the Zotero collection** in the next steps shows the list first and adds it once you confirm.
+  The agent does the same: in the standard mode it shows you the list at the stop before the cards and
+  adds it when you agree; in full auto it adds without stopping; in manual it asks each time.
+- No PDFs come with the items: select them in Zotero, right-click → **Find Full Text**.
+- **Undo What Priorwork Added…** (or asking the agent to undo it, `./priorwork zotero <survey> --undo`)
+  takes back only what Priorwork wrote. Items it made go to the Zotero trash, except those you changed
+  or attached a file to since; items that were already in your library only leave the collection.
+
 **Link a Zotero collection to the survey.** Under each survey in the sidebar, click **Link a Zotero
 collection…** and choose a collection you made in Zotero (without the Zotero link it reads **Zotero:
-not set up** and opens the settings page). Priorwork never writes to Zotero, so make a new collection in
+not set up** and opens the settings page). Priorwork does not make collections, so make a new one in
 Zotero (right-click "My Library" → New Collection…) and bring it in with **Reload the list**. The list is
 the same tree as in Zotero, and papers in a collection under it count as in it (when the same name is
 under two parents, the path `parent / child` tells them apart). Then choose it (or tell the agent
@@ -332,13 +347,14 @@ it. Once linked:
   scope.
 - Full texts come from the PDFs in that collection first.
 
-### 4.8 Start from a manuscript (a draft or advice)
+### 4.8 Start from a manuscript (filling it in, a draft or advice)
 
-You can also start from your own manuscript instead of a topic. There are two kinds of report, and one
-manuscript can have both as separate reports.
+You can also start from your own manuscript, finished or not, instead of a topic. There are three
+kinds of report, and one manuscript can have several as separate reports.
 
 | Purpose | Suits | What the report holds |
 | :--- | :--- | :--- |
+| **Filling it in** (the default) | a manuscript in progress: sections missing, thin or without citations | a map of what each section lacks, and a list of what to add where (each item quotes the sentence it goes before or after), cards, a check of its citations |
 | **A draft of sections 1–3** | a manuscript with the analysis (data, methods, results) written | claims to back with literature, paper cards, a draft introduction, literature review and theory and hypotheses, a check against fitting hypotheses after the results |
 | **Advice on the manuscript** | a finished or unfinished paper | a summary of the advice, a check of its citations (the direction of each cited finding, overstatements), missing literature, comments on the argument |
 
@@ -366,8 +382,15 @@ into `manuscripts/` (the original stays where it is). You can also ask in the ch
 > What literature is the manuscript in manuscripts/make_or_buy missing, and where does it cite the
 > literature badly?
 
-**Agreeing what to make.** The agent reads the manuscript, then proposes the purpose (a draft, advice or
-both), which parts of the manuscript to cover, the scope of the searches and how many reports, and waits
+> The manuscript in manuscripts/make_or_buy is half written. Fill in what it lacks from the literature.
+
+**Leave marks where you want help.** While writing, put `[cite]` where a citation is needed, `[@?]`
+where a paper should be cited, or `TODO(priorwork): <what you need>` on a line of its own (say,
+`TODO(priorwork): the literature on institutions`). `./priorwork read` lists them, and when filling the
+manuscript in, the agent takes them first and says which it could not fill (and why).
+
+**Agreeing what to make.** The agent reads the manuscript, then proposes the purpose (filling it in, a
+draft, advice, or several), which parts of the manuscript to cover, the scope of the searches and how many reports, and waits
 for your answer. If your request already settles these, it goes ahead. If you want both, the papers
 included in the first report carry over into the second.
 
@@ -398,11 +421,21 @@ the literature the manuscript is missing (where and why to cite it) and about th
 question, the gap in the literature, the hypotheses, the methods, the results and the contribution hang
 together), and sums up what to fix, most important first.
 
-Either way, the manuscript itself is never rewritten. Read the draft or the advice and edit your
-manuscript yourself.
+For **filling it in**, the agent maps each section's state (written, thin, heading only, missing) and
+your marks, lists the claims that need literature (with the findings that conflict with your results),
+searches and screens claim by claim, and writes what to add in the manuscript's order: "Write the
+section", "Insert" or "Add citations", each with **Where** (the heading and the sentence it goes before
+or after, quoted) and **Why**, and the text in the language of the manuscript. It fills in only what the
+literature backs, never the content of your methods or results. `./priorwork export SURVEY --draft`
+writes the list with its references; for an Octavo manuscript it goes into the project's inbox
+([4.9](#49-working-with-an-octavo-manuscript)).
+
+Either way, the manuscript itself is never rewritten. Read the draft, the additions or the advice and
+edit your manuscript yourself.
 
 On the command line: `./priorwork new "<topic>" --slug <slug> --manuscript manuscripts/make_or_buy
---purpose draft` (`--purpose advice` for advice), and for a draft, `./priorwork export SURVEY --draft`.
+--purpose complete` (`draft` for a draft, `advice` for advice; without `--purpose`, `complete`), and for
+filling in or a draft, `./priorwork export SURVEY --draft`.
 
 ### 4.9 Working with an Octavo manuscript
 
@@ -427,17 +460,28 @@ too.
 3. The agent reads the manuscript, the project's results and tables, and the literature it cites (the
    `.bib`), and registers the papers it cites (`./priorwork add SURVEY --cited`). The survey is linked to
    the same Zotero collection as Octavo.
-4. The draft is exported in Octavo's form (`./priorwork export SURVEY --draft --octavo` →
-   `reports/<name>.octavo.md`): citations become `[@key]` from the `.bib`, and Octavo makes the
-   references section. Read and edit it before moving it into the Octavo manuscript (`paper.md`).
-5. Papers not in the `.bib` yet are written as `[@PRIORWORK:…]`, with a list of their DOIs. Put them in
-   the Zotero collection, run `octavo bib pull` in Octavo, and export again: they become `[@key]` (until
-   then, Octavo's checks report them as missing keys).
+4. The draft is exported in Octavo's form into the Octavo project's inbox
+   (`./priorwork export SURVEY --draft --octavo` → `literature/priorwork/<survey>.md`, with a `.json`
+   manifest and `<survey>.cards.json`, the cards of the included papers for Octavo to show over each
+   `[@key]`): citations become `[@key]` from the `.bib`, and Octavo makes the references section.
+   Priorwork never changes the manuscript: ask the agent in the Octavo project to "work the draft from
+   Priorwork into the manuscript" (or move it yourself).
+5. Papers not in the `.bib` yet are written as `[@PRIORWORK:<DOI>]`, with a list of their DOIs. Put them
+   in the Zotero collection ([4.7](#47-collect-the-papers-in-zotero); Priorwork can do it for you) and run
+   `octavo bib pull` and then `octavo priorwork resolve` in Octavo, which replaces them by `[@key]` from
+   the DOIs (until then, Octavo's checks report them as missing keys). Octavo 0.6.6 and older have no
+   inbox: export again after `octavo bib pull` instead.
+
+**Requests without the clipboard.** An Octavo that knows where your Priorwork workspace is puts its
+requests in the workspace's `.priorwork/requests/` instead of copying them. They show under **Requests
+from Octavo** at the top of the sidebar: click one to ask your agent to carry it out (a short request
+that points to it) or to decline it with a reason Octavo can read. The agent records the outcome with
+`./priorwork requests <id> --done --survey <survey>`, and Octavo shows it.
 
 **One survey for several papers.** A survey on a topic (say, the literature on outsourcing) can serve
 several papers. Right-click the survey → **Link to an Octavo Project…** and choose the project's folder
 (as many as you like); **Export for an Octavo Project…** writes the sections on theories, methods,
-debates and gaps with that project's `.bib` keys to `reports/<name>.<project>.octavo.md`
+debates and gaps with that project's `.bib` keys to its inbox, `literature/priorwork/<survey>.md`
 (`./priorwork scope SURVEY --octavo <path>`, `./priorwork export SURVEY --octavo <project>`). In Octavo,
 add the survey's collection to the project's (**Choose the Zotero Collection** there lets you mark any
 number).
@@ -454,6 +498,24 @@ Priorwork never changes the files of the Octavo project. The check tells you whe
 use different collections. The manuscript's place is recorded relative to the workspace (e.g.
 `../make_or_buy/papers/main`), so it works on another machine too if the repositories are cloned side by
 side in the same way.
+
+### 4.10 Short texts from a survey
+
+You can also ask for a short text based on a survey: a lecture handout, reading notes, a summary of
+the main points ("a lecture handout from this survey, in three parts, about 2,000 characters", say).
+The agent records its purpose, length and structure (`./priorwork derive`) and writes it in
+`reports/<name>.<text name>.md`. It sits beside the survey's files, so it goes into Git with them.
+
+- It cites included papers whose cards were checked against the full text, and checks numbers and the
+  direction of findings against the cards.
+- The length leaves out citations in parentheses ("(Dell 2010)") unless you say otherwise
+  (`--count-citations`).
+- The references at the end are made from the papers it cites.
+- `./priorwork check` reports citations that are not included papers (ERROR), citations from cards not
+  checked against the full text and numbers that are not in the card (WARN), and a length off the
+  target (INFO).
+- The version for reading is `./priorwork export SURVEY --derived <text name>`
+  (`reports/<name>.<text name>.html`; `--format docx` for Word).
 
 ---
 
@@ -635,12 +697,17 @@ excluded with a comment in the report:
 ### 8.2 Zotero
 
 With Zotero set up, Priorwork shows which included papers are in Zotero, links a collection to a
-survey ([4.7](#47-collect-the-papers-in-zotero)) and gets full texts from the PDFs attached there. It never writes to Zotero or WebDAV.
+survey ([4.7](#47-collect-the-papers-in-zotero)) and gets full texts from the PDFs attached there. By
+default it only reads: it never writes to Zotero or WebDAV.
 
 1. Create an API key at <https://www.zotero.org/settings/keys> with **only "Allow library access"**
    (no notes, no write access). "Your user ID for use in API calls" on the same page is the user ID.
 2. Enter the key and the user ID under **Zotero** in the settings. If Zotero runs on this machine,
    enter its data folder too (default `~/Zotero`).
+   - **To let Priorwork add the included papers to the survey's collection** ([4.7](#47-collect-the-papers-in-zotero)),
+     check **Let Priorwork add the included papers to the survey's collection** (`ZOTERO_WRITE=1` in
+     `.env`) and also check **Allow write access** for the key on the Zotero page. Both are needed;
+     **Save and Check the Connections** tells you whether the key can write.
 3. If Zotero syncs its files through WebDAV (Nextcloud and the like), enter under **Zotero file sync
    through WebDAV** the URL of the folder that holds the PDF zips (the URL set in Zotero plus
    `zotero/`), the user name and the password. With Nextcloud, share the `zotero` folder read only
@@ -683,7 +750,7 @@ The workspace carries instructions for agents (`AGENTS.md`) and a skill for each
 also seen through `.claude/skills/`). The entry point is the `priorwork` skill: it looks at the state and
 goes on to the skill of the next step (`priorwork-new`, `priorwork-screen`, `priorwork-snowball`,
 `priorwork-extract`, `priorwork-check`). To start from a manuscript, it uses
-`priorwork-manuscript` ([4.8](#48-start-from-a-manuscript-a-draft-or-advice)). The agent
+`priorwork-manuscript` ([4.8](#48-start-from-a-manuscript-filling-it-in-a-draft-or-advice)). The agent
 picks them from the words of your request, so there are no names to remember.
 
 Instructions for one workspace only (fields to prefer, writing style, journals to leave out, "Mode:
@@ -701,7 +768,8 @@ match the engine's version; do not edit them.
   calls a 🟡 (guessed) journal "in the SSCI".
 - It runs the checks before calling anything finished.
 - It never opens the files of Priorwork itself (inside `.venv`).
-- It never writes to Zotero. In Git, it commits and pushes on a branch named after the survey and opens
+- It writes to Zotero only through `./priorwork zotero --add`, when you allow it (it adds the included
+  papers to the survey's collection). In Git, it commits and pushes on a branch named after the survey and opens
   a pull request; you merge.
 
 ---
@@ -775,6 +843,8 @@ Everything the extension does is also a `./priorwork` command (the agent uses th
 ./priorwork render SURVEY
 ./priorwork check SURVEY [--offline]
 ./priorwork export SURVEY [--format html|docx|md] [--with-abstracts]
+./priorwork derive SURVEY [NAME --purpose "..." --length N --structure "a; b"]   # a short text from the survey (no NAME: list them)
+./priorwork export SURVEY --derived NAME [--format html|docx|md]
 ./priorwork fulltext SURVEY <number> [--pdf <path>]
 
 # Zotero (read only)

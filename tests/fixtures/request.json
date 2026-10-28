@@ -1,0 +1,15 @@
+{
+  "format": "priorwork-request",
+  "version": 1,
+  "id": "20261028T120000-make_or_buy",
+  "from": "octavo",
+  "project": "/home/user/make_or_buy",
+  "manuscript": "/home/user/make_or_buy/docs/paper/paper.md",
+  "kind": "start",
+  "text": "My manuscript is in docs/paper/paper.md, in an Octavo project. Read it, propose what to make from it and wait for my answer.",
+  "created_at": "2026-10-28T12:00:00",
+  "status": "open",
+  "survey": null,
+  "done_at": null,
+  "note": ""
+}

@@ -1,18 +1,23 @@
 """
-Zotero 連携（読み取り専用）。
+Zotero 連携。既定は読み取り専用で、設定で許可したときだけ採用論文をコレクションに入れる。
 
 - Zotero Web API: ライブラリの論文一覧（DOI・添付ファイル）を手元に同期し、登録状況の照合と本文取得に使う
 - WebDAV（Nextcloud など）: Zotero が `<添付キー>.zip` の形で保存している PDF を取得する
 - WebDAV を使っていない場合は、Zotero File Storage の `/items/<key>/file` から取得する
 
-Zotero にも WebDAV にも書き込みは一切しない（GET のみ）。
-
 サーベイに Zotero のコレクションを結び付けると（`priorwork zotero SURVEY --collection 名前`）、
 「Zotero にあるか」はそのコレクションに入っているかで見る。コレクションに入れた論文は候補として取り込め（`--import`）、
-本文もそのコレクションの PDF を優先する。コレクションを作る・論文を入れるのはユーザー（Zotero に書き込まない）。
+本文もそのコレクションの PDF を優先する。コレクションを作るのはユーザー。
+
+書き込み（`priorwork zotero SURVEY --add`）は、ZOTERO_WRITE=1 で、キーに書き込みの権限があり、サーベイに
+コレクションを結び付けたときだけ行う。することは「採用論文をそのコレクションに入れる」だけ:
+ライブラリに同じ DOI（無ければタイトル）のアイテムがあれば、そのコレクションに足す。無ければ書誌から作る。
+ほかのアイテムの中身・ほかのコレクション・WebDAV には触らない。書いたものは状態ファイルに記録し、
+`--undo` で Priorwork が書いたものだけを戻す（作ったアイテムはごみ箱へ。ユーザーが手を入れたものは残す）。
 
 設定（.env）:
-  ZOTERO_API_KEY, ZOTERO_USER_ID               … 必須（キーは「Allow library access」のみの読み取り専用を推奨）
+  ZOTERO_API_KEY, ZOTERO_USER_ID               … 必須（書き込まないなら「Allow library access」のみのキーを推奨）
+  ZOTERO_WRITE=1                               … 採用論文をコレクションに入れてよい（キーに「Allow write access」も要る）
   ZOTERO_WEBDAV_URL, ZOTERO_WEBDAV_USER, ZOTERO_WEBDAV_PASSWORD … WebDAV 同期のとき
 """
 
@@ -20,6 +25,7 @@ import io
 import json
 import os
 import re
+import secrets
 import sys
 import tempfile
 import time
@@ -37,6 +43,7 @@ API_BASE = "https://api.zotero.org"
 INDEX_PATH = CACHE_DIR / "zotero" / "index.json"
 MAX_RETRIES = 5
 MAX_PDF_BYTES = 100 * 1024 * 1024
+WRITE_BATCH = 50   # Zotero の API が一度に受け付けるアイテムの数
 
 _DOI_IN_EXTRA = re.compile(r"^\s*DOI:\s*(10\.\S+)\s*$", re.IGNORECASE | re.MULTILINE)
 
@@ -51,8 +58,9 @@ def normalize_doi(doi: str) -> str:
 
 class ZoteroClient:
     def __init__(self, api_key: str, user_id: str, webdav_url: str = "", webdav_user: str = "",
-                 webdav_password: str = "", index_path: Optional[Path] = None):
+                 webdav_password: str = "", index_path: Optional[Path] = None, write: bool = False):
         self.api_key = api_key
+        self.write = write   # ZOTERO_WRITE で、採用論文をコレクションに入れることを許されているか
         self.prefix = f"{API_BASE}/users/{user_id}"
         self.webdav_url = webdav_url.rstrip("/") + "/" if webdav_url else ""
         self.webdav_auth = (webdav_user, webdav_password) if webdav_user else None
@@ -72,12 +80,20 @@ class ZoteroClient:
         return cls(key, user,
                    webdav_url=os.environ.get("ZOTERO_WEBDAV_URL", ""),
                    webdav_user=os.environ.get("ZOTERO_WEBDAV_USER", ""),
-                   webdav_password=os.environ.get("ZOTERO_WEBDAV_PASSWORD", ""))
+                   webdav_password=os.environ.get("ZOTERO_WEBDAV_PASSWORD", ""),
+                   write=write_allowed())
 
     # ---- HTTP ----
 
     def _get(self, url: str, params: Optional[Dict[str, Any]] = None, headers: Optional[Dict[str, str]] = None,
              auth=None, api: bool = True, stream: bool = False) -> requests.Response:
+        return self._request("GET", url, params=params, headers=headers, auth=auth, api=api, stream=stream)
+
+    def _request(self, method: str, url: str, params: Optional[Dict[str, Any]] = None,
+                 headers: Optional[Dict[str, str]] = None, auth=None, api: bool = True, stream: bool = False,
+                 body: Any = None) -> requests.Response:
+        if method != "GET" and not (api and self.write):
+            raise ZoteroError(t("Writing to Zotero is not allowed (set ZOTERO_WRITE=1 in .env)"))
         h = {"User-Agent": "priorwork/0.1"}
         if api:
             h.update({"Zotero-API-Key": self.api_key, "Zotero-API-Version": "3"})
@@ -85,7 +101,8 @@ class ZoteroClient:
         service = "Zotero" if api else "WebDAV"
         for attempt in range(MAX_RETRIES + 1):
             try:
-                resp = requests.get(url, params=params, headers=h, auth=auth, timeout=60, stream=stream)
+                resp = requests.request(method, url, params=params, headers=h, auth=auth, timeout=60, stream=stream,
+                                        json=body)
             except (requests.ConnectionError, requests.Timeout) as e:
                 if attempt >= MAX_RETRIES:
                     raise ZoteroError(f"[{service}] " + t("Cannot connect: {error}", error=e.__class__.__name__))
@@ -268,6 +285,16 @@ class ZoteroClient:
             self.sync()
         return self._index
 
+    def sync_note(self) -> str:
+        """Zotero のアプリでの変更が見えないときの説明。Priorwork が読むのは zotero.org のライブラリで、
+        アプリの変更はアプリが同期してから届く（PDF はファイルの同期も要る）。"""
+        when = (self._index or {}).get("synced_at") or "?"
+        return t("Priorwork reads your library on zotero.org (read at {when}). What you change in the Zotero app "
+                 "shows here once the app has synced it: press the sync button (the green arrows) in Zotero, wait "
+                 "until it stops, and run this again. A PDF also needs Zotero's file syncing (Settings > Sync > "
+                 "File Syncing, or WebDAV); until then, `priorwork fulltext SURVEY N --pdf <path>` reads it.",
+                 when=when)
+
     # ---- Lookup ----
 
     def find_item(self, record: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -349,6 +376,120 @@ class ZoteroClient:
             return t("folder not found (check that ZOTERO_WEBDAV_URL ends in .../zotero/)")
         return t("unexpected response (HTTP {status})", status=resp.status_code)
 
+    # ---- Writing (ZOTERO_WRITE=1 のときだけ。採用論文をコレクションに入れることだけをする) ----
+
+    def check_write_access(self):
+        """キーに書き込みの権限があるか確かめる。無ければ ZoteroError。"""
+        resp = self._get(f"{API_BASE}/keys/current")
+        if not resp.ok:
+            raise ZoteroError("[Zotero] " + t("Cannot read the key's permissions (HTTP {status})", status=resp.status_code))
+        if not ((resp.json().get("access") or {}).get("user") or {}).get("write"):
+            raise ZoteroError("[Zotero] " + t("The API key cannot write to the library. At https://www.zotero.org/settings/keys, "
+                                              "edit the key and check \"Allow write access\""))
+
+    def item(self, key: str) -> Optional[Dict[str, Any]]:
+        """アイテムの今の中身（version と data）。消えていれば None。"""
+        resp = self._get(f"{self.prefix}/items/{key}")
+        if resp.status_code == 404:
+            return None
+        if not resp.ok:
+            raise ZoteroError("[Zotero] " + t("Cannot read the item {key} (HTTP {status})", key=key, status=resp.status_code))
+        return resp.json()
+
+    def _patch(self, key: str, version: int, data: Dict[str, Any]) -> int:
+        """アイテムの一部を書き換え、新しい版を返す。ほかで書き換えられていれば（版が違えば）書かない。"""
+        resp = self._request("PATCH", f"{self.prefix}/items/{key}", headers={"If-Unmodified-Since-Version": str(version)},
+                             body=data)
+        if resp.status_code == 412:
+            raise ZoteroError("[Zotero] " + t("The item {key} was changed in Zotero meanwhile; run it again", key=key))
+        if not resp.ok:
+            raise ZoteroError("[Zotero] " + t("Cannot change the item {key} (HTTP {status}): {detail}", key=key,
+                                              status=resp.status_code, detail=resp.text[:200]))
+        return int(resp.headers.get("Last-Modified-Version") or version + 1)
+
+    def _create(self, items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """アイテムを作る。作れたものは {key, version}、断られたものは {error}（並びは渡したものと同じ）。
+        途中で失敗しても、それまでに作ったものを返す（記録して --undo で戻せるように）。"""
+        out: List[Dict[str, Any]] = []
+        for i in range(0, len(items), WRITE_BATCH):
+            chunk = items[i:i + WRITE_BATCH]
+            try:
+                # 書き込みの合言葉があれば、やり直しで同じアイテムが二重にできない
+                resp = self._request("POST", f"{self.prefix}/items",
+                                     headers={"Zotero-Write-Token": secrets.token_hex(16)}, body=chunk)
+                if not resp.ok:
+                    raise ZoteroError("[Zotero] " + t("Cannot add the items (HTTP {status}): {detail}",
+                                                      status=resp.status_code, detail=resp.text[:200]))
+            except ZoteroError as e:
+                out += [{"error": str(e)} for _ in chunk]
+                continue
+            result = resp.json()
+            for n in range(len(chunk)):
+                done = (result.get("successful") or {}).get(str(n))
+                failed = (result.get("failed") or {}).get(str(n)) or {}
+                out.append({"key": done["key"], "version": int(done.get("version") or 0)} if done
+                           else {"error": failed.get("message") or t("rejected by Zotero")})
+        return out
+
+    def plan_add(self, papers: List[Dict[str, Any]], collection: str) -> List[Dict[str, Any]]:
+        """コレクションに入れる論文と、そのやり方（collect: ライブラリにあるアイテムを足す / create: 書誌から作る）。
+        papers はサーベイの論文（number と record）。コレクションに（その下も含めて）既にあるものは入れない。"""
+        plan = []
+        for e in papers:
+            st = self.status(e["record"], collection)
+            if st["in_collection"]:
+                continue
+            plan.append({"number": e["number"], "title": e["record"]["title"], "doi": e["record"].get("doi") or "",
+                         "action": "collect" if st["registered"] else "create", "key": st["key"]})
+        return plan
+
+    def add(self, plan: List[Dict[str, Any]], records: Dict[int, Dict[str, Any]], collection: str) -> List[Dict[str, Any]]:
+        """plan_add の計画どおりに書き、それぞれに done（と key・version、または error）を付けて返す。"""
+        creates = [p for p in plan if p["action"] == "create"]
+        for p, r in zip(creates, self._create([item_from_record(records[p["number"]], [collection]) for p in creates])):
+            p.update(r, done="key" in r)
+        for p in plan:
+            if p["action"] != "collect":
+                continue
+            try:
+                cur = self.item(p["key"])
+                if cur is None:
+                    raise ZoteroError("[Zotero] " + t("The item {key} is no longer in the library", key=p["key"]))
+                cols = cur["data"].get("collections") or []
+                version = cur["version"] if collection in cols else self._patch(p["key"], cur["version"],
+                                                                               {"collections": cols + [collection]})
+                p.update(done=True, version=version)
+            except ZoteroError as e:
+                p.update(done=False, error=str(e))
+        return plan
+
+    def undo(self, written: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """add で書いたものを戻す。作ったアイテムは、その後に手が入っていなければ（版が同じで、PDF などの子が
+        無ければ）ごみ箱に入れ、入っていれば残す（keep）。足したアイテムは、そのコレクションから外すだけ。"""
+        out = []
+        for w in written:
+            r = {**w, "done": True}
+            try:
+                cur = self.item(w["key"])
+                if cur is None or cur["data"].get("deleted"):
+                    r["undo"] = "gone"
+                elif w["action"] == "create":
+                    children = any(i["parentItem"] == w["key"] for i in self.index["items"].values())
+                    if cur["version"] == w.get("version") and not children:
+                        self._patch(w["key"], cur["version"], {"deleted": 1})
+                        r["undo"] = "trash"
+                    else:
+                        r["undo"] = "keep"
+                else:
+                    cols = cur["data"].get("collections") or []
+                    if w["collection"] in cols:
+                        self._patch(w["key"], cur["version"], {"collections": [c for c in cols if c != w["collection"]]})
+                    r["undo"] = "uncollect"
+            except ZoteroError as e:
+                r.update(done=False, error=str(e))
+            out.append(r)
+        return out
+
 
 def _pdf_from_zip(data: bytes, filename: str) -> bytes:
     try:
@@ -365,3 +506,33 @@ def _pdf_from_zip(data: bytes, filename: str) -> bytes:
     if not pdf.startswith(b"%PDF"):
         raise ZoteroError(t("The file in the ZIP is not a PDF"))
     return pdf
+
+
+def write_allowed() -> bool:
+    """.env の ZOTERO_WRITE で、採用論文を Zotero のコレクションに入れることが許されているか。"""
+    return os.environ.get("ZOTERO_WRITE", "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _creator(name: str) -> Dict[str, str]:
+    first, _, last = name.rpartition(" ")
+    return ({"creatorType": "author", "firstName": first, "lastName": last} if first
+            else {"creatorType": "author", "name": name})
+
+
+def item_from_record(rec: Dict[str, Any], collections: List[str]) -> Dict[str, Any]:
+    """サーベイの論文の書誌から、Zotero のアイテムを作る（雑誌論文・本の章・本）。"""
+    types = {x.lower() for x in rec.get("publication_types") or []}
+    doi = rec.get("doi") or ""
+    common = {"title": rec.get("title", ""), "creators": [_creator(a) for a in rec.get("authors") or []],
+              "abstractNote": rec.get("abstract", ""), "date": str(rec.get("year") or ""), "url": rec.get("url", ""),
+              "collections": collections}
+    if types & {"book-chapter", "booksection"}:
+        item = {"itemType": "bookSection", **common, "bookTitle": rec.get("journal_name", ""),
+                "pages": rec.get("pages", ""), "extra": f"DOI: {doi}" if doi else ""}
+    elif "book" in types and not rec.get("journal_name"):
+        item = {"itemType": "book", **common, "extra": f"DOI: {doi}" if doi else ""}
+    else:
+        item = {"itemType": "journalArticle", **common, "publicationTitle": rec.get("journal_name", ""),
+                "volume": rec.get("volume", ""), "issue": rec.get("issue", ""), "pages": rec.get("pages", ""),
+                "DOI": doi, "ISSN": ", ".join(rec.get("issns") or [])}
+    return {k: v for k, v in item.items() if v or k == "collections"}

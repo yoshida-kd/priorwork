@@ -5,7 +5,9 @@ Priorwork の原稿（`new --manuscript`）が Octavo のプロジェクトの�
   * `.bib` から、原稿が引いている論文（`[@key]`）の DOI を読む（`add --cited`）
   * 下書きの「著者 (年)」を、`.bib` のキーで `[@key]` に書き換える（`export --draft --octavo`）
 
-**Octavo のファイルは読むだけで、書き換えない。** 書誌の正本は Zotero で、`.bib` は Zotero から
+**Octavo のファイルは読むだけで、書き換えない。** 書くのは、プロジェクトの受け取り場所
+（`literature/priorwork/`。Octavo は原稿として拾わない）に、書き出した文章と添え状（JSON）を置くことだけ。
+原稿に取り込むのは Octavo の側（エージェント）。書誌の正本は Zotero で、`.bib` は Zotero から
 書き出したもの（Better BibTeX など）。Priorwork はキーを作らず、`.bib` にあるキーを使う。
 設定は Python のファイルなので、実行せずに（ast で）書かれた値だけを読む。
 """
@@ -19,8 +21,28 @@ from typing import Any, Dict, List, Optional
 
 CONFIG_NAME = "octavo.config.py"
 DEFAULT_BIB = "literature.bib"
-# 下書きで、.bib にまだ無い論文の印。Octavo の checkbib が「無いキー」として拾う（組むと ?? になる）
+# 下書きで、.bib にまだ無い論文の印。DOI があれば `PRIORWORK:<DOI>` にして、Octavo が `octavo bib pull` の後に
+# .bib の DOI から本物のキーに置き換えられるようにする。置き換えるまでは、Octavo の検査が「無いキー」として拾う
 MISSING_PREFIX = "PRIORWORK:"
+# Priorwork が書き出す受け取り場所（プロジェクトの根から）と、添え状の形式の版。
+# 添え状の形は Octavo との約束で、tests/fixtures/handoff.json が見本（Octavo のテストも同じ見本を見る）
+INBOX = Path("literature") / "priorwork"
+HANDOFF_FORMAT = "priorwork-handoff"
+HANDOFF_VERSION = 1
+# Pandoc の引用キーにそのまま書ける文字（それ以外を含む DOI は @{…} で囲む）
+_KEY_SAFE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_:.#$%&\-+?<>~/]*[A-Za-z0-9_]$")
+
+
+def placeholder(doi: str, fallback: str) -> str:
+    """.bib に無い論文の印（`@` の後ろに書くもの）。DOI があれば DOI で、無ければ fallback（著者と年）で。"""
+    if not doi:
+        return MISSING_PREFIX + fallback
+    key = MISSING_PREFIX + doi.lower()
+    return key if _KEY_SAFE.match(key) and "}" not in key else "{" + key.replace("}", "") + "}"
+
+
+def inbox(root: Path) -> Path:
+    return Path(root) / INBOX
 
 
 def find_project(path: Path) -> Optional[Path]:

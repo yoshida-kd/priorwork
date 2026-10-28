@@ -37,7 +37,7 @@ Follow the rules in [AGENTS.md](../../../AGENTS.md).
    | A card is not in the report's language | Rewrite it in that language (keep terms in the original in brackets) |
    | A synthesis section cites no paper | Rewrite it from the included papers, citing them as Author (year). If it is this study's own view, move it to "Hypotheses and implications for this study" |
    | The text gives a wrong number of included papers | Delete the sentence with the count (the appendix gives it) |
-   | Included papers not in Zotero | Show the DOIs from `./priorwork zotero <survey> --dois` as they are in your report (also those whose full text you got) |
+   | Included papers not in Zotero | If Priorwork may write to Zotero (the next step is `zotero <survey> --add`), add them with `--add` as the mode says (full auto: just add; standard and manual: show `--dry-run` and add once the user agrees). Otherwise show the DOIs from `./priorwork zotero <survey> --dois` as they are in your report (also those whose full text you got) |
    | The survey and the Octavo project use different Zotero collections | Ask the user which one to use. The survey's is set with `./priorwork zotero <survey> --collection "<name>"`; the user sets Octavo's with `octavo config set zotero_collection "<name>"` |
    | The draft cites papers not in the Octavo project's .bib | Give their DOIs in your report; the user puts them in the Zotero collection and runs `octavo bib pull`, then export again with `export --draft --octavo` |
    | The Markdown does not match the state | `./priorwork render <survey>` |

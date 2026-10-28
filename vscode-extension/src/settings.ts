@@ -13,6 +13,9 @@ export interface SettingsActions {
 /** 秘密の欄は undefined（触っていない）と ''（消す）を区別する。JSON では undefined のキーは落ちる。 */
 type Values = Record<string, string>;
 
+/** チェックボックスで見せる設定（入れると 1、外すと消す）。 */
+const FLAGS = new Set(['ZOTERO_WRITE']);
+
 type Msg =
     | { type: 'save'; values: Values }
     | { type: 'check'; values: Values }
@@ -128,6 +131,7 @@ export class SettingsPanel implements vscode.Disposable {
             OPENALEX_MAILTO: L.t('Your email address (sent with requests, as OpenAlex asks)'),
             ZOTERO_API_KEY: L.t('API key'),
             ZOTERO_USER_ID: L.t('User ID ("Your user ID for use in API calls" on the same page)'),
+            ZOTERO_WRITE: L.t('Let Priorwork add the included papers to the survey\'s collection (the key then needs "Allow write access" too)'),
             ZOTERO_DATA_DIR: L.t('Zotero\'s data folder, if Zotero runs on this computer (default: ~/Zotero)'),
             ZOTERO_WEBDAV_URL: L.t('URL of the folder that holds the PDF zips (the URL set in Zotero, plus zotero/)'),
             ZOTERO_WEBDAV_USER: L.t('User name'),
@@ -143,15 +147,20 @@ export class SettingsPanel implements vscode.Disposable {
               note: L.t('Optional. Used to verify DOIs and journals; works without a key, with a daily usage cap.'),
               keys: ['OPENALEX_API_KEY', 'OPENALEX_MAILTO'] },
             { title: 'Zotero',
-              note: L.t('Optional, read only: shows which included papers are in Zotero and gets full texts from the PDFs attached there.') + ' '
+              note: L.t('Optional: shows which included papers are in Zotero and gets full texts from the PDFs attached there. Read only, unless you let Priorwork add the included papers to the collection you link to the survey (it never changes or deletes your items, and can undo what it added).') + ' '
                   + link('https://www.zotero.org/settings/keys', L.t('Create a key with only "Allow library access"')),
-              keys: ['ZOTERO_API_KEY', 'ZOTERO_USER_ID', 'ZOTERO_DATA_DIR'] },
+              keys: ['ZOTERO_API_KEY', 'ZOTERO_USER_ID', 'ZOTERO_WRITE', 'ZOTERO_DATA_DIR'] },
             { title: L.t('Zotero file sync through WebDAV'),
               note: L.t('Only if Zotero syncs its files through WebDAV (Nextcloud and the like).'),
               keys: ['ZOTERO_WEBDAV_URL', 'ZOTERO_WEBDAV_USER', 'ZOTERO_WEBDAV_PASSWORD'] },
         ];
         const field = (i: SettingItem): string => {
             const label = `<span>${esc(labels[i.key] ?? i.key)} <code>${esc(i.key)}</code></span>`;
+            if (FLAGS.has(i.key)) {
+                const on = /^(1|true|yes|on)$/i.test(i.value.trim());
+                return `<label class="field flag"><input type="checkbox" data-key="${esc(i.key)}" data-flag="1"
+                          data-original="${on ? '1' : ''}" ${on ? 'checked' : ''}>${label}</label>`;
+            }
             if (!i.secret) {
                 return `<label class="field">${label}<input type="text" data-key="${esc(i.key)}"
                           data-original="${esc(i.value)}" value="${esc(i.value)}" spellcheck="false"></label>`;

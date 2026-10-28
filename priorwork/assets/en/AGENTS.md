@@ -31,7 +31,11 @@ Record the mode of a new survey with `./priorwork new ... --mode standard|auto|m
 The two stops of **standard**:
 
 - **Once the scope is set**: after `./priorwork new`, show the research question, period, fields, inclusion and exclusion criteria and depth, with what you decided yourself, and stop. If the user corrects them, fix them with `./priorwork scope`, then go on to the searches.
-- **Before filling in the cards**: when screening and citation chasing are done, show the DOIs from `./priorwork zotero <survey> --dois` as they are, tell the user "select the Zotero collection you want them in, paste them into the magic wand, and once the PDFs are there too, say 'carry on'", and stop (more cards are then checked against the full texts from the PDFs, which saves work in the end). When the user says to go on, record it with `./priorwork scope <survey> --go-on` and resume with the cards (while the next steps in `./priorwork status` show "Stop here and wait for the user", you are before this stop).
+- **Before filling in the cards**: when screening and citation chasing are done, stop for the user to collect the included papers and their PDFs in Zotero (more cards are then checked against the full texts from the PDFs, which saves work in the end).
+  - When Priorwork may write to Zotero (the next step is `./priorwork zotero <survey> --add --dry-run`; see "Zotero" below): show its output (the list of what goes into the collection) as it is and ask "may I add these to the Zotero collection '…'?". Once the user agrees, add them with `./priorwork zotero <survey> --add` and say "get the PDFs in Zotero, then say 'carry on'".
+  - Otherwise: show the DOIs from `./priorwork zotero <survey> --dois` as they are and tell the user "select the Zotero collection you want them in, paste them into the magic wand, and once the PDFs are there too, say 'carry on'".
+
+   When the user says to go on, record it with `./priorwork scope <survey> --go-on` and resume with the cards (while the next steps in `./priorwork status` show "Stop here and wait for the user", you are before this stop).
 
 In between (searches, screening, citation chasing; cards, text, check and export), carry on without stopping.
 
@@ -43,7 +47,8 @@ In every mode, stop and ask when the topic is too vague to choose search terms, 
 
 - `reports/YYYYMMDD_<slug>.md` … the working report (with managed blocks and card fields). The agent writes it. A redone survey is `YYYYMMDD_v2_<slug>.md`.
 - `manuscripts/<paper name>/` … the user's manuscripts in any format (Markdown, Quarto, HTML, Word, PDF, …), with their tables and figures (used by `priorwork-manuscript`). **Only read them; never rewrite them.** A manuscript in an Octavo project (another repository, with `octavo.config.py`) is used where it is, not copied (`../<project>/papers/<name>`; only read it too).
-- `reports/YYYYMMDD_<slug>.draft.md` … for a survey that drafts a manuscript's sections 1–3, the draft (with references), made by `./priorwork export --draft`. When the manuscript is in an Octavo project, `--octavo` makes `reports/YYYYMMDD_<slug>.octavo.md` (citations as `[@key]`; the user pastes it into the Octavo manuscript).
+- `reports/YYYYMMDD_<slug>.draft.md` … for a survey that drafts a manuscript's sections 1–3 (or fills it in), the draft (or what to add, and where), with references, made by `./priorwork export --draft`. When the manuscript is in an Octavo project, `--octavo` puts it in the Octavo project's inbox `literature/priorwork/<survey>.md` (with a `.json` manifest) (citations as `[@key]`; working it into the manuscript happens on Octavo's side).
+- `reports/YYYYMMDD_<slug>.<name>.md` … a short text made from the survey (a lecture handout, reading notes, a summary). `./priorwork derive` makes it and writes its purpose, target length and references in managed blocks; the agent writes the text between them (skill `priorwork-derive`). Don't make such files under other names (`<name>.lecture.md` by hand and the like).
 - `reports/YYYYMMDD_<slug>.html` … **the version for reading, made by `./priorwork export`. This is what people read.**
   If fields are empty, papers are unchecked or `check` still reports ERRORs, it is marked "Draft" at the top.
 - `.priorwork/surveys/YYYYMMDD_<slug>.json` … candidates, decisions and the search log (the state). Only `./priorwork` changes it.
@@ -77,8 +82,11 @@ The entry point is the `priorwork` skill. It looks at the state and follows the 
 | Check, fix and export | `priorwork-check` | `check`, `export` |
 | Audit as another model (only when asked) | `priorwork-audit` | `check`, `card`, `audit` |
 | Start from a manuscript (a draft of sections 1–3, advice on it) | `priorwork-manuscript` | `read`, `new --manuscript --purpose …`, `card --set role=…`, `export --draft` |
+| A short text from the survey (a lecture handout, reading notes, a summary) | `priorwork-derive` | `derive`, `check`, `export --derived` |
 
-When the user points to their own manuscript and asks for a draft of its introduction, literature review, theory and hypotheses, for the literature behind it, or for advice on missing literature, the direction of its citations or the argument, follow `priorwork-manuscript`. Any format will do (`./priorwork read` turns it into text). Only read the manuscript; do not rewrite it.
+When the user points to their own manuscript (finished or not) and asks to fill in what it lacks, for a draft of its introduction, literature review, theory and hypotheses, for the literature behind it, or for advice on missing literature, the direction of its citations or the argument, follow `priorwork-manuscript`. Any format will do (`./priorwork read` turns it into text). Only read the manuscript; do not rewrite it.
+
+When asked for lecture material, reading notes, a summary or another short text based on a survey, follow `priorwork-derive` (record its purpose, length and structure with `./priorwork derive`, and cite from cards checked against the full text).
 
 ## Depth (quick / full)
 
@@ -125,18 +133,30 @@ The workspace is kept in a private GitHub repository. You may operate Git withou
 
 ## Zotero
 
-The user adds to Zotero by hand. The agent never writes to Zotero.
+Write to Zotero only with `./priorwork zotero <survey> --add`, and only when the user has allowed it in the settings (`ZOTERO_WRITE=1` in `.env`). Otherwise the user adds to Zotero by hand. Never call the Zotero API yourself or change Zotero's data files. The setting that allows writing (`.env`) is the user's to change.
 
 - **Every included paper is meant to be in Zotero, without exception.** Zotero is where the user manages the references for their own papers, so do not drop a paper from the list to add to Zotero because you could get its full text yourself (open access, for example).
-- **The list to add to Zotero is always the output of `./priorwork zotero <survey> --dois`, as it is.** Do not reselect or trim it. Give the number not in Zotero yet in your report (`./priorwork check` gives a WARN too).
+- **The list to add to Zotero is always `./priorwork`'s output, as it is** (`./priorwork zotero <survey> --dois`, or `--add --dry-run`). Do not reselect or trim it. Give the number not in Zotero yet in your report (`./priorwork check` gives a WARN too).
+
+**When Priorwork adds to Zotero** (if the next steps in `./priorwork status <survey>` show `zotero <survey> --add`, writing is allowed and a collection is linked):
+
+- `--add` does **one thing: it puts the included papers into the linked collection.** An item in the library with the same DOI (or, without one, the same title) is added to the collection; otherwise a new item is made from the bibliographic data. It never touches the content of other items or other collections, and it does not make collections (if there is none, ask the user to make one in Zotero).
+- **When to add depends on the mode.** In full auto, add with `--add` without stopping. In standard, at the stop before the cards, show the list from `--add --dry-run`, ask, and add once the user agrees ("Modes" above). In manual, show `--dry-run` and ask each time.
+- After adding, report which items were made new and which were already in the library. No PDFs come with them, so ask the user to find the PDFs in Zotero (select them, right-click → Find Full Text).
+- **When asked to undo it**, use `./priorwork zotero <survey> --undo [number …]` (show `--dry-run` first). It takes back only what Priorwork wrote: items it made go to the trash, except those the user has changed since.
+- When the user wants the papers in Zotero but writing is not allowed, show the manual way below, and say that the settings page can allow it ("Let Priorwork add the included papers to the survey's collection").
+
+**Adding by hand**:
 
 - **When the user wants the included papers in Zotero**, show the DOIs from `./priorwork zotero <survey> --dois` and tell them to select the collection they want in Zotero and paste the DOIs into the magic wand (Add Item by Identifier). The "Add to Zotero" next step in the sidebar copies the DOIs too.
+- **What the user does in the Zotero app arrives once the app has synced with zotero.org.** When the user says a paper or PDF is in Zotero but `./priorwork zotero` or `fulltext` does not see it, ask them to wait for Zotero's sync (the green arrows) and run it again (`./priorwork` says so too). A PDF also needs file syncing. If they cannot wait, have them put the PDF in `manuscripts/` or similar and read it with `fulltext --pdf`.
 - **When the user names a Zotero collection**, link it with `./priorwork zotero <survey> --collection "<name>"` (list the collections with `./priorwork zotero --collections` if you are unsure of the name). Zotero's collections can be nested; if the same name is under another parent too, give the path (`"parent / child"`). From then on:
   - "In Zotero" means in that collection (or in a collection under it).
   - `./priorwork zotero <survey> --import` registers the papers of the collection as candidates. The user chose these papers, so include them unless they are clearly out of scope.
   - The full text (`./priorwork fulltext`) comes from the collection's PDFs first. Start filling in the cards with the papers that have a PDF there.
-- **When the manuscript is in an Octavo project**, Octavo pulls its `.bib` of references from the Zotero collection in its settings (`zotero_collection`). Link the survey to the same collection (`./priorwork new --manuscript` links it by itself; `./priorwork check` says when they differ). The included papers put in that collection then become the Octavo manuscript's references too. Octavo also takes the collections under it, so **when one Octavo project has several surveys, give each survey a collection under Octavo's** (`"<Octavo's collection> / <survey>"`; in one shared collection, `--import` would bring each survey's papers into the others as candidates). The user makes collections in Zotero. Never change the Octavo project's files (settings, `.bib`, manuscript).
-- **Surveys and Octavo projects are many-to-many.** When asked to use a survey on a topic for a paper (an Octavo project), link it with `./priorwork scope <survey> --octavo <project path>` (as many as needed) and write it with that project's `.bib` keys with `./priorwork export <survey> --octavo <project>` (`reports/<name>.<project>.octavo.md`: the draft for a survey that drafts a manuscript, otherwise the sections on theories, methods, debates and gaps). `./priorwork check` says when the project's Zotero collections (a name or a list) do not include the survey's; tell the user to add it in Octavo.
+- **When the manuscript is in an Octavo project**, Octavo pulls its `.bib` of references from the Zotero collection in its settings (`zotero_collection`). Link the survey to the same collection (`./priorwork new --manuscript` links it by itself; `./priorwork check` says when they differ). The included papers put in that collection then become the Octavo manuscript's references too. Octavo also takes the collections under it, so **when one Octavo project has several surveys, give each survey a collection under Octavo's** (`"<Octavo's collection> / <survey>"`; in one shared collection, `--import` would bring each survey's papers into the others as candidates). The user makes collections in Zotero. **The only things written into an Octavo project are what `./priorwork export --octavo` puts in its inbox (`literature/priorwork/`).** Never change its settings, `.bib` or manuscript. Tell the user to ask the agent in the Octavo project to work the text into the manuscript.
+- **Requests from Octavo.** Octavo may put requests in `.priorwork/requests/` (`./priorwork status` gives the count). When asked to "carry out the requests from Octavo", list them with `./priorwork requests`, read one with `./priorwork requests <id>`, and follow its text (`priorwork-manuscript` for one about a manuscript). When it is done, record it with `./priorwork requests <id> --done --survey <survey>`. If you cannot carry it out (out of scope, the manuscript is missing, …), record it with `--decline --note "<why>"` and tell the user. Never edit the request files yourself.
+- **Surveys and Octavo projects are many-to-many.** When asked to use a survey on a topic for a paper (an Octavo project), link it with `./priorwork scope <survey> --octavo <project path>` (as many as needed) and write it with that project's `.bib` keys with `./priorwork export <survey> --octavo <project>` (the project's `literature/priorwork/<survey>.md`: the draft for a survey that drafts a manuscript, otherwise the sections on theories, methods, debates and gaps). `./priorwork check` says when the project's Zotero collections (a name or a list) do not include the survey's; tell the user to add it in Octavo.
 
 ## Rules
 
@@ -147,6 +167,7 @@ The user adds to Zotero by hand. The agent never writes to Zotero.
    - Every paper you mention in the text must be registered in `./priorwork`. Never write authors, years or DOIs from memory.
    - Write on a card only what the abstract or full text says, and always update its evidence level (unchecked / abstract only / full text checked). **Set "full text checked" only when you fetched the paper's full text with `./priorwork fulltext` and read it.** A card written from the abstract is "abstract only".
    - On a card checked against the full text, give the page (`(p. 12)`) for numbers, methods and main findings. If the full text has no page breaks, write "(page not checked)". `./priorwork check` gives a WARN for numbers not in the full text and pages not in the paper.
+   - Cite the year of the journal issue, not the year it came out online. `./priorwork add` changes a paper with a volume to its issue's year, and `./priorwork check` names included papers whose year differs, with the `fix --year` to run.
    - Write the cards **in the language of the report** (keep terms in the original in brackets). Do not copy the English abstract into a report in another language.
    - When the text cites the literature, make sure **the direction of the finding** (does / does not, rises / falls) matches the card's main findings.
    - **Never mix what the literature found with the framework and hypotheses of this study (the user's).** Write the user's typology or hypotheses only in the section "Hypotheses and implications for this study", never as a consensus of the literature.
@@ -181,10 +202,14 @@ The user adds to Zotero by hand. The agent never writes to Zotero.
 ./priorwork audit SURVEY [--by "<model>" --note "..."]   # record an audit you were asked for (without --by: show the record)
 ./priorwork export SURVEY [--format html|docx|md] [--with-abstracts]   # write the version for reading
 ./priorwork export SURVEY --draft [--format md|docx|html]             # the draft of the manuscript's sections 1–3 (a survey with --purpose draft)
+./priorwork derive SURVEY [NAME --purpose "..." --length N --structure "a; b; c" [--count-citations]]   # a derived document (leave out NAME to list them)
+./priorwork export SURVEY --derived NAME [--format html|docx|md]      # a derived document, for reading
 ./priorwork export SURVEY --octavo [PROJECT] [--bib PATH]             # for an Octavo project (citations as [@key]; the draft, or the synthesis sections)
 ./priorwork scope SURVEY --octavo PATH [--octavo PATH ...]           # link the Octavo projects that use this survey (--unlink-octavo to unlink)
+./priorwork requests [ID] [--done --survey SURVEY | --decline --note "..."]   # requests from Octavo
 ./priorwork read PATH [--out FILE]   # the text of a manuscript (.md, .qmd, .html, .docx, .pdf, … or a folder)
 ./priorwork zotero [SURVEY] [--collections] [--collection NAME] [--import] [--dois]   # --dois works without the Zotero link too
+./priorwork zotero SURVEY --add [--dry-run]      # put the included papers into the linked collection (only with ZOTERO_WRITE=1; --undo [NUMBER …] takes it back)
 ./priorwork get <DOI>      ./priorwork citations <DOI> [--sort cited]      ./priorwork references <DOI> [--sort cited]      ./priorwork journal "<journal>"
 ./priorwork doctor [--online]        # diagnose the setup (when something is wrong)
 ./priorwork sync                     # update AGENTS.md and the skills to the engine's version

@@ -35,7 +35,7 @@ export interface SurveySummary {
     report: string;
     /** 原稿から始めたサーベイの原稿のパス（0.1.4 から。古い CLI には無い） */
     manuscript?: string | null;
-    /** 原稿から始めたサーベイの目的: draft（1〜3 章の下書き）/ advice（原稿への助言）（0.1.9 から） */
+    /** 原稿から始めたサーベイの目的: complete（欠けを補う。古い CLI には無い）/ draft（1〜3 章の下書き）/ advice（原稿への助言）（0.1.9 から） */
     purpose?: string | null;
     /** 結び付けた Zotero のコレクション（0.1.5 から一覧にも出る。古い CLI では詳細にだけある） */
     zotero_collection?: ZoteroCollectionLink | null;
@@ -63,6 +63,10 @@ export interface WorkspaceStatus {
     sync: string | null;
     /** Zotero の連携が設定されているか（0.1.5 から） */
     zotero?: boolean;
+    /** 採用論文を Zotero のコレクションに入れることが許されているか（ZOTERO_WRITE=1。古い CLI には無い） */
+    zotero_write?: boolean;
+    /** Octavo からの未処理の依頼（.priorwork/requests/。古い CLI には無い） */
+    requests?: OctavoRequest[];
     surveys: SurveySummary[];
     /** アーカイブしたサーベイ（0.1.5 から） */
     archived?: SurveySummary[];
@@ -86,6 +90,10 @@ export interface SurveyDetail extends SurveySummary {
     scope: Scope;
     unfilled: number[];
     zotero_missing: number[];
+    /** 採用論文を Zotero のコレクションに入れることが許されているか（古い CLI には無い） */
+    zotero_write?: boolean;
+    /** Priorwork がこのサーベイで Zotero に書いたものの数（`zotero --undo` で戻せる。古い CLI には無い） */
+    zotero_written?: number;
     /** サーベイを書いたモデル（0.1.6 から） */
     written_by?: string[];
     /** 書いたのと別のモデルによる監査（0.1.6 から） */
@@ -121,6 +129,22 @@ export interface Audit {
     included: number;
 }
 
+/** Octavo からの依頼（`priorwork requests --json`）。 */
+export interface OctavoRequest {
+    id: string;
+    from: string | null;
+    /** start: 原稿からサーベイを作る / use-surveys: あるサーベイを使う / other */
+    kind: string | null;
+    project: string | null;
+    manuscript: string | null;
+    text: string | null;
+    created_at: string | null;
+    status: 'open' | 'done' | 'declined';
+    survey: string | null;
+    done_at: string | null;
+    note: string | null;
+}
+
 /** サーベイに結び付けた Zotero のコレクション。 */
 export interface ZoteroCollectionLink {
     key: string;
@@ -147,7 +171,7 @@ export interface ZoteroCollection {
     total?: number;
 }
 
-/** `priorwork zotero SURVEY [--collection X] [--import] --json` */
+/** `priorwork zotero SURVEY [--collection X] [--import] [--add | --undo] [--dry-run] --json` */
 export interface ZoteroReport {
     survey: string;
     collection: ZoteroCollectionLink | null;
@@ -155,6 +179,24 @@ export interface ZoteroReport {
     to_import: number;
     imported: AddedPaper[];
     no_doi: string[];
+    /** ZOTERO_WRITE=1 か（古い CLI には無い） */
+    can_write?: boolean;
+    dry_run?: boolean;
+    /** --add / --undo で書いたもの（--dry-run なら、書くもの） */
+    written?: ZoteroWrite[];
+}
+
+/** Priorwork が Zotero に書いたもの・書くもの。 */
+export interface ZoteroWrite {
+    number: number;
+    title: string;
+    /** create: 書誌から作る / collect: ライブラリにあるアイテムをコレクションに足す */
+    action: 'create' | 'collect';
+    key: string;
+    done?: boolean;
+    error?: string;
+    /** --undo の結果（trash: ごみ箱へ / keep: 手が入っていたので残した / uncollect: コレクションから外した / gone: もう無い） */
+    undo?: 'trash' | 'keep' | 'uncollect' | 'gone';
 }
 
 export interface Ssci {

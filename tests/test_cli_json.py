@@ -109,19 +109,23 @@ def test_the_extension_reads_only_keys_the_cli_writes():
     for name, body in re.findall(r"export interface (\w+)(?: extends [\w, ]+)? \{(.*?)\n\}", text, re.S):
         declared[name] = set(re.findall(r"^\s+(\w+)\??:", body, re.M))
     expected = {
-        "WorkspaceStatus": {"version", "root", "workspace", "lang", "git", "sync", "zotero", "surveys", "archived"},
+        "WorkspaceStatus": {"version", "root", "workspace", "lang", "git", "sync", "zotero", "zotero_write", "requests", "surveys", "archived"},
         "GitInfo": {"repo", "remote", "branch", "other_surveys"},
         "SurveySummary": {"name", "topic", "created", "version", "depth", "mode", "lang", "report", "manuscript", "purpose",
                           "zotero_collection", "archived", "counts", "searches"},
-        "SurveyDetail": {"scope", "unfilled", "zotero_missing", "written_by", "audits", "octavo", "octavo_projects",
+        "SurveyDetail": {"scope", "unfilled", "zotero_missing", "zotero_write", "zotero_written", "written_by", "audits", "octavo", "octavo_projects",
                          "sync", "next"},
         "OctavoProject": {"root", "name", "bib", "bib_exists", "zotero_collections", "manuscript", "missing"},
         "Audit": {"at", "by", "note", "included"},
         "ZoteroCollectionLink": {"key", "name"},
         "ZoteroCollections": {"collections"},
         "ZoteroCollection": {"key", "name", "path", "parent", "depth", "items", "total"},
-        "ZoteroReport": {"survey", "collection", "papers", "missing_dois", "to_import", "imported", "no_doi"},
+        "ZoteroReport": {"survey", "collection", "papers", "missing_dois", "to_import", "imported", "no_doi",
+                         "can_write", "dry_run", "written"},
+        "ZoteroWrite": {"number", "title", "doi", "action", "key", "done", "error", "undo"},
         "NextStep": {"id", "text", "args"},
+        "OctavoRequest": {"id", "from", "kind", "project", "manuscript", "text", "created_at", "status", "survey",
+                          "done_at", "note"},
         "Entry": {"number", "key", "status", "reason", "found_by", "history", "record", "fulltext"},
         "PaperRecord": {"title", "authors", "year", "journal_name", "doi", "abstract", "tldr", "citation_count",
                         "ssci", "warnings", "url", "oa_pdf"},
@@ -151,7 +155,7 @@ def test_the_extension_reads_only_keys_the_cli_writes():
 
 def test_a_survey_from_a_manuscript(ws, tmp_path):
     (tmp_path / "paper.md").write_text("# 5. Results\n")
-    made = ws("new", "t", "--slug", "mp", "--manuscript", str(tmp_path / "paper.md"), "--json")
+    made = ws("new", "t", "--slug", "mp", "--manuscript", str(tmp_path / "paper.md"), "--purpose", "draft", "--json")
     assert made["manuscript"] == "paper.md"
     ws("search", "minimum wage", "--into", "mp", "--limit", "1", "--json")
     ws("include", "mp", "1", "--json")
@@ -249,9 +253,11 @@ def test_a_survey_that_advises_on_a_manuscript(ws, tmp_path):
     ws("include", "adv", "1", "--json")
     ids = [s["id"] for s in ws("status", "adv", "--json")["next"]]
     assert "advice" in ids and "draft" not in ids
-    # 同じ原稿から、下書きのサーベイも別に作れる
-    draft = ws("new", "t", "--slug", "drf", "--manuscript", str(tmp_path / "paper.md"), "--json")
-    assert draft["purpose"] == "draft" and draft["manuscript"] == made["manuscript"]
+    # 同じ原稿から、補完のサーベイ（目的を省いたときの既定）も別に作れる
+    filled = ws("new", "t", "--slug", "fill", "--manuscript", str(tmp_path / "paper.md"), "--json")
+    assert filled["purpose"] == "complete" and filled["manuscript"] == made["manuscript"]
+    report = Path(filled["report"]).read_text(encoding="utf-8")
+    assert "原稿の補完" in report and "priorwork:draft" in report and "原稿の欠けの地図" in report
     with pytest.raises(SystemExit):
         cli.main(["new", "t", "--slug", "x", "--purpose", "advice"])          # 原稿が無い
 
@@ -264,3 +270,24 @@ def test_zotero_dois_without_zotero_lists_every_included_paper(ws, capsys):
     cli.main(["zotero", "zd", "--dois"])
     out = capsys.readouterr().out.split()
     assert len(out) == 1 and out[0].startswith("10.")
+
+
+def test_requests_from_octavo(ws, tmp_path):
+    """Octavo が .priorwork/requests/ に置いた依頼を一覧にし、結果を書き込む（Octavo が書いた欄はそのまま）。"""
+    sample = json.loads((Path(__file__).parent / "fixtures" / "request.json").read_text(encoding="utf-8"))
+    d = tmp_path / ".priorwork" / "requests"
+    d.mkdir(parents=True)
+    (d / f"{sample['id']}.json").write_text(json.dumps(sample), encoding="utf-8")
+    (d / "broken.json").write_text("{", encoding="utf-8")                     # 読めないものは飛ばす
+    (d / "other.json").write_text('{"format": "something-else"}', encoding="utf-8")
+    st = ws("status", "--json")
+    assert [r["id"] for r in st["requests"]] == [sample["id"]] and st["requests"][0]["kind"] == "start"
+    assert set(st["requests"][0]) == set(sample) - {"format", "version"}
+    assert ws("requests", "2026", "--json")["text"] == sample["text"]      # id の先頭だけでよい
+    ws("new", "t", "--slug", "mob", "--json")
+    done = ws("requests", sample["id"], "--done", "--survey", "mob", "--note", "made a survey", "--json")
+    assert done["status"] == "done" and done["survey"] == "mob" and done["done_at"]
+    on_disk = json.loads((d / f"{sample['id']}.json").read_text(encoding="utf-8"))
+    assert {k: on_disk[k] for k in ("format", "project", "text", "created_at")} == \
+        {k: sample[k] for k in ("format", "project", "text", "created_at")}
+    assert ws("status", "--json")["requests"] == [] and len(ws("requests", "--all", "--json")["requests"]) == 1

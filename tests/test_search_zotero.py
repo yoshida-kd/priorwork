@@ -186,3 +186,140 @@ def test_a_new_survey_leaves_out_papers_outside_the_social_sciences(ws, monkeypa
     assert sorted(e["record"]["title"][-1] for e in ws("list", "soc", "--json")) == ["1", "2"]
     ws("scope", "soc", "--search-field", "all", "--json")
     assert len(ws("search", "statutes", "--into", "soc", "--json")["added"]) == 3
+
+
+# ---------------- Zotero への書き込み（ZOTERO_WRITE=1 のときだけ） ----------------
+
+class FakeZoteroServer:
+    """Zotero の Web API の書き込みの部分。書いたものは z の一覧（_index）にも映す。"""
+
+    def __init__(self, z, can_write=True):
+        self.z, self.can_write, self.calls = z, can_write, []
+        self.version = 10
+        self.items = {k: {"key": k, "version": 3, "data": {"key": k, "collections": list(i["collections"])}}
+                      for k, i in z._index["items"].items()}
+
+    def __call__(self, method, url, params=None, headers=None, auth=None, timeout=None, stream=False, json=None):
+        self.calls.append((method, url.replace(zotero.API_BASE, ""), json))
+        path = url.replace(zotero.API_BASE, "")
+        if path == "/keys/current":
+            return FakeResponse(200, {"access": {"user": {"library": True, "write": self.can_write}}})
+        key = path.rsplit("/", 1)[-1]
+        if method == "GET":
+            return FakeResponse(200, self.items[key]) if key in self.items else FakeResponse(404, {})
+        self.version += 1
+        if method == "POST":
+            done = {}
+            for n, data in enumerate(json):
+                k = f"NEW{self.version}{n}"
+                self.items[k] = {"key": k, "version": self.version, "data": {**data, "key": k}}
+                self.z._index["items"][k] = {"key": k, "itemType": data["itemType"], "title": data["title"],
+                                             "doi": data.get("DOI", ""), "parentItem": "", "contentType": "",
+                                             "linkMode": "", "filename": "", "year": data.get("date", ""),
+                                             "collections": data["collections"]}
+                done[str(n)] = {"key": k, "version": self.version}
+            return FakeResponse(200, {"successful": done, "failed": {}})
+        item = self.items[key]
+        assert headers["If-Unmodified-Since-Version"] == str(item["version"])
+        item["data"].update(json)
+        item["version"] = self.version
+        if json.get("deleted"):
+            self.z._index["items"].pop(key)
+        else:
+            self.z._index["items"][key]["collections"] = item["data"]["collections"]
+        return FakeResponse(204, None, {"Last-Modified-Version": str(self.version)})
+
+    def writes(self):
+        return [(m, p, b) for m, p, b in self.calls if m != "GET"]
+
+
+class FakeResponse:
+    def __init__(self, status, body, headers=None):
+        self.status_code, self.ok, self._body, self.headers, self.text = status, status < 400, body, headers or {}, ""
+
+    def json(self):
+        return self._body
+
+
+def test_adding_the_included_papers_to_the_collection_and_undoing_it(ws, tmp_path, monkeypatch, capsys):  # noqa: F811
+    z = fake_zotero(tmp_path)
+    monkeypatch.setattr(cli.ZoteroClient, "from_env", classmethod(lambda cls: z))
+    server = FakeZoteroServer(z)
+    monkeypatch.setattr(zotero.requests, "request", server)
+
+    class Client(ManyClient):
+        def search(self, query, limit=20, year=None, bulk=False):
+            return [from_openalex(openalex_work(title=f"Paper number {i} on minimum wages", doi=f"10.1/{i}",
+                                                wid=f"W{i}", citations=100 - i)) for i in range(3)]
+
+    monkeypatch.setattr(cli, "LiteratureClient", Client)
+    ws("new", "t", "--slug", "mw", "--json")
+    ws("search", "x", "--into", "mw", "--json")
+    ws("include", "mw", "1", "2", "3", "--json")
+    ws("zotero", "mw", "--collection", "make-or-buy", "--json")
+
+    # 設定で許していなければ書かない（何をするかを見るだけならできる）
+    with pytest.raises(SystemExit, match="ZOTERO_WRITE=1"):
+        cli.main(["zotero", "mw", "--add"])
+    plan = ws("zotero", "mw", "--add", "--dry-run", "--json")
+    assert [(w["number"], w["action"]) for w in plan["written"]] == [(2, "collect"), (3, "create")]
+    assert plan["dry_run"] and not plan["can_write"] and not server.writes()
+    capsys.readouterr()
+    cli.main(["zotero", "mw", "--add", "--dry-run"])
+    out = capsys.readouterr().out
+    assert "まだ何も書いていません" in out and "#3 新規（書誌から作成）" in out and "#2 ライブラリにあるアイテム" in out
+    steps = {s["id"]: s for s in ws("status", "mw", "--json")["next"]}
+    assert steps["zotero"]["args"][2:] == [] and steps["wait_zotero"]["args"][-1] == "--dois"
+
+    # 許していても、キーに書き込みの権限が無ければ書かない
+    monkeypatch.setenv("ZOTERO_WRITE", "1")
+    z.write = True
+    server.can_write = False
+    with pytest.raises(SystemExit, match="Allow write access"):
+        cli.main(["zotero", "mw", "--add"])
+    assert not server.writes()
+    server.can_write = True
+
+    detail = ws("status", "mw", "--json")
+    steps = {s["id"]: s for s in detail["next"]}
+    assert detail["zotero_write"] and steps["zotero"]["args"][2:] == ["--add"]
+    assert steps["wait_zotero"]["args"][2:] == ["--add", "--dry-run"]   # 標準: 見せて了解を得てから
+
+    added = ws("zotero", "mw", "--add", "--json")
+    assert [(w["number"], w["action"], w["done"]) for w in added["written"]] == [(2, "collect", True), (3, "create", True)]
+    assert added["missing_dois"] == []
+    (post,) = [b for m, p, b in server.writes() if m == "POST"]
+    assert post[0]["itemType"] == "journalArticle" and post[0]["DOI"] == "10.1/2" and post[0]["collections"] == ["C1"]
+    assert post[0]["creators"][0] == {"creatorType": "author", "firstName": "Doruk", "lastName": "Cengiz"}
+    patches = [(p, b) for m, p, b in server.writes() if m == "PATCH"]
+    assert patches == [("/users/1/items/B", {"collections": ["C1"]})]        # ほかのアイテムの中身は書き換えない
+    assert ws("status", "mw", "--json")["zotero_written"] == 2
+
+    server.calls.clear()   # もう一度実行しても、二重には入れない
+    assert ws("zotero", "mw", "--add", "--json")["written"] == [] and not server.writes()
+
+    # 作ったアイテムは、手が入っていなければごみ箱へ
+    created = added["written"][1]["key"]
+    undone = ws("zotero", "mw", "--undo", "3", "--json")
+    assert [(w["number"], w["undo"]) for w in undone["written"]] == [(3, "trash")]
+    assert server.items[created]["data"]["deleted"] == 1 and ws("status", "mw", "--json")["zotero_written"] == 1
+
+    # 作り直したアイテムにユーザーが手を入れたら残し、足しただけのアイテムはコレクションから外す
+    again = ws("zotero", "mw", "--add", "--json")["written"]
+    server.items[again[0]["key"]]["version"] += 5
+    undone = ws("zotero", "mw", "--undo", "--json")
+    assert sorted((w["number"], w["undo"]) for w in undone["written"]) == [(2, "uncollect"), (3, "keep")]
+    assert server.items["B"]["data"]["collections"] == [] and "deleted" not in server.items[again[0]["key"]]["data"]
+    assert ws("status", "mw", "--json")["zotero_written"] == 0
+    assert ws("zotero", "mw", "--undo", "--json")["written"] == []
+
+
+def test_reading_never_writes_without_the_setting(tmp_path, monkeypatch):
+    z = fake_zotero(tmp_path)
+    monkeypatch.setattr(zotero.requests, "request", FakeZoteroServer(z))
+    with pytest.raises(ZoteroError):
+        z._patch("B", 3, {"collections": []})
+    assert zotero.item_from_record({"title": "A chapter", "authors": ["Plato"], "year": 2001, "doi": "10.1/c",
+                                    "publication_types": ["book-chapter"], "journal_name": "A Book"}, ["C1"]) == {
+        "itemType": "bookSection", "title": "A chapter", "creators": [{"creatorType": "author", "name": "Plato"}],
+        "date": "2001", "bookTitle": "A Book", "extra": "DOI: 10.1/c", "collections": ["C1"]}

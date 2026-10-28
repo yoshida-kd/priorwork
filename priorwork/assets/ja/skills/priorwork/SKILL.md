@@ -35,7 +35,7 @@ description: >-
 1. **検索**（`priorwork-new` の 2）: 「検索を足す」と出ている間は、サブテーマを変えて検索を足す。
 2. **選別**（`priorwork-screen`）: 候補をすべて採用・除外・保留に分ける。
 3. **引用をたどる**（`priorwork-snowball`）: full なら必ず。新しい候補が出たら 2 に戻る。
-4. **Zotero への取り込み**（標準と手動では、ここで止まる）: `./priorwork zotero <survey> --dois` の DOI をそのまま示し、ユーザーが Zotero に論文と PDF を集めて続きを頼むのを待つ（AGENTS.md「進め方」）。続きを頼まれたら `./priorwork scope <survey> --go-on`。全自動では止まらず、Zotero に未登録の本数を最後の報告で伝える。
+4. **Zotero への取り込み**（標準と手動では、ここで止まる）: Priorwork が書き込めるとき（次にやることが `zotero <survey> --add`）は `--add --dry-run` の一覧を示して了解を得てから `--add` で入れ、そうでなければ `./priorwork zotero <survey> --dois` の DOI をそのまま示して、ユーザーが Zotero に論文と PDF を集めて続きを頼むのを待つ（AGENTS.md「進め方」「Zotero」）。続きを頼まれたら `./priorwork scope <survey> --go-on`。全自動では止まらず、書き込めれば `--add` で入れ、Zotero に未登録の本数を最後の報告で伝える。
 5. **カードの記入**（`priorwork-extract`）: 採用論文すべて。
 6. **文章**: 下の 3。
 7. **検査と書き出し**（`priorwork-check`）: ERROR が 0 になるまで直し、HTML を書き出す。
@@ -70,7 +70,7 @@ description: >-
 - 検索のクエリ数・候補数・採用数・除外の主な理由
 - 範囲（RQ・期間・基準・深さ）のうち、依頼に無く自分で決めたもの
 - 残った WARN と「下書き」の理由（あれば）
-- Zotero に未登録の採用論文の本数（`./priorwork zotero <survey> --dois` の DOI をそのまま示す。本文を自分で取得できた論文も除かない）
+- Zotero に未登録の採用論文の本数（`./priorwork zotero <survey> --dois` の DOI をそのまま示す。本文を自分で取得できた論文も除かない）。`--add` で入れたなら、新しく作ったものとライブラリから足したもの、PDF を Zotero でそろえてほしいこと
 - レポートの見方（AGENTS.md「レポートを見せる」）
 - 採否やカードは、サイドバーで直せば次の作業でそれに従うこと
 

@@ -1,0 +1,31 @@
+{
+  "format": "priorwork-cards",
+  "version": 1,
+  "survey": "20261028_mw",
+  "lang": "en",
+  "papers": [
+    {
+      "key": "card1994",
+      "in_bib": true,
+      "doi": "10.1/card",
+      "label": "Card & Krueger (1994)",
+      "title": "Minimum Wages and Employment",
+      "year": 1994,
+      "evidence": "fulltext",
+      "fields": {
+        "rq": "Does a minimum wage rise cut jobs in fast food?",
+        "findings": "No fall in employment (p. 792)"
+      }
+    },
+    {
+      "key": "PRIORWORK:10.1/neum",
+      "in_bib": false,
+      "doi": "10.1/neum",
+      "label": "Neumark & Wascher (2007)",
+      "title": "Minimum Wages and Employment",
+      "year": 2007,
+      "evidence": "abstract",
+      "fields": {}
+    }
+  ]
+}

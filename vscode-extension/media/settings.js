@@ -1,5 +1,6 @@
 // 設定のページ（settings.ts）の操作。変えた欄だけを拡張機能に渡す。
 // 秘密の欄（API キー・パスワード）は、何か入力したときと「削除」を押したときだけ渡す。
+// チェックボックス（data-flag）は、入れると '1'、外すと ''（消す）。
 const vscode = acquireVsCodeApi();
 const inputs = [...document.querySelectorAll('input[data-key]')];
 const removed = new Set();
@@ -8,7 +9,12 @@ function values() {
   const out = {};
   for (const el of inputs) {
     const key = el.dataset.key;
-    if (el.dataset.secret) {
+    if (el.dataset.flag) {
+      const v = el.checked ? '1' : '';
+      if (v !== el.dataset.original) {
+        out[key] = v;
+      }
+    } else if (el.dataset.secret) {
       if (el.value.trim()) {
         out[key] = el.value.trim();
       } else if (removed.has(key)) {
@@ -26,6 +32,7 @@ function noteChanges() {
 }
 
 document.addEventListener('input', noteChanges);
+document.addEventListener('change', noteChanges);
 
 document.addEventListener('click', (ev) => {
   const el = ev.target.closest('button');

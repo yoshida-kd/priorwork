@@ -22,6 +22,7 @@ ITEMS = [
     ("OPENALEX_MAILTO", False),
     ("ZOTERO_API_KEY", True),
     ("ZOTERO_USER_ID", False),
+    ("ZOTERO_WRITE", False),
     ("ZOTERO_DATA_DIR", False),
     ("ZOTERO_WEBDAV_URL", False),
     ("ZOTERO_WEBDAV_USER", False),

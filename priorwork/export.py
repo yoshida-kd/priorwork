@@ -10,17 +10,20 @@
 原稿に貼るためのものなので、「下書き」の表示は付けない（問題はコマンドの出力で伝える）。
 """
 
+import hashlib
 import html
+import json
 import re
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from . import i18n
 from .check import ERROR, check_survey, find_citations
 from .i18n import t, tl
-from .survey import BIBLIO_LABEL, CARD_FIELDS, INCLUDED, Survey, first_surname, render_references, year_labels
+from .survey import (BIBLIO_LABEL, CARD_FIELDS, INCLUDED, Survey, first_surname, now_iso, render_references,
+                     year_labels)
 
 FORMATS = {"html": ".html", "md": ".clean.md", "docx": ".docx"}
 DRAFT_FORMATS = {"html": ".draft.html", "md": ".draft.md", "docx": ".draft.docx"}
@@ -260,12 +263,13 @@ def _draft_lang(text: str) -> str:
 
 
 def export_draft(survey: Survey, fmt: str = "md", out: Optional[Path] = None) -> Tuple[Path, List[str]]:
-    """原稿の 1〜3 章の下書きを書き出す。戻り値: (出力先, 問題（表示の言語）)"""
+    """原稿の 1〜3 章の下書き（補完のサーベイなら、補完の一覧）を書き出す。戻り値: (出力先, 問題（表示の言語）)"""
     if fmt not in DRAFT_FORMATS:
         raise ValueError(t("The format is one of {choices}: {fmt}", choices=" / ".join(DRAFT_FORMATS), fmt=fmt))
     text = draft_section(survey.md_path.read_text(encoding="utf-8"))
     if not re.search(r"^(?!#)\S", text, re.MULTILINE):
-        raise RuntimeError(t("The draft of the manuscript is not written yet"))
+        raise RuntimeError(t("What to add to the manuscript is not written yet") if survey.purpose == "complete"
+                           else t("The draft of the manuscript is not written yet"))
     lang = _draft_lang(text)
     cited = cited_papers(survey, text)
     labels = year_labels(survey.by_status(INCLUDED))
@@ -317,22 +321,24 @@ _O_PAREN = re.compile(r"[(（]([^()（）]*\d{4}[^()（）]*)[)）]")
 
 
 def _o_key(name_part: str, year: str, labels_index: Dict[Tuple[str, str], dict], bib_keys: Dict[str, str],
-           missing: Dict[str, dict]) -> Optional[str]:
+           missing: Dict[str, dict], cited: Dict[str, dict]) -> Optional[str]:
     first = re.split(r"\s+et\s+al|\s*,\s*|\s*(?:\band\b|&)\s*", name_part.strip())[0].split()[-1]
     from .survey import surname
     entry = labels_index.get((surname(first), year))
     if entry is None:
         return None
+    cited[entry["key"]] = entry
     key = bib_keys.get(entry["key"])
     if key:
         return key
     missing[entry["key"]] = entry
-    from .octavo import MISSING_PREFIX
-    return f"{MISSING_PREFIX}{re.sub(r'[^A-Za-z0-9]', '', first)}{year}"
+    from .octavo import placeholder
+    return placeholder(entry["record"].get("doi") or "", f"{re.sub(r'[^A-Za-z0-9]', '', first)}{year}")
 
 
-def octavo_citations(text: str, survey: Survey, bib_entries: List[dict]) -> Tuple[str, List[dict]]:
-    """下書きの「著者 (年)」を Pandoc の引用（[@key]）にする。戻り値: (本文, .bib に無い採用論文)。
+def octavo_citations(text: str, survey: Survey, bib_entries: List[dict]) -> Tuple[str, List[dict], Dict[str, str]]:
+    """下書きの「著者 (年)」を Pandoc の引用（[@key]）にする。
+    戻り値: (本文, .bib に無い採用論文, 引いた採用論文のキー → 書いたキー（.bib のキーか印）)。
     採用論文に当たらない引用は、そのまま残す（check が ERROR にする）。"""
     from .octavo import match_entry
     included = survey.by_status(INCLUDED)
@@ -340,6 +346,7 @@ def octavo_citations(text: str, survey: Survey, bib_entries: List[dict]) -> Tupl
     index = {(first_surname(e["record"]), labels[e["key"]]): e for e in included}
     bib_keys = {e["key"]: (match_entry(e["record"], bib_entries) or {}).get("key", "") for e in included}
     missing: Dict[str, dict] = {}
+    cited: Dict[str, dict] = {}
 
     def years(s: str) -> List[str]:
         return re.findall(r"\d{4}[a-z]?", s)
@@ -351,7 +358,7 @@ def octavo_citations(text: str, survey: Survey, bib_entries: List[dict]) -> Tupl
             if not im:
                 return m.group(0)
             prefix, names, ys, loc = im.group(1).strip(), im.group(2), years(im.group(3)), (im.group(4) or "").strip()
-            keys = [_o_key(names, y, index, bib_keys, missing) for y in ys]
+            keys = [_o_key(names, y, index, bib_keys, missing, cited) for y in ys]
             if None in keys:
                 return m.group(0)
             for i, k in enumerate(keys):
@@ -361,7 +368,7 @@ def octavo_citations(text: str, survey: Survey, bib_entries: List[dict]) -> Tupl
 
     def narrative(m: "re.Match") -> str:
         names, ys, loc = m.group(1), years(m.group(3)), (m.group(4) or "").strip()
-        keys = [_o_key(names, y, index, bib_keys, missing) for y in ys]
+        keys = [_o_key(names, y, index, bib_keys, missing, cited) for y in ys]
         if None in keys:
             return m.group(0)
         if len(keys) == 1:
@@ -370,7 +377,7 @@ def octavo_citations(text: str, survey: Survey, bib_entries: List[dict]) -> Tupl
 
     text = _O_PAREN.sub(paren, text)
     text = _O_NARRATIVE.sub(narrative, text)
-    return text, list(missing.values())
+    return text, list(missing.values()), {k: bib_keys.get(k) or "" for k in cited}
 
 
 def synthesis_sections(md: str) -> str:
@@ -393,23 +400,81 @@ def synthesis_sections(md: str) -> str:
 
 def octavo_text(survey: Survey, md: str) -> str:
     """Octavo の原稿に持っていく文章: 原稿の 1〜3 章を書くサーベイなら下書き、それ以外は先行研究のまとめの節。"""
-    return draft_section(md) if survey.purpose == "draft" else synthesis_sections(md)
+    return draft_section(md) if survey.purpose in ("draft", "complete") else synthesis_sections(md)
 
 
-def export_octavo(survey: Survey, bib: Path, out: Optional[Path] = None, project: str = "") -> Tuple[Path, List[dict]]:
+def export_octavo(survey: Survey, bib: Path, out: Optional[Path] = None, project: str = "",
+                  root: Optional[Path] = None) -> Tuple[Path, List[dict]]:
     """Octavo の原稿に貼れる形（[@key] の引用。参考文献は Octavo が .bib から作る）で書き出す。
-    キーはそのプロジェクトの .bib から取るので、プロジェクトごとに書き出す（reports/<名前>.<プロジェクト>.octavo.md）。"""
-    from .octavo import read_bib
+    キーはそのプロジェクトの .bib から取るので、プロジェクトごとに書き出す。root（プロジェクトの根）があれば、
+    その受け取り場所（literature/priorwork/<サーベイ>.md）に、添え状（同じ名前の .json）と一緒に置く。
+    無ければ（--bib だけのとき）reports/<名前>.octavo.md。"""
+    from .octavo import inbox, read_bib
     text = octavo_text(survey, survey.md_path.read_text(encoding="utf-8"))
     if not re.search(r"^(?!#)\S", text, re.MULTILINE):
-        raise RuntimeError(t("The draft of the manuscript is not written yet") if survey.purpose == "draft"
-                           else t("The sections on the literature (theories, methods, debates, gaps) are not written yet"))
+        raise RuntimeError({"draft": t("The draft of the manuscript is not written yet"),
+                            "complete": t("What to add to the manuscript is not written yet")}.get(
+            survey.purpose, t("The sections on the literature (theories, methods, debates, gaps) are not written yet")))
     entries = read_bib(bib)
     if not entries:
         raise RuntimeError(t("No entries in {path}. Pull it from Zotero first (`octavo bib pull`)", path=bib))
-    text, missing = octavo_citations(text, survey, entries)
+    text, missing, cited = octavo_citations(text, survey, entries)
+    if out is None and root is not None:
+        out = inbox(root) / f"{survey.name}.md"
     stem = survey.md_path.stem + (f".{re.sub(r'[^A-Za-z0-9_-]+', '_', project)}" if project else "")
     out = out or survey.md_path.with_name(stem + ".octavo.md")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(text, encoding="utf-8")
+    if root is not None:
+        cards = out.with_name(out.stem + ".cards.json")
+        cards.write_text(json.dumps(handoff_cards(survey, entries), ensure_ascii=False, indent=2) + "\n",
+                         encoding="utf-8")
+        manifest = handoff_manifest(survey, out, text, cited, cards)
+        out.with_suffix(".json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return out, missing
+
+
+def handoff_cards(survey: Survey, bib_entries: List[dict]) -> Dict[str, Any]:
+    """受け取り場所に置く、採用論文のカード（Octavo が原稿の [@key] の上に要点と確認レベルを出す）。
+    キーは .bib のキー（無ければ [@PRIORWORK:…] の印）。欄はカードの記入欄のキー（evidence は確認レベルのキー）。"""
+    from .octavo import HANDOFF_VERSION, match_entry, placeholder
+    from .survey import author_short, evidence_key
+    included = survey.by_status(INCLUDED)
+    labels = year_labels(included)
+    fields = survey.card_fields()
+    papers = []
+    for e in included:
+        r = e["record"]
+        bib_key = (match_entry(r, bib_entries) or {}).get("key", "")
+        values = {k: v for k, v in fields.get(e["key"], {}).items() if v and k != "evidence"}
+        papers.append({"key": bib_key or placeholder(r.get("doi") or "", "").strip("{}"), "in_bib": bool(bib_key),
+                       "doi": r.get("doi") or "", "label": f"{author_short(r.get('authors') or [])} ({labels[e['key']]})",
+                       "title": r["title"], "year": r.get("year"),
+                       "evidence": evidence_key(fields.get(e["key"], {}).get("evidence", "")) or "unchecked",
+                       "fields": values})
+    return {"format": "priorwork-cards", "version": HANDOFF_VERSION, "survey": survey.name, "lang": survey.lang,
+            "papers": papers}
+
+
+def handoff_manifest(survey: Survey, out: Path, text: str, cited: Dict[str, str], cards: Path) -> Dict[str, Any]:
+    """受け取り場所に置く添え状。Octavo はこれだけを読む（Priorwork を入れていなくてよい）。
+    形は Octavo との約束（octavo.HANDOFF_VERSION。見本は tests/fixtures/handoff.json）。"""
+    from . import __version__
+    from .octavo import HANDOFF_FORMAT, HANDOFF_VERSION, placeholder
+    by_key = {e["key"]: e for e in survey.papers}
+    citations = []
+    for k, bib_key in cited.items():
+        r = by_key[k]["record"]
+        doi = r.get("doi") or ""
+        citations.append({"key": bib_key or placeholder(doi, "").strip("{}"), "in_bib": bool(bib_key), "doi": doi,
+                          "title": r["title"], "authors": r.get("authors") or [], "year": r.get("year")})
+    return {
+        "format": HANDOFF_FORMAT, "version": HANDOFF_VERSION,
+        "survey": survey.name, "topic": survey.data["topic"], "lang": survey.lang,
+        "kind": survey.purpose if survey.purpose in ("draft", "complete") else "synthesis",
+        "text": out.name, "cards": cards.name, "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        "written_at": now_iso(), "priorwork": __version__,
+        "report": str(survey.md_path.resolve()),
+        "zotero_collection": survey.zotero_collection or None,
+        "citations": citations,
+    }

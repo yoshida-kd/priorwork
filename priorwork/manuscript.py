@@ -7,9 +7,13 @@ PDF はページごとのテキストを取り出す。フォルダなら、中�
 原稿が Octavo のプロジェクトの中にあれば、原稿のほかに、プロジェクトの分析の結果（results/*.json）・
 表（tables/）・分析（analysis/*.qmd）・図の名前と、原稿が引いている文献（.bib の [@key]）も並べる。
 組んだ出力（build/）や元データ（data/）は読まない。
+
+作者は、原稿に Priorwork への頼みごとを印で残せる（`find_marks`）: `[cite]`（引用が要る）、`[@?]`（ここに引く論文を）、
+`TODO(priorwork): …`（何を補ってほしいか）。補完（`--purpose complete`）は、この印を優先して埋める。
 """
 from __future__ import annotations
 
+import hashlib
 import html
 import re
 import zipfile
@@ -132,11 +136,34 @@ def _walk(path: Path, skip: frozenset = frozenset()) -> List[Path]:
 def read(path: Path) -> List[Tuple[Path, str]]:
     """原稿（ファイルかフォルダ）を、(ファイル, テキスト) の並びにする。読めないファイル（画像など）は
     テキストを空にして並べる（表・図があることはエージェントに伝える）。"""
+    return [(f, file_text(f) if text else "") for f, text in files_of(path)]
+
+
+def fingerprint(path: Path) -> str:
+    """原稿（read が読むファイルすべて）の指紋。読んだ後に原稿が変わったかを見る（テキストにはせず、中身のバイトで）。"""
+    h = hashlib.sha256()
+    root = path if path.is_dir() else path.parent
+    for f, _ in files_of(path):
+        try:
+            rel = f.resolve().relative_to(root.resolve()).as_posix()
+        except ValueError:
+            rel = f.resolve().as_posix()
+        h.update(rel.encode("utf-8") + b"\0")
+        try:
+            h.update(f.read_bytes() if f.stat().st_size <= MAX_BYTES * 10 else str(f.stat().st_size).encode())
+        except OSError:
+            pass
+        h.update(b"\0")
+    return h.hexdigest()
+
+
+def files_of(path: Path) -> List[Tuple[Path, bool]]:
+    """read が読むファイルと、テキストにするか（図・画像は名前だけ）。"""
     if not path.exists():
         raise ManuscriptError(t("The manuscript is not found: {path}", path=path))
     root = octavo.find_project(path)
     if root is None:
-        return [(f, file_text(f) if readable(f) else "") for f in _walk(path) if f.suffix.lower() != ".bib"]
+        return [(f, readable(f)) for f in _walk(path) if f.suffix.lower() != ".bib"]
     skip = frozenset(OCTAVO_SKIP_DIRS)
     files = _walk(path, skip if path.resolve() == root else frozenset())
     if path.resolve() != root:
@@ -149,8 +176,29 @@ def read(path: Path) -> List[Tuple[Path, str]]:
             continue
         seen.add(f.resolve())
         figure = f.resolve().is_relative_to((root / "figures").resolve())   # 図は名前だけ
-        got.append((f, file_text(f) if readable(f) and not figure else ""))
+        got.append((f, readable(f) and not figure))
     return got
+
+
+# 作者が原稿に残す、Priorwork への頼みごとの印
+_MARKS = re.compile(r"\[cite\]|\[@\?\]|TODO\(priorwork\):?[ \t]*([^\n]*)", re.IGNORECASE)
+_HEADING = re.compile(r"^#{1,6}\s+(.+?)\s*#*\s*$")
+
+
+def find_marks(files: List[Tuple[Path, str]]) -> List[Dict[str, Any]]:
+    """原稿の中の作者の印。ファイル・行・その上の見出し・印・頼みごと（TODO の後ろ）・前後の文。"""
+    out = []
+    for f, text in files:
+        heading = ""
+        for n, line in enumerate(text.splitlines(), 1):
+            m = _HEADING.match(line)
+            if m:
+                heading = m.group(1)
+            for mark in _MARKS.finditer(line):
+                out.append({"file": str(f), "line": n, "heading": heading,
+                            "mark": "TODO(priorwork)" if mark.group(0).lower().startswith("todo") else mark.group(0),
+                            "note": (mark.group(1) or "").strip(), "context": line.strip()[:200]})
+    return out
 
 
 def cited_entries(path: Path) -> Tuple[Optional[Path], List[Dict[str, Any]]]:

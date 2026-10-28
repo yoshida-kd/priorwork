@@ -1,0 +1,42 @@
+{
+  "format": "priorwork-handoff",
+  "version": 1,
+  "survey": "20261028_mw",
+  "topic": "Minimum wages and employment",
+  "lang": "en",
+  "kind": "draft",
+  "text": "20261028_mw.md",
+  "cards": "20261028_mw.cards.json",
+  "sha256": "5f3c0d6c1e1a4b2f0e6b8c1d2a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4c5d",
+  "written_at": "2026-10-28T12:00:00",
+  "priorwork": "0.1.9",
+  "report": "/home/user/priorwork/reports/20261028_mw.md",
+  "zotero_collection": {
+    "key": "ABCD1234",
+    "name": "Minimum wages / Survey"
+  },
+  "citations": [
+    {
+      "key": "card1994",
+      "in_bib": true,
+      "doi": "10.1/card",
+      "title": "Minimum Wages and Employment",
+      "authors": [
+        "David Card",
+        "Alan B. Krueger"
+      ],
+      "year": 1994
+    },
+    {
+      "key": "PRIORWORK:10.1/neum",
+      "in_bib": false,
+      "doi": "10.1/neum",
+      "title": "Minimum Wages and Employment",
+      "authors": [
+        "David Neumark",
+        "William Wascher"
+      ],
+      "year": 2007
+    }
+  ]
+}

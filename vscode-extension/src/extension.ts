@@ -12,8 +12,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import {
-    CheckReport, CliError, DoctorReport, Entry, ExportReport, runJson, runText, SearchReport, Status, SurveySummary,
-    ZoteroCollections, ZoteroReport,
+    CheckReport, CliError, DoctorReport, Entry, ExportReport, OctavoRequest, runJson, runText, SearchReport, Status,
+    SurveySummary, ZoteroCollections, ZoteroReport,
 } from './cli';
 import { browseCollections } from './collections';
 import { Model } from './model';
@@ -23,7 +23,7 @@ import { Setup } from './setup';
 import { Node, SurveyTree } from './tree';
 
 /** エージェントに頼める仕事（文面は askAgent）。 */
-type AgentTask = 'survey' | 'auto' | 'search' | 'screen' | 'snowball' | 'fill' | 'write' | 'check' | 'audit';
+type AgentTask = 'survey' | 'auto' | 'search' | 'screen' | 'snowball' | 'fill' | 'write' | 'reread' | 'check' | 'audit';
 
 /** エージェントのチャットを開くコマンド（入っているものだけ出す）。 */
 const AGENT_CHATS: { command: string; label: string }[] = [
@@ -148,11 +148,14 @@ export function activate(context: vscode.ExtensionContext): void {
             screen: L.t('Screen the candidates of the survey "{0}" ({1}) with Priorwork against its criteria, recording a reason for each decision.', s.topic, s.name),
             snowball: L.t('Chase the citations of the included papers of the survey "{0}" ({1}) with Priorwork and screen the new candidates.', s.topic, s.name),
             fill: L.t('Fill in the paper cards of the survey "{0}" ({1}) with Priorwork: {2}. Write only what the abstract or the full text says, and update the evidence level.', s.topic, s.name, which),
-            write: s.purpose === 'advice'
+            write: s.purpose === 'complete'
+                ? L.t('Fill in my manuscript ({0}) from the survey "{1}" ({2}): map what each section lacks (the marks I left first: [cite], [@?], TODO(priorwork)), then write what to add and where, quoting the sentence it goes before or after, in the language of the manuscript. Fill in only what the literature backs, not the methods or the results. Cite only papers included in the survey, run ./priorwork check and export it with ./priorwork export {2} --draft. Do not rewrite the manuscript.', s.manuscript ?? '', s.topic, s.name)
+                : s.purpose === 'advice'
                 ? L.t('Write the advice on my manuscript ({0}) from the survey "{1}" ({2}): how it cites the literature (the direction of each citation), the literature it is missing, and comments on the argument, most important first. Cite only papers included in the survey, keep the literature apart from my own claims, and run ./priorwork check at the end. Do not rewrite the manuscript.', s.manuscript ?? '', s.topic, s.name)
                 : s.manuscript
                 ? L.t('Write the draft of the introduction, literature review and theory and hypotheses of my manuscript ({0}) from the survey "{1}" ({2}), in the language of the manuscript. Cite only papers included in the survey, show where the literature disagrees with my results, run ./priorwork check and export the draft with ./priorwork export {2} --draft.', s.manuscript, s.topic, s.name)
                 : L.t('Write the text of the report of the survey "{0}" ({1}) from the paper cards: the background, the sections on the literature (theories, methods, debates, gaps), citing included papers for each claim, and the hypotheses of this study kept apart from the literature. Run ./priorwork check at the end.', s.topic, s.name),
+            reread: L.t('My manuscript ({0}) has changed since the survey "{1}" ({2}) read it. Read it again with ./priorwork read {0} --for {2}, tell me what changed, and update what it made stale (what to add, the draft or the advice; search more if new claims need literature). Do not rewrite the manuscript.', s.manuscript ?? '', s.topic, s.name),
             check: L.t('Check the survey "{0}" ({1}) with Priorwork, fix what it finds and export the report.', s.topic, s.name),
             audit: L.t('Audit the survey "{0}" ({1}) with Priorwork, written by another model: check every paper card against the full text, the direction of each citation in the text, that my hypotheses are not presented as the literature, and the excluded papers. Fix what is wrong and record the audit with ./priorwork audit.', s.topic, s.name),
         }[task];
@@ -179,7 +182,7 @@ export function activate(context: vscode.ExtensionContext): void {
         if (octavo) {
             // Octavo のプロジェクト（別のリポジトリ）の原稿は、写さずにその場で読む（.bib と分析の結果もそこにある）
             const rel = path.relative(r, file).split(path.sep).join('/');
-            await copyForAgent(L.t('My manuscript is in {0}, in an Octavo project. With Priorwork, read it (./priorwork read reads the project\'s results and the literature it cites too), then propose what to make from it and wait for my answer: what for (a draft of its introduction, literature review and theory and hypotheses, advice on it such as missing literature, the direction of its citations and the argument, or both as separate reports), which parts of the manuscript to cover, and the scope of the searches. Write drafts for Octavo (./priorwork export --draft --octavo). Do not rewrite the manuscript.', rel));
+            await copyForAgent(L.t('My manuscript is in {0}, in an Octavo project. With Priorwork, read it (./priorwork read reads the project\'s results and the literature it cites too), then propose what to make from it and wait for my answer: what for (filling in what it lacks, with what to add and where, the marks I left first; a draft of its introduction, literature review and theory and hypotheses; advice on it such as missing literature, the direction of its citations and the argument; or several as separate reports), which parts of the manuscript to cover, and the scope of the searches. Write for Octavo (./priorwork export --draft --octavo puts it in the project\'s inbox). Do not rewrite the manuscript.', rel));
             return;
         }
         if (path.relative(r, file).startsWith('..') || path.isAbsolute(path.relative(r, file))) {
@@ -200,7 +203,7 @@ export function activate(context: vscode.ExtensionContext): void {
             file = dest;
         }
         const rel = path.relative(r, file).split(path.sep).join('/');
-        await copyForAgent(L.t('My manuscript is in {0}. With Priorwork, read it, then propose what to make from it and wait for my answer: what for (a draft of its introduction, literature review and theory and hypotheses, advice on it such as missing literature, the direction of its citations and the argument, or both as separate reports), which parts of the manuscript to cover, and the scope of the searches. Do not rewrite the manuscript.', rel));
+        await copyForAgent(L.t('My manuscript is in {0}. With Priorwork, read it, then propose what to make from it and wait for my answer: what for (filling in what it lacks, with what to add and where, the marks I left first; a draft of its introduction, literature review and theory and hypotheses; advice on it such as missing literature, the direction of its citations and the argument; or several as separate reports), which parts of the manuscript to cover, and the scope of the searches. Do not rewrite the manuscript.', rel));
     }
 
     /**
@@ -285,10 +288,20 @@ export function activate(context: vscode.ExtensionContext): void {
         if (got.missing.length) {
             const copy = L.t('Copy the DOIs');
             if (await vscode.window.showWarningMessage(
-                L.t('{0} papers are not in the .bib of {1}, so they are written as [@PRIORWORK:…]. Add them to its Zotero collection, run octavo bib pull, then export again.',
+                L.t('{0} papers are not in the .bib of {1}, so they are written as [@PRIORWORK:<DOI>]. Add them to its Zotero collection, then run octavo bib pull and octavo priorwork resolve there to replace them by their keys.',
                     got.missing.length, project.name), copy) === copy) {
                 await vscode.env.clipboard.writeText(got.missing.map((m) => m.doi).filter(Boolean).join('\n'));
             }
+        }
+        // 原稿への取り込みは Octavo の側（別のウィンドウ）でする。そのエージェントへの依頼文を渡す
+        const request = L.t('Copy the Request for Octavo');
+        if (await vscode.window.showInformationMessage(
+            L.t('Priorwork: put the text in the inbox of the Octavo project {0} (literature/priorwork/). Priorwork does not change the manuscript; ask the agent in the Octavo project to work it in.', project.name),
+            request) === request) {
+            const rel = got.path.startsWith(project.root) ? got.path.slice(project.root.length).replace(/^[\\/]/, '') : got.path;
+            await vscode.env.clipboard.writeText(L.t('Priorwork has put text for my manuscript in {0} (the .json next to it says what it is and which papers it cites). Read it with the manuscript, propose where and how to work it in, and wait for my answer before changing the manuscript. Keep its citations ([@key]); [@PRIORWORK:…] marks papers not in the .bib yet.', rel));
+            void vscode.window.showInformationMessage(
+                L.t('Copied a request for Octavo. Paste it into your agent\'s chat in the window of the Octavo project.'));
         }
     }
 
@@ -335,7 +348,6 @@ export function activate(context: vscode.ExtensionContext): void {
         }
     }
 
-    /** Zotero に無い採用論文。DOI をまとめてコピーし（Zotero の「識別子でアイテムを追加」に貼れる）、読み直す。 */
     /**
      * 標準の進め方で、カードの記入の前に止まっているとき。採用論文を Zotero に集め（PDF も）、
      * それからエージェントに続きを頼む（本文で確かめたカードが増える）。
@@ -343,11 +355,21 @@ export function activate(context: vscode.ExtensionContext): void {
     async function beforeCards(s: SurveySummary): Promise<void> {
         const L = vscode.l10n;
         const copy = L.t('Copy the DOIs');
+        const add = L.t('Add to Zotero…');
         const goOn = L.t('Ask the Agent to Go On');
         for (;;) {
+            // 設定で許されていれば、Priorwork が採用論文を結び付けたコレクションに入れられる（入れる前に見せて確かめる）
+            const d = await model.detail(s.name).catch(() => undefined);
+            const collection = d?.zotero_write ? d.zotero_collection?.name : undefined;
             const picked = await vscode.window.showInformationMessage(
-                L.t('The agent stops here so that you can collect the included papers of "{0}" and their PDFs in Zotero: the cards are then read from the full texts. Copy the DOIs, paste them into Zotero\'s "Add Item by Identifier" (the magic wand), then ask the agent to go on.', s.topic),
-                copy, goOn);
+                collection
+                    ? L.t('The agent stops here so that you can collect the included papers of "{0}" and their PDFs in Zotero: the cards are then read from the full texts. Priorwork can add the papers to the collection "{1}"; then get their PDFs in Zotero and ask the agent to go on.', s.topic, collection)
+                    : L.t('The agent stops here so that you can collect the included papers of "{0}" and their PDFs in Zotero: the cards are then read from the full texts. Copy the DOIs, paste them into Zotero\'s "Add Item by Identifier" (the magic wand), then ask the agent to go on.', s.topic),
+                ...(collection ? [add] : [copy]), goOn);
+            if (picked === add) {
+                await zoteroAdd(s);
+                continue;
+            }
             if (picked === copy) {
                 try {
                     const dois = (await runText(model.root, ['zotero', s.name, '--dois'])).trim();
@@ -367,37 +389,59 @@ export function activate(context: vscode.ExtensionContext): void {
         }
     }
 
+    /**
+     * Zotero に無い採用論文。設定で許されていれば Priorwork がコレクションに入れ、そうでなければ DOI をまとめて
+     * コピーする（Zotero の「識別子でアイテムを追加」に貼れる）。それから読み直す。
+     */
     async function zoteroMissing(s: SurveySummary): Promise<void> {
         const L = vscode.l10n;
         const reload = L.t('Reload from Zotero');
         const link = L.t('Link a collection…');
         let collection = '';
+        let canWrite = false;
+        let written = 0;
         const missing = async (): Promise<Entry[]> => {
             const d = await model.detail(s.name);
             collection = d.zotero_collection?.name ?? '';
+            canWrite = !!d.zotero_write && !!collection;
+            written = d.zotero_written ?? 0;
             const numbers = new Set(d.zotero_missing);
             return (await model.papers(s.name)).filter((e) => numbers.has(e.number));
         };
         let entries = await missing();
         for (;;) {
+            const undo = L.t('Undo What Priorwork Added…');
             if (!entries.length) {
-                void vscode.window.showInformationMessage(L.t('Priorwork: all included papers are in Zotero.'));
+                const picked = await vscode.window.showInformationMessage(L.t('Priorwork: all included papers are in Zotero.'),
+                    ...(written ? [undo] : []));
+                if (picked === undo) {
+                    await zoteroUndo(s);
+                }
                 return;
             }
             const dois = entries.filter((e) => e.record.doi).map((e) => e.record.doi as string);
             const noDoi = entries.filter((e) => !e.record.doi).map((e) => `#${e.number}`);
             const copy = L.t('Copy the DOIs');
+            const add = L.t('Add to Zotero…');
             const picked = await vscode.window.showInformationMessage(
                 (collection
                     ? L.t('{0} included papers are not in the Zotero collection "{1}": {2}.', entries.length, collection,
                           entries.map((e) => `#${e.number}`).join(', '))
                     : L.t('{0} included papers are not in Zotero: {1}.', entries.length, entries.map((e) => `#${e.number}`).join(', ')))
-                + ' ' + L.t('Copy their DOIs, paste them into Zotero\'s "Add Item by Identifier" (the magic wand), then reload.')
-                + (collection ? ' ' + L.t('Select the collection in Zotero first, so that they go into it.') : '')
-                + (noDoi.length ? ' ' + L.t('Add these by hand (no DOI): {0}.', noDoi.join(', ')) : ''),
-                ...(dois.length ? [copy] : []), reload, ...(collection ? [] : [link]));
+                + ' ' + (canWrite
+                    ? L.t('Priorwork can add them to the collection (you see the list first, and can undo it).')
+                    : L.t('Copy their DOIs, paste them into Zotero\'s "Add Item by Identifier" (the magic wand), then reload.')
+                      + (collection ? ' ' + L.t('Select the collection in Zotero first, so that they go into it.') : '')
+                      + (noDoi.length ? ' ' + L.t('Add these by hand (no DOI): {0}.', noDoi.join(', ')) : '')),
+                ...(canWrite ? [add] : dois.length ? [copy] : []), reload, ...(collection ? [] : [link]),
+                ...(written ? [undo] : []));
             if (picked === link) {
                 return zoteroCollection(s);
+            }
+            if (picked === add || picked === undo) {
+                await (picked === add ? zoteroAdd(s) : zoteroUndo(s));
+                entries = await missing();
+                continue;
             }
             if (picked === copy) {
                 await vscode.env.clipboard.writeText(dois.join('\n'));
@@ -420,9 +464,81 @@ export function activate(context: vscode.ExtensionContext): void {
         }
     }
 
-    /** Zotero のコレクションをサーベイに結び付ける。Zotero には書き込まない（コレクションを作るのはユーザー）。 */
     /**
-     * サーベイに Zotero のコレクションを結び付ける。Priorwork は Zotero に書き込まないので、コレクションは Zotero で
+     * 採用論文を、サーベイに結び付けた Zotero のコレクションに入れる（設定の ZOTERO_WRITE で許されているときだけ）。
+     * 先に入れるものを見せて確かめる。入れたら、PDF は Zotero でそろえてもらう。
+     */
+    async function zoteroAdd(s: SurveySummary): Promise<void> {
+        const L = vscode.l10n;
+        let plan: ZoteroReport;
+        try {
+            plan = await busy(L.t('checking what goes into Zotero'),
+                (o) => runJson<ZoteroReport>(model.root, ['zotero', s.name, '--add', '--dry-run', '--json'], o));
+        } catch (e) {
+            fail(e);
+            return;
+        }
+        const name = plan.collection?.name ?? '';
+        const items = plan.written ?? [];
+        if (!items.length) {
+            void vscode.window.showInformationMessage(L.t('Priorwork: all included papers are in the Zotero collection "{0}".', name));
+            return;
+        }
+        const add = L.t('Add to Zotero');
+        const picked = await vscode.window.showInformationMessage(
+            L.t('Add {0} papers to the Zotero collection "{1}"?', items.length, name),
+            { modal: true,
+              detail: items.map((w) => `#${w.number} ${w.action === 'create' ? L.t('(new item)') : L.t('(already in the library)')} ${w.title}`).join('\n')
+                  + '\n\n' + L.t('Priorwork only adds them to the collection: it does not change or delete your items, and can undo what it added.') },
+            add);
+        if (picked !== add) {
+            return;
+        }
+        let r: ZoteroReport;
+        try {
+            r = await busy(L.t('adding the papers to Zotero'),
+                (o) => runJson<ZoteroReport>(model.root, ['zotero', s.name, '--add', '--json'], o));
+        } catch (e) {
+            fail(e);
+            return;
+        }
+        model.refresh();
+        const done = (r.written ?? []).filter((w) => w.done);
+        const failed = (r.written ?? []).filter((w) => !w.done);
+        void vscode.window.showInformationMessage(
+            L.t('Priorwork: added {0} papers to the Zotero collection "{1}". Get their PDFs in Zotero (select them, right-click → Find Full Text).', done.length, name)
+            + (failed.length ? ' ' + L.t('Not added: {0}.', failed.map((w) => `#${w.number} (${w.error ?? ''})`).join(', ')) : ''));
+    }
+
+    /** Priorwork が Zotero に書いたものを戻す。作ったアイテムは、手が入っていなければごみ箱へ。 */
+    async function zoteroUndo(s: SurveySummary): Promise<void> {
+        const L = vscode.l10n;
+        const undo = L.t('Undo');
+        const picked = await vscode.window.showWarningMessage(
+            L.t('Take back what Priorwork added to Zotero for "{0}"?', s.topic),
+            { modal: true, detail: L.t('Items Priorwork made go to the Zotero trash, unless you changed them or attached files since. Items that were already in your library only leave the collection.') },
+            undo);
+        if (picked !== undo) {
+            return;
+        }
+        try {
+            const r = await busy(L.t('undoing the changes in Zotero'),
+                (o) => runJson<ZoteroReport>(model.root, ['zotero', s.name, '--undo', '--json'], o));
+            model.refresh();
+            const w = r.written ?? [];
+            const kept = w.filter((x) => x.undo === 'keep').map((x) => `#${x.number}`);
+            const failed = w.filter((x) => !x.done).map((x) => `#${x.number} (${x.error ?? ''})`);
+            void vscode.window.showInformationMessage(
+                L.t('Priorwork: undid {0} changes in Zotero.', w.filter((x) => x.done && x.undo !== 'keep').length)
+                + (kept.length ? ' ' + L.t('Kept, because they were changed in Zotero since: {0}.', kept.join(', ')) : '')
+                + (failed.length ? ' ' + L.t('Failed: {0}.', failed.join(', ')) : ''));
+        } catch (e) {
+            fail(e);
+        }
+    }
+
+    /**
+     * サーベイに Zotero のコレクションを結び付ける。Priorwork はコレクションを作らないので、コレクションは Zotero で
      * 作ってもらい、ここで読み直す。原稿が Octavo のプロジェクトにあれば、Octavo が .bib を取るコレクションを先頭に出す
      * （同じコレクションに集めれば、Octavo の参考文献にもなる）。
      */
@@ -466,7 +582,7 @@ export function activate(context: vscode.ExtensionContext): void {
             if (r.kind === 'howto') {
                 const reload = L.t('Reload the list');
                 const again = await vscode.window.showInformationMessage(
-                    L.t('Priorwork never writes to Zotero, so make the collection there: in Zotero, right-click "My Library" (or a collection) → New Collection… and name it{0}. Then come back and reload the list.',
+                    L.t('Priorwork does not make collections, so make it in Zotero: right-click "My Library" (or a collection) → New Collection… and name it{0}. Then come back and reload the list.',
                         octavoNames.length ? ' ' + L.t('"{0}" (the name the Octavo project uses)', octavoNames[0]) : ''),
                     { modal: false }, reload);
                 if (again !== reload) {
@@ -705,7 +821,9 @@ export function activate(context: vscode.ExtensionContext): void {
                     { label: L.t('Screen the candidates'), description: L.t('decisions with reasons'), task: 'screen' },
                     { label: L.t('Chase citations'), description: L.t('snowball, then screening'), task: 'snowball' },
                     { label: L.t('Fill in the paper cards'), description: L.t('from the abstracts or full texts'), task: 'fill' },
-                    s.purpose === 'advice'
+                    s.purpose === 'complete'
+                        ? { label: L.t('Fill in the manuscript'), description: L.t('what it lacks, and where to add it'), task: 'write' }
+                        : s.purpose === 'advice'
                         ? { label: L.t('Write the advice on the manuscript'), description: L.t('citations, missing literature, the argument'), task: 'write' }
                         : s.manuscript
                         ? { label: L.t('Write the draft of the manuscript'), description: L.t('introduction, literature review, hypotheses'), task: 'write' }
@@ -733,7 +851,7 @@ export function activate(context: vscode.ExtensionContext): void {
             const L = vscode.l10n;
             const how = await vscode.window.showQuickPick([
                 { label: L.t('Ask your agent to do it'), detail: L.t('Recommended. Give the topic; the agent sets the scope, searches, screens, fills in the cards and writes the report.'), agent: true },
-                { label: L.t('Start from my manuscript'), detail: L.t('Any format (Markdown, Quarto HTML, Word, PDF). The agent proposes what to make with you: a draft of its introduction, literature review and hypotheses, advice on it, or both.'), agent: true, manuscript: true },
+                { label: L.t('Start from my manuscript'), detail: L.t('Any format (Markdown, Quarto HTML, Word, PDF), finished or not. The agent proposes what to make with you: what to add where it lacks something (leave [cite] or TODO(priorwork): … where you want help), a draft of its introduction, literature review and hypotheses, or advice on it.'), agent: true, manuscript: true },
                 { label: L.t('Set it up myself'), detail: L.t('Give the topic, slug, depth and question, then search and screen in the sidebar.'), agent: false },
             ], { title: L.t('New survey'), placeHolder: L.t('How do you want to make it?') });
             if (!how) {
@@ -769,6 +887,14 @@ export function activate(context: vscode.ExtensionContext): void {
                 if (!mode) {
                     return;
                 }
+                const notes = await vscode.window.showInputBox({
+                    title: L.t('New survey'),
+                    prompt: L.t('Anything else for the agent? (optional) E.g. the research question, inclusion criteria, years, fields or papers to start from. Press Enter to skip.'),
+                    placeHolder: L.t('e.g. Since 2000, field experiments only; start from Card and Krueger (1994)'),
+                });
+                if (notes === undefined) {
+                    return;
+                }
                 const what = deep.label === 'full' || deep.label === 'quick'
                     ? L.t('Make a literature survey with Priorwork (depth: {0}) on: {1}.', deep.label, about.trim())
                     : L.t('Make a literature survey with Priorwork on: {0}. Choose the depth yourself.', about.trim());
@@ -777,7 +903,7 @@ export function activate(context: vscode.ExtensionContext): void {
                     auto: L.t('Go in full auto: set the scope yourself, then search, screen, chase citations, fill in the cards, write the text, check and export without stopping, and report at the end.'),
                     manual: L.t('Go step by step: stop after each step (scope, searches, screening, citations, cards, text, check) and wait for me.'),
                 }[mode.mode];
-                await copyForAgent(`${what} ${how}`);
+                await copyForAgent(`${what} ${how}${notes.trim() ? ' ' + L.t('Notes from me: {0}', notes.trim()) : ''}`);
                 return;
             }
             const topic = await vscode.window.showInputBox({
@@ -953,6 +1079,7 @@ export function activate(context: vscode.ExtensionContext): void {
                     (o) => runJson(model.root, ['add', s.name, ...list, ...how.args], o));
                 model.refresh();
             } catch (e) {
+                model.refresh();        // 途中で止まっても、それまでに登録した論文は保存されている
                 fail(e);
             }
         },
@@ -1014,6 +1141,32 @@ export function activate(context: vscode.ExtensionContext): void {
             }
         },
 
+        'priorwork.openRequest': async (arg?: unknown) => {
+            // Octavo からの依頼: エージェントに頼む（短い依頼文。中身は ./priorwork requests で読む）か、断る
+            const r = arg as OctavoRequest | undefined;
+            if (!r?.id) {
+                return;
+            }
+            const L = vscode.l10n;
+            const ask = L.t('Ask the Agent to Carry It Out');
+            const decline = L.t('Decline…');
+            const picked = await vscode.window.showInformationMessage(
+                L.t('A request from Octavo ({0}):', r.project ?? ''), { modal: true, detail: r.text ?? '' }, ask, decline);
+            if (picked === ask) {
+                await copyForAgent(L.t('Carry out the request {0} from Octavo with Priorwork: read it with ./priorwork requests {0}, follow it, and when it is done record it with ./priorwork requests {0} --done --survey <survey>.', r.id));
+            } else if (picked === decline) {
+                const note = await vscode.window.showInputBox({ prompt: L.t('Why (shown to Octavo)'), ignoreFocusOut: true });
+                if (note === undefined) {
+                    return;
+                }
+                try {
+                    await runJson(model.root, ['requests', r.id, '--decline', '--note', note, '--json']);
+                } catch (e) {
+                    fail(e);
+                }
+                model.refresh();
+            }
+        },
         'priorwork.openReport': async (arg?: unknown) => {
             const s = await surveyOf(arg);
             if (s) {
@@ -1260,7 +1413,10 @@ export function activate(context: vscode.ExtensionContext): void {
                     return vscode.commands.executeCommand('priorwork.askAgent', { name: s.name, task: 'write' });
                 case 'zotero': return zoteroMissing(s);
                 case 'wait_zotero': return beforeCards(s);
+                case 'manuscript_changed':
+                    return vscode.commands.executeCommand('priorwork.askAgent', { name: s.name, task: 'reread' });
                 case 'advice':
+                case 'complete':
                     return vscode.commands.executeCommand('priorwork.askAgent', { name: s.name, task: 'write' });
                 case 'audit':
                     return vscode.commands.executeCommand('priorwork.askAgent', { name: s.name, task: 'audit' });

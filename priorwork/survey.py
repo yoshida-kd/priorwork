@@ -40,7 +40,10 @@ DEFAULT_DEPTH = "full"
 MODES = ("standard", "auto", "manual")
 DEFAULT_MODE = "standard"
 # 原稿から始めるサーベイの目的。draft: 原稿の 1〜3 章の下書き。advice: 出来上がった原稿への助言
-PURPOSES = ("draft", "advice")
+# 原稿から始めるサーベイの目的。draft は目的を持たない古いサーベイの既定でもある（並びの先頭）。
+# 新しいサーベイの既定は complete（書きかけの原稿の欠けを補う。draft・advice はその特別な場合）
+PURPOSES = ("draft", "advice", "complete")
+DEFAULT_PURPOSE = "complete"
 # 検索で残す分野。social: S2 の分野が社会科学に無い論文（医学・計算機科学など）を落とす。
 # 分野の付いていない論文は残す。search_field を持たない既存サーベイは all
 SEARCH_FIELDS = {"social": "social sciences only (papers with no field are kept)", "all": "all fields"}
@@ -136,8 +139,13 @@ def off_field(record: Dict[str, Any]) -> bool:
     return record.get("source") == "SemanticScholar" and bool(fields) and not fields & SOCIAL_FIELDS
 
 
+# 姓の中のハイフン（Fernández‐i‐Marín の U+2010 など）。ASCII の - にそろえる（落とすと
+# 「fernandezimarin」になり、本文の「Fernandez-i-Marin」と照合できない）
+HYPHENS = str.maketrans({c: "-" for c in "\u2010\u2011\ufe63\uff0d"})
+
+
 def ascii_fold(text: str) -> str:
-    return unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
+    return unicodedata.normalize("NFKD", text.translate(HYPHENS)).encode("ascii", "ignore").decode("ascii")
 
 
 _NAME_SUFFIXES = {"jr", "sr", "ii", "iii", "iv"}
@@ -280,7 +288,7 @@ class Survey:
         if purpose and purpose not in PURPOSES:
             raise SurveyError(t("the purpose is one of {choices}: {purpose}", choices=" / ".join(PURPOSES),
                                 purpose=purpose))
-        purpose = (purpose or PURPOSES[0]) if manuscript else None
+        purpose = (purpose or DEFAULT_PURPOSE) if manuscript else None
         template = template or template_path(lang, manuscript=bool(manuscript), purpose=purpose)
         slug = sanitize_slug(slug) or "survey"
         # やり直し（同じ slug がある）なら版を振る: 20261012_v2_<slug>。日付の直後に置き、一覧で版が見えるようにする
@@ -308,6 +316,8 @@ class Survey:
             data["manuscript"] = manuscript_ref(manuscript, reports_dir.parent)
             data["purpose"] = purpose
         survey = cls(md_path, data, json_path)
+        if manuscript:
+            survey.note_manuscript_read()
         values = {"topic": topic, "topic_yaml": topic.replace("\\", "\\\\").replace('"', '\\"'),
                   "date": today.isoformat()}
         text = template.read_text(encoding="utf-8")
@@ -516,6 +526,18 @@ class Survey:
             self.data.pop("zotero_collection", None)
 
     @property
+    def zotero_written(self) -> List[Dict[str, Any]]:
+        """Priorwork が Zotero に書いたもの（`zotero --add`）。`--undo` はこれだけを戻す（キーは任意）。
+        number・key・action（create: 作った / collect: コレクションに足した）・collection・version・at。"""
+        return self.data.get("zotero_written") or []
+
+    def set_zotero_written(self, written: List[Dict[str, Any]]):
+        if written:
+            self.data["zotero_written"] = written
+        else:
+            self.data.pop("zotero_written", None)
+
+    @property
     def root(self) -> Path:
         """ワークスペースの根（reports/ の親）。"""
         return self.md_path.parent.parent
@@ -527,7 +549,7 @@ class Survey:
 
     @property
     def purpose(self) -> str:
-        """原稿から始めるサーベイの目的（draft / advice）。原稿が無ければ空。purpose を持たないものは draft。"""
+        """原稿から始めるサーベイの目的（draft / advice / complete）。原稿が無ければ空。purpose を持たないものは draft。"""
         return (self.data.get("purpose") or PURPOSES[0]) if self.manuscript else ""
 
     @property
@@ -579,6 +601,31 @@ class Survey:
     def set_manuscript(self, path: str):
         """原稿を結び付ける（キーは任意。無い状態ファイルもそのまま読める）。"""
         self.data["manuscript"] = manuscript_ref(path, self.root)
+        self.note_manuscript_read()
+
+    @property
+    def manuscript_read(self) -> Dict[str, str]:
+        """原稿を読んだときの指紋と日時（{sha256, at}。キーは任意。古い状態ファイルには無い）。"""
+        return self.data.get("manuscript_read") or {}
+
+    def note_manuscript_read(self):
+        """今の原稿を読んだと記録する（`new --manuscript`・`read --for`）。"""
+        from .manuscript import ManuscriptError, fingerprint
+        try:
+            self.data["manuscript_read"] = {"sha256": fingerprint(self.root / self.manuscript), "at": now_iso()}
+        except (ManuscriptError, OSError):
+            pass
+
+    def manuscript_changed(self) -> bool:
+        """読んだ後に原稿が変わったか（記録が無い・原稿が見つからないときは False）。"""
+        seen = self.manuscript_read.get("sha256")
+        if not (self.manuscript and seen):
+            return False
+        from .manuscript import ManuscriptError, fingerprint
+        try:
+            return fingerprint(self.root / self.manuscript) != seen
+        except (ManuscriptError, OSError):
+            return False
 
     @property
     def card_spec(self) -> List[Tuple[str, str]]:

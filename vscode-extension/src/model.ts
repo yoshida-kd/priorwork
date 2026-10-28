@@ -33,7 +33,7 @@ export class Model implements vscode.Disposable {
 
     constructor(private readonly log: (s: string) => void) {
         this.root = findRoot();
-        const watcher = vscode.workspace.createFileSystemWatcher('**/.priorwork/{surveys/*.json,config.json}');
+        const watcher = vscode.workspace.createFileSystemWatcher('**/.priorwork/{surveys/*.json,config.json,requests/*.json}');
         // カードはレポートに書かれるので、エージェントがレポートを直したときも読み直す
         const reports = vscode.workspace.createFileSystemWatcher('**/reports/*.md', true, false, true);
         const soon = (): void => this.refreshSoon();

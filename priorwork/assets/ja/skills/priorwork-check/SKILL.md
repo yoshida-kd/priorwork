@@ -37,7 +37,7 @@ description: >-
    | カードがレポートの言語でない | レポートの言語で書き直す（用語の原語は括弧内に残す） |
    | まとめの節が論文を引いていない | 採用論文に基づいて書き直し、著者 (年) で引く。本研究の考えなら「本研究の仮説と示唆」に移す |
    | 本文の採用数が実際と違う | 本数を書いた文を消す（付録の記録にある） |
-   | Zotero にない採用論文 | `./priorwork zotero <survey> --dois` の DOI をそのまま報告で示す（本文を取得できた論文も除かない） |
+   | Zotero にない採用論文 | Priorwork が書き込めれば（次にやることが `zotero <survey> --add`）、進め方に従って `--add` で入れる（全自動はそのまま、標準・手動は `--dry-run` を示して了解を得てから）。そうでなければ `./priorwork zotero <survey> --dois` の DOI をそのまま報告で示す（本文を取得できた論文も除かない） |
    | サーベイと Octavo のプロジェクトで Zotero のコレクションが違う | どちらに合わせるかをユーザーに聞く。サーベイ側は `./priorwork zotero <survey> --collection "<名前>"`、Octavo 側はユーザーが `octavo config set zotero_collection "<名前>"` |
    | 下書きが Octavo の .bib に無い論文を引いている | その DOI を報告で示し、Zotero のコレクションに入れて `octavo bib pull` してから `export --draft --octavo` し直すよう伝える |
    | Markdown が状態ファイルと一致しない | `./priorwork render <survey>` |
