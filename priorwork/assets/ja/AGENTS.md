@@ -189,7 +189,7 @@ Zotero に書き込むのは、ユーザーが設定で許したとき（`.env` 
 ./priorwork new "<テーマ>" --slug <slug> --by "<モデル名>" [--mode standard|auto|manual] [--depth quick|full] [--manuscript PATH [--purpose draft|advice]] [--question ... --years ... --fields ... --inclusion ... --exclusion ...]
 ./priorwork scope SURVEY [--question ...] [--mode standard|auto|manual] [--go-on] [--depth quick|full] [--search-field social|all] [--manuscript PATH] [--by "<モデル名>"]
 ./priorwork archive SURVEY [--undo]  # 一覧から隠す（ファイルは残る）。アーカイブの一覧は status --archived
-./priorwork search "<English query>" [--into SURVEY] [--bulk] [--sort citations|relevance|recent|cpy] [--year 2010-2024] [--ssci-only] [--field social|all] [--limit N]
+./priorwork search "<English query>" [--into SURVEY] [--bulk] [--sort citations|relevance|recent|cpy] [--year 2010-2024] [--journal "<full journal name>" ...] [--ssci-only] [--field social|all] [--limit N]
 ./priorwork list SURVEY [--status candidate maybe included excluded] [--abstract]
 ./priorwork include SURVEY N... --reason "..."   ./priorwork exclude SURVEY N... --reason "..."   ./priorwork maybe SURVEY N... --reason "..."   ./priorwork reset SURVEY N...
 ./priorwork add SURVEY <DOI>... [--candidate]      ./priorwork add SURVEY --cited   # 原稿が引いている論文（.bib の DOI）を登録
@@ -216,3 +216,5 @@ Zotero に書き込むのは、ユーザーが設定で許したとき（`.env` 
 ```
 
 `SURVEY` は `20260917_minimum_wage_employment` のようなファイル名（拡張子なし）か、slug（`minimum_wage_employment`）で指定する。やり直した版があるときは `v2_minimum_wage_employment` のように版を付けるか、ファイル名で指定する。
+
+コマンドやオプションが何をするかは、推測せずに調べる: `./priorwork docs` でこのエンジンに同梱のリファレンスの節の一覧、`./priorwork docs zotero` で1つの節、`./priorwork docs --search snowball` で言葉を探せる。

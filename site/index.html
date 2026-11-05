@@ -37,6 +37,7 @@
     <nav>
       <a href="#install">Install</a>
       <a href="guide/">Guide</a>
+      <a href="reference/">Reference</a>
       <a href="https://github.com/yoshida-kd/priorwork">GitHub</a>
       <a href="ja/" hreflang="ja" lang="ja" data-lang="ja">日本語</a>
     </nav>
@@ -48,15 +49,22 @@
   <div class="wrap">
     <h1>Priorwork</h1>
     <p class="tagline">Hand your review of the prior work to an AI agent — then check it</p>
-    <p class="lead">Tell your agent (Claude Code, Antigravity, …) the topic. It sets the scope, searches Semantic Scholar and OpenAlex, screens with a reason for every decision, chases citations, fills in a card for each paper, writes the review and checks every citation. You read the result and overturn or correct anything from the VS Code sidebar — no terminal, no commands to learn.</p>
+    <p class="lead">For the social sciences. Ask in plain words; check and correct in VS Code.</p>
     <div class="actions">
       <a class="button primary" href="https://marketplace.visualstudio.com/items?itemName=yoshida-kd.priorwork">Get the VS Code extension</a>
-      <a class="button secondary" href="guide/">Read the guide</a>
+      <a class="button secondary" href="quickstart/">Quick guide</a>
     </div>
   </div>
 </div>
 
-<section class="alt">
+<section id="install" class="install alt">
+  <div class="wrap">
+    <h2>Install</h2>
+    <p>Install the <a href="https://marketplace.visualstudio.com/items?itemName=yoshida-kd.priorwork">VS Code extension</a> and press <strong>Create a Workspace</strong> in its sidebar. That's all: Python is set up for you (without administrator rights). You need an AI agent that works in VS Code (Claude Code, Antigravity, …); Linux and macOS, or WSL on Windows.</p>
+  </div>
+</section>
+
+<section>
   <div class="wrap">
     <h2>What the agent does, without stopping</h2>
     <ol class="chapters">
@@ -71,7 +79,7 @@
   </div>
 </section>
 
-<section>
+<section class="alt">
   <div class="wrap">
     <h2>What it does</h2>
     <div class="features">
@@ -103,46 +111,7 @@
   </div>
 </section>
 
-<section id="install" class="alt">
-  <div class="wrap two">
-    <div>
-      <h2>Install</h2>
-      <p>Install the <a href="https://marketplace.visualstudio.com/items?itemName=yoshida-kd.priorwork">Priorwork extension</a> in VS Code and press <strong>Create a Workspace</strong> in its sidebar. Nothing else is needed to start: it uses Python 3.10 or later if you have it, and otherwise installs uv, which downloads Python (into your home folder, without administrator rights).</p>
-      <p>Linux and macOS; on Windows, inside WSL. And an AI agent that works in VS Code (Claude Code, Antigravity, …).</p>
-    </div>
-    <div>
-      <h2>From a terminal</h2>
-      <p>The same engine is a command, for agents and scripts:</p>
-<pre><code>python3 -m venv .venv
-.venv/bin/pip install priorwork
-.venv/bin/priorwork init --lang en
-./priorwork settings
-./priorwork new "minimum wages and employment" --slug minimum_wage</code></pre>
-    </div>
-  </div>
-</section>
 
-<section>
-  <div class="wrap">
-    <h2>Documentation</h2>
-    <p><a href="guide/">The guide</a> covers everything.</p>
-    <ol class="chapters">
-      <li><a href="guide/#1-introduction">Introduction</a> <span>— what it does, what you need</span></li>
-      <li><a href="guide/#2-install">Install</a> <span>— VS Code, WSL, servers over SSH</span></li>
-      <li><a href="guide/#3-create-a-workspace">Create a workspace</a> <span>— settings, GitHub, another machine</span></li>
-      <li><a href="guide/#4-hand-it-to-the-agent">Hand it to the agent</a> <span>— ask, view the report, check and correct, Zotero</span></li>
-      <li><a href="guide/#5-doing-it-yourself">Doing it yourself</a> <span>— search and screen from the sidebar</span></li>
-      <li><a href="guide/#6-paper-cards">Paper cards</a> <span>— fields, evidence levels, full texts</span></li>
-      <li><a href="guide/#7-checks">Checks</a></li>
-      <li><a href="guide/#8-settings">Settings</a> <span>— API keys, Zotero, the SSCI list</span></li>
-      <li><a href="guide/#9-instructions-for-the-agent">Instructions for the agent</a></li>
-      <li><a href="guide/#10-inside-a-workspace">Inside a workspace</a></li>
-      <li><a href="guide/#11-updating-the-engine">Updating the engine</a></li>
-      <li><a href="guide/#12-on-the-command-line">On the command line</a></li>
-      <li><a href="guide/#13-troubleshooting">Troubleshooting</a></li>
-    </ol>
-  </div>
-</section>
 </main>
 
 <footer>

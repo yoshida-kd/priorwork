@@ -23,6 +23,10 @@ MESSAGES = {
     "all fields": "すべての分野",
     "Fields searched": "検索の分野",
     "the search field is one of {choices}: {field}": "検索の分野は {choices} のいずれかです: {field}",
+    "Left out {n|# paper|# papers} in other journals (e.g. {example}). Give each journal's full name, as the journal writes it":
+        "ほかの誌の論文 {n} 件を除きました（{example} など）。誌名は、誌が名乗る正式な名前で指定してください",
+    "only papers in this journal (its full name; repeat for several)":
+        "この誌の論文だけ（正式な誌名。複数なら繰り返す）",
     "Left out {n|# paper|# papers} outside the social sciences (e.g. {example}). To keep them, add --field all":
         "社会科学の外の論文 {n} 件を除きました（{example} など）。残すなら --field all を付けてください",
     "social: leave out papers outside the social sciences / all (default: the survey's setting; all without --into)":
@@ -1001,4 +1005,17 @@ MESSAGES = {
     "requests from Octavo": "Octavo からの依頼",
     "with --done: the survey that carried it out": "--done と一緒に: 依頼を進めたサーベイ",
     "{n|# request|# requests} from Octavo waiting: `priorwork requests`": "Octavo からの依頼が {n} 件あります: `priorwork requests`",
+    "Reference": "リファレンス",
+    "  docs [SECTION]                 the reference for AI agents (--search WORD, --all)":
+        "  docs [SECTION]                 AI エージェント向けのリファレンス（--search 言葉、--all）",
+    "the reference for AI agents, section by section": "AI エージェント向けのリファレンスを節ごとに",
+    "a section number (5.2) or words from its heading": "節の番号（5.2）か、見出しの言葉",
+    "every section that mentions WORD": "WORD が出てくる節すべて",
+    "the whole reference": "リファレンス全体",
+    "the language (default: the display language)": "言語（既定は表示の言語）",
+    "the reference is not installed with this priorwork": "この priorwork にはリファレンスが入っていません",
+    "nothing in the reference mentions {word}": "リファレンスに {word} の出てくる所はありません",
+    "./priorwork docs <number or words> shows a section (./priorwork docs 5.2, ./priorwork docs zotero); --search WORD finds a word; --all prints everything":
+        "./priorwork docs <番号か言葉> で1つの節を表示します（./priorwork docs 5.2、./priorwork docs zotero）。--search 言葉 で探し、--all で全部を表示します",
+    "no section called {name}: ./priorwork docs lists them": "{name} という節はありません。./priorwork docs で一覧が出ます",
 }

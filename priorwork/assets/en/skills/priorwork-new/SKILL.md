@@ -48,6 +48,7 @@ For each subtopic, write 2–4 English queries and use both plain and `--bulk` s
 - Rerun a query that found nothing or almost nothing with fewer terms, synonyms, or without `--bulk`.
 - Ideas for terms: the concept in English and its synonyms, the names of the main theories (`"transaction cost"`, …), identification strategies (`"difference-in-differences"`), countries and regions.
 - Searches into a new survey leave out papers outside the social sciences (medicine or computer science only, say), judged by the S2 fields; papers with no field are kept. If the topic reaches into the natural sciences or engineering, set `./priorwork scope <survey> --search-field all`.
+- To stay within particular journals ("the major journals of the field"), add `--journal "<full name>"` for each, as the journal writes its name (e.g. `--journal "American Political Science Review" --journal "American Journal of Political Science"`). Papers in other journals are left out and the count is shown.
 - Abstracts missing from the databases are filled in from Crossref. Do not exclude a paper still without one on its title and journal alone: set it to maybe and check the full text.
 - If you know a well-known paper, you may register it directly with `./priorwork add <survey> <DOI>` (after checking it with `get`).
 

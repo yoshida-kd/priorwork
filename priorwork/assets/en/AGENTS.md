@@ -189,7 +189,7 @@ Write to Zotero only with `./priorwork zotero <survey> --add`, and only when the
 ./priorwork new "<topic>" --slug <slug> --by "<model>" [--mode standard|auto|manual] [--depth quick|full] [--manuscript PATH [--purpose draft|advice]] [--question ... --years ... --fields ... --inclusion ... --exclusion ...]
 ./priorwork scope SURVEY [--question ...] [--mode standard|auto|manual] [--go-on] [--depth quick|full] [--search-field social|all] [--manuscript PATH] [--by "<model>"]
 ./priorwork archive SURVEY [--undo]  # hide it from the list (the files stay); list the archived with status --archived
-./priorwork search "<English query>" [--into SURVEY] [--bulk] [--sort citations|relevance|recent|cpy] [--year 2010-2024] [--ssci-only] [--field social|all] [--limit N]
+./priorwork search "<English query>" [--into SURVEY] [--bulk] [--sort citations|relevance|recent|cpy] [--year 2010-2024] [--journal "<full journal name>" ...] [--ssci-only] [--field social|all] [--limit N]
 ./priorwork list SURVEY [--status candidate maybe included excluded] [--abstract]
 ./priorwork include SURVEY N... --reason "..."   ./priorwork exclude SURVEY N... --reason "..."   ./priorwork maybe SURVEY N... --reason "..."   ./priorwork reset SURVEY N...
 ./priorwork add SURVEY <DOI>... [--candidate]      ./priorwork add SURVEY --cited   # register the papers the manuscript cites (the DOIs in its .bib)
@@ -216,3 +216,5 @@ Write to Zotero only with `./priorwork zotero <survey> --add`, and only when the
 ```
 
 `SURVEY` is a file name without the extension, such as `20260917_minimum_wage_employment`, or the slug (`minimum_wage_employment`). When the survey was redone, add the version (`v2_minimum_wage_employment`) or use the file name.
+
+For what a command or option does, look it up rather than guessing: `./priorwork docs` lists the sections of the reference that comes with this engine, `./priorwork docs zotero` shows one, and `./priorwork docs --search snowball` finds a word.

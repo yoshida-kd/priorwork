@@ -323,3 +323,62 @@ def test_reading_never_writes_without_the_setting(tmp_path, monkeypatch):
                                     "publication_types": ["book-chapter"], "journal_name": "A Book"}, ["C1"]) == {
         "itemType": "bookSection", "title": "A chapter", "creators": [{"creatorType": "author", "name": "Plato"}],
         "date": "2001", "bookTitle": "A Book", "extra": "DOI: 10.1/c", "collections": ["C1"]}
+
+
+# ---------------- 誌で絞る ----------------
+
+class JournalClient(ManyClient):
+    """渡された誌を覚え、指定外の誌も1本まぜて返す（S2 の venue の揺れの代わり）。"""
+    got = []
+
+    def search(self, query, limit=20, year=None, bulk=False, journals=()):
+        JournalClient.got.append(list(journals))
+        out = []
+        for i, journal in enumerate(["American Political Science Review", "The American Political Science Review",
+                                     "American Political Science Review Supplement"]):
+            out.append(from_openalex(openalex_work(title=f"Paper {i} on representation", doi=f"10.1/j{i}",
+                                                   wid=f"WJ{i}", journal=journal)))
+        return out
+
+
+def test_journal_names_compare_loosely():
+    from priorwork.api import journal_key
+    assert journal_key("The Journal of Public Administration Research &amp; Theory") == \
+        journal_key("journal of public administration research and theory")
+    assert journal_key("Public Administration Review") != journal_key("Public Administration")
+
+
+def test_search_only_in_the_given_journals(ws, monkeypatch, capsys):  # noqa: F811
+    monkeypatch.setattr(cli, "LiteratureClient", JournalClient)
+    ws("new", "t", "--slug", "apsr", "--json")
+    capsys.readouterr()
+    cli.main(["search", "representation", "--into", "apsr", "--journal", "American Political Science Review",
+              "--journal", "Public Administration", "--json"])
+    out = capsys.readouterr()
+    assert JournalClient.got[-1] == ["American Political Science Review", "Public Administration"]
+    assert "Supplement" in out.err                       # 別の誌は除き、そう言う
+    assert sorted(e["record"]["doi"] for e in ws("list", "apsr", "--json")) == ["10.1/j0", "10.1/j1"]
+    from priorwork.survey import Survey
+    log = Survey.load("apsr").data["searches"][-1]["params"]
+    assert log["journals"] == "American Political Science Review; Public Administration"
+
+
+def test_without_journals_the_search_is_unchanged(ws, monkeypatch):  # noqa: F811
+    monkeypatch.setattr(cli, "LiteratureClient", ManyClient)       # journals を受け取らない検索のまま動く
+    ws("new", "t", "--slug", "plain", "--json")
+    assert ws("search", "a", "--into", "plain", "--limit", "3", "--json")["hits"] == 3
+
+
+def test_the_client_passes_journals_as_s2_venue(monkeypatch):
+    from priorwork.api import LiteratureClient
+    seen = {}
+
+    def fake_s2(self, path, params):
+        seen[path] = params
+        return {"data": []}
+    monkeypatch.setattr(LiteratureClient, "_s2", fake_s2)
+    c = LiteratureClient(use_cache=False)
+    c.search("x", journals=["Public Administration Review", "Governance, An International Journal"])
+    assert seen["/paper/search"]["venue"] == "Public Administration Review,Governance  An International Journal"
+    c.search("x", bulk=True)
+    assert seen["/paper/search/bulk"]["venue"] is None

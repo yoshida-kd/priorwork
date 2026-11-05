@@ -15,12 +15,12 @@ from typing import Any, Dict, List, Optional
 from . import __version__, derived, i18n, scaffold, settings, ssci
 import requests
 
-from .api import RETRY_STATUSES, ApiError, LiteratureClient
+from .api import RETRY_STATUSES, ApiError, LiteratureClient, in_journals
 from .check import ERROR, INFO, WARN, check_survey
 from .doctor import NG, OK, run_checks
 from .export import FORMATS, export, export_draft
 from .fulltext import FulltextError, fetch_fulltext, incomplete_fulltext
-from .i18n import t, tl
+from .i18n import language, t, tl
 from .snowball import snowball
 from .survey import (
     CANDIDATE, DEFAULT_DEPTH, DEPTHS, EVIDENCE_KEYS, EXCLUDED, INCLUDED, MAYBE, MODES, PURPOSES, SEARCH_FIELDS,
@@ -82,6 +82,9 @@ USAGE_LINES = [
     "  snowball SURVEY                register candidates from the citations of the included papers",
     "  get / citations / references   paper details and citation links",
     "  journal NAME_OR_ISSN           the SSCI status of a journal",
+    "",
+    "Reference",
+    "  docs [SECTION]                 the reference for AI agents (--search WORD, --all)",
 ]
 
 
@@ -1272,13 +1275,23 @@ def cmd_search(args, client):
     # 除外・重複統合で件数が減るので多めに取得する
     fetch_limit = min(max(limit * 4, 20), 100)
     try:
-        papers = client.search(args.query, limit=fetch_limit, year=args.year, bulk=args.bulk)
+        kw = {"journals": args.journal} if args.journal else {}
+        papers = client.search(args.query, limit=fetch_limit, year=args.year, bulk=args.bulk, **kw)
     except ApiError as e:
         if s is not None and (e.status is None or e.status in RETRY_STATUSES):
             # 検索は1回の問い合わせなので、途中までの結果は無い。サーベイは前のまま（前の検索の結果も残る）
             print("[Notice] " + t("This query gave nothing, and {name} is as it was (earlier searches are kept). "
                                   "Wait a little and run the same command again", name=s.name), file=sys.stderr)
         raise
+    if args.journal:
+        # S2 の誌の絞り込みは名前の揺れを含むので、照合した誌名でもう一度確かめる
+        other = [p for p in papers if not in_journals(p, args.journal)]
+        papers = [p for p in papers if in_journals(p, args.journal)]
+        if other:
+            print("[Notice] " + t("Left out {n|# paper|# papers} in other journals (e.g. {example}). "
+                                  "Give each journal's full name, as the journal writes it", n=len(other),
+                                  example=", ".join(sorted({p["journal_name"] or "?" for p in other})[:3])),
+                  file=sys.stderr)
     field = args.field or (s.search_field if s else "all")
     if field == "social":
         dropped = [p for p in papers if off_field(p)]
@@ -1306,7 +1319,8 @@ def cmd_search(args, client):
     added = add_records(s, results, "search")
     new = sum(1 for _, is_new in added if is_new)
     s.log_search("bulk" if args.bulk else "search", args.query,
-                 {"year": args.year, "sort": args.sort, "ssci_only": args.ssci_only, "limit": limit, "field": field},
+                 {"year": args.year, "sort": args.sort, "ssci_only": args.ssci_only, "limit": limit, "field": field,
+                  "journals": "; ".join(args.journal or []) or None},
                  len(results), new)
     render_and_report(s)
     if args.json:
@@ -1613,6 +1627,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--into", metavar="SURVEY", help=t("register the results as candidates of the survey"))
     p.add_argument("--year", help=t("a year or a range (e.g. 2015-2024)"))
     p.add_argument("--bulk", action="store_true", help=t("bulk search (boolean operators, most cited first)"))
+    p.add_argument("--journal", action="append", metavar="NAME",
+                   help=t("only papers in this journal (its full name; repeat for several)"))
     p.add_argument("--sort", choices=SORTS, default="citations",
                    help=t("citations / relevance / recent (newest first) / cpy (citations per year)"))
     p.add_argument("--field", choices=list(SEARCH_FIELDS),
@@ -1640,7 +1656,48 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("journal", parents=[common, as_json], help=t("the SSCI status of a journal name or ISSN"))
     p.add_argument("name_or_issn")
+
+    p = sub.add_parser("docs", parents=[common], help=t("the reference for AI agents, section by section"))
+    p.add_argument("topic", nargs="*", help=t("a section number (5.2) or words from its heading"))
+    p.add_argument("--search", metavar="WORD", help=t("every section that mentions WORD"))
+    p.add_argument("--all", action="store_true", help=t("the whole reference"))
+    p.add_argument("--lang", choices=("ja", "en"), help=t("the language (default: the display language)"))
     return parser
+
+
+def cmd_docs(args, client):
+    """エージェント向けのリファレンスを、節ごとに表示する（入っている版のもの）。"""
+    from . import docsref
+    text = docsref.read(args.lang or language())
+    if not text:
+        sys.exit(t("the reference is not installed with this priorwork"))
+    if args.all:
+        print(text)
+        return
+    if args.search:
+        hits = docsref.search(text, args.search)
+        if not hits:
+            sys.exit(t("nothing in the reference mentions {word}", word=args.search))
+        for sec in hits:
+            print(docsref.body(text, sec))
+        return
+    if not args.topic:
+        print(text.split("\n", 1)[0].lstrip("# ").strip() + "\n")
+        for level, title, _, _ in docsref.sections(text):
+            print(("  " if level == 3 else "") + title)
+        print("\n" + t("./priorwork docs <number or words> shows a section (./priorwork docs 5.2, "
+                       "./priorwork docs zotero); --search WORD finds a word; --all prints everything"))
+        return
+    hits = docsref.find(text, " ".join(args.topic))
+    if not hits:
+        sys.exit(t("no section called {name}: ./priorwork docs lists them", name=" ".join(args.topic)))
+    shown = []
+    for sec in hits:
+        # 広い節が当たれば、その中の小さい節は重ねて出さない
+        if any(s[2] <= sec[2] < s[3] for s in shown):
+            continue
+        shown.append(sec)
+        print(docsref.body(text, sec))
 
 
 HANDLERS = {
@@ -1649,7 +1706,7 @@ HANDLERS = {
     "include": cmd_set_status, "exclude": cmd_set_status, "maybe": cmd_set_status, "reset": cmd_set_status,
     "add": cmd_add, "fix": cmd_fix, "card": cmd_card, "render": cmd_render, "check": cmd_check, "derive": cmd_derive, "audit": cmd_audit, "read": cmd_read, "requests": cmd_requests, "export": cmd_export, "fulltext": cmd_fulltext, "zotero": cmd_zotero,
     "search": cmd_search, "snowball": cmd_snowball, "get": cmd_get,
-    "citations": cmd_linked, "references": cmd_linked, "journal": cmd_journal,
+    "citations": cmd_linked, "references": cmd_linked, "journal": cmd_journal, "docs": cmd_docs,
 }
 
 

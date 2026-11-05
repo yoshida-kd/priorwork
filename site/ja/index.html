@@ -31,6 +31,7 @@ document.addEventListener('click', function (e) {
     <nav>
       <a href="#install">インストール</a>
       <a href="guide/">手引き</a>
+      <a href="reference/">リファレンス</a>
       <a href="https://github.com/yoshida-kd/priorwork">GitHub</a>
       <a href="../" hreflang="en" lang="en" data-lang="en">English</a>
     </nav>
@@ -42,15 +43,22 @@ document.addEventListener('click', function (e) {
   <div class="wrap">
     <h1>Priorwork</h1>
     <p class="tagline">先行研究サーベイを AI エージェントに任せて、確かめる</p>
-    <p class="lead">エージェント（Claude Code・Antigravity など）にテーマを伝えるだけ。範囲を決め、Semantic Scholar と OpenAlex で探し、理由を残しながら選別し、引用をたどり、論文ごとのカードを書き、サーベイの文章を書いて、すべての引用を検査します。あなたは結果を読み、VS Code のサイドバーで覆したり直したりします。ターミナルも、覚えるコマンドもありません。</p>
+    <p class="lead">社会科学のために。ふつうの言葉で頼み、VS Code で確かめて直します。</p>
     <div class="actions">
       <a class="button primary" href="https://marketplace.visualstudio.com/items?itemName=yoshida-kd.priorwork">VS Code の拡張機能を入れる</a>
-      <a class="button secondary" href="guide/">手引きを読む</a>
+      <a class="button secondary" href="quickstart/">クイックガイド</a>
     </div>
   </div>
 </div>
 
-<section class="alt">
+<section id="install" class="install alt">
+  <div class="wrap">
+    <h2>インストール</h2>
+    <p><a href="https://marketplace.visualstudio.com/items?itemName=yoshida-kd.priorwork">VS Code の拡張機能</a>を入れて、サイドバーの<strong>ワークスペースを作る</strong>を押すだけです。Python は自動で用意されます（管理者権限は要りません）。VS Code で動く AI エージェント（Claude Code・Antigravity など）が要ります。Linux と macOS、Windows では WSL の中で使えます。</p>
+  </div>
+</section>
+
+<section>
   <div class="wrap">
     <h2>エージェントが止まらずに進めること</h2>
     <ol class="chapters">
@@ -65,7 +73,7 @@ document.addEventListener('click', function (e) {
   </div>
 </section>
 
-<section>
+<section class="alt">
   <div class="wrap">
     <h2>できること</h2>
     <div class="features">
@@ -97,46 +105,7 @@ document.addEventListener('click', function (e) {
   </div>
 </section>
 
-<section id="install" class="alt">
-  <div class="wrap two">
-    <div>
-      <h2>インストール</h2>
-      <p>VS Code に <a href="https://marketplace.visualstudio.com/items?itemName=yoshida-kd.priorwork">Priorwork の拡張機能</a>を入れ、サイドバーの <strong>ワークスペースを作る</strong> を押します。始めるのにほかに入れるものはありません。Python 3.10 以上があればそれを使い、無ければ uv を入れて Python を取ってきます（ホームフォルダーに入り、管理者権限は要りません）。</p>
-      <p>Linux と macOS で。Windows では WSL の中で。それと、VS Code で動く AI エージェント（Claude Code・Antigravity など）を。</p>
-    </div>
-    <div>
-      <h2>ターミナルから</h2>
-      <p>同じエンジンはコマンドとしても使えます（エージェントやスクリプト向け）:</p>
-<pre><code>python3 -m venv .venv
-.venv/bin/pip install priorwork
-.venv/bin/priorwork init --lang ja
-./priorwork settings
-./priorwork new "最低賃金と雇用" --slug minimum_wage</code></pre>
-    </div>
-  </div>
-</section>
 
-<section>
-  <div class="wrap">
-    <h2>手引き</h2>
-    <p><a href="guide/">手引き</a>に使い方の全体があります。</p>
-    <ol class="chapters">
-      <li><a href="guide/#1-はじめに">はじめに</a> <span>— できること・必要なもの</span></li>
-      <li><a href="guide/#2-インストール">インストール</a> <span>— VS Code・WSL・SSH のサーバー</span></li>
-      <li><a href="guide/#3-ワークスペースを作る">ワークスペースを作る</a> <span>— 設定・GitHub・別のマシン</span></li>
-      <li><a href="guide/#4-ai-に任せる">AI に任せる</a> <span>— 頼み方・レポートを見る・確かめて直す・Zotero</span></li>
-      <li><a href="guide/#5-自分で操作する">自分で操作する</a> <span>— サイドバーで検索・選別</span></li>
-      <li><a href="guide/#6-論文カード">論文カード</a> <span>— 欄・確認レベル・本文の取得</span></li>
-      <li><a href="guide/#7-検査">検査</a></li>
-      <li><a href="guide/#8-設定">設定</a> <span>— API キー・Zotero・SSCI リスト</span></li>
-      <li><a href="guide/#9-エージェントへの指示">エージェントへの指示</a></li>
-      <li><a href="guide/#10-ワークスペースの中身">ワークスペースの中身</a></li>
-      <li><a href="guide/#11-エンジンを更新する">エンジンを更新する</a></li>
-      <li><a href="guide/#12-コマンドラインで使う">コマンドラインで使う</a></li>
-      <li><a href="guide/#13-困ったとき">困ったとき</a></li>
-    </ol>
-  </div>
-</section>
 </main>
 
 <footer>

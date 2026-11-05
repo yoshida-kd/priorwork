@@ -2,7 +2,7 @@
 
 **先行研究サーベイを AI エージェントに任せて、確かめる — ターミナルは不要**
 
-[English](README.md) · **[手引き](https://yoshida-kd.github.io/priorwork/ja/guide/)** · [ウェブページ](https://yoshida-kd.github.io/priorwork/ja/)
+[English](README.md) · [クイックガイド](https://yoshida-kd.github.io/priorwork/ja/quickstart/) · **[手引き](https://yoshida-kd.github.io/priorwork/ja/guide/)** · [リファレンス](https://yoshida-kd.github.io/priorwork/ja/reference/)（AI エージェント向け。`./priorwork docs` でも読める） · [ウェブページ](https://yoshida-kd.github.io/priorwork/ja/)
 
 Priorwork（prior work ＝ 先行研究）は、社会科学（経済学・社会学・政治学・行政学・経営学・心理学など）のテーマ別文献サーベイを、AI エージェント（Claude Code・Antigravity など）に任せて作るためのツールです。
 
@@ -250,7 +250,7 @@ SSCI に収録されているかは、Clarivate の [Master Journal List](https:
 ./priorwork zotero --collections | SURVEY --collection 名前 | SURVEY --import | SURVEY --dois  # コレクション
 
 # 文献の探索
-./priorwork search "<English query>" [--into SURVEY] [--bulk] [--sort citations|relevance|recent|cpy] [--year 2010-2024] [--ssci-only] [--field social|all] [--limit N]
+./priorwork search "<English query>" [--into SURVEY] [--bulk] [--sort citations|relevance|recent|cpy] [--year 2010-2024] [--journal "<full journal name>" ...] [--ssci-only] [--field social|all] [--limit N]
 ./priorwork snowball SURVEY [--direction both|references|citations] [--limit N] [--min-links N]
 ./priorwork get <DOI>
 ./priorwork citations <DOI> [--sort cited]      ./priorwork references <DOI> [--sort cited]

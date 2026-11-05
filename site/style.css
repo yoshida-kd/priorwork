@@ -266,3 +266,6 @@ footer a { color: var(--muted); }
     padding: 10px 14px;
   }
 }
+
+/* 長い URL などのインラインのコードは折り返す（スマートフォンで横にはみ出さないように） */
+.content :not(pre) > code { overflow-wrap: anywhere; }

@@ -48,6 +48,7 @@ description: >-
 - 0 件・数件だったクエリは、語を減らす・同義語に変える・`--bulk` を外すなどして検索し直す。
 - 検索語の例: 概念の英語表現と同義語、代表的な理論の名前（`"transaction cost"` など）、識別戦略（`"difference-in-differences"`）、対象国・地域。
 - 新しいサーベイの検索は、社会科学の外（医学・計算機科学だけなど）の論文を除く（S2 の分野で判定し、分野の無い論文は残す）。テーマが自然科学・工学にまたがるなら `./priorwork scope <survey> --search-field all` にする。
+- 特定の誌に限るとき（「分野の主要誌に限って」など）は、誌ごとに `--journal "<正式な誌名>"` を付ける（誌が名乗る英語の名前。例: `--journal "American Political Science Review" --journal "American Journal of Political Science"`）。ほかの誌の論文は除かれ、件数が表示される。
 - 要旨がデータベースに無い論文は、Crossref の要旨で補われる。それでも無い論文は、タイトルと誌名だけで除外せず保留にし、本文で確かめる。
 - 有名な論文が分かっていれば `./priorwork add <survey> <DOI>` で直接登録してよい（`get` で書誌を確かめてから）。
 

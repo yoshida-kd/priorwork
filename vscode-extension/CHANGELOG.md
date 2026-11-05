@@ -3,6 +3,19 @@
 Priorwork's command-line tool (`priorwork` on PyPI) and this extension are
 released together, under one version number.
 
+## 0.1.11
+
+- **The documentation, regrouped like Octavo's.** A simpler top page with a quick guide, the guide
+  written for people in VS Code (no commands), and a new **reference** with every command, written for
+  the agent. `./priorwork docs` prints that reference from the installed engine, section by section
+  (`./priorwork docs zotero`, `./priorwork docs --search snowball`), and the workspace's `AGENTS.md`
+  tells the agent to look things up there (`priorwork sync` brings it to existing workspaces).
+- **Search within particular journals.** `priorwork search ... --journal
+  "American Political Science Review"` (repeat it for several) keeps only
+  papers in those journals. Give the journal's full name; papers that
+  Semantic Scholar matched to another journal are left out, and the count is
+  shown. Searches into a survey record the journals in the search log.
+
 ## 0.1.10
 
 - **Notes for the agent when you ask it to make a survey.** After the mode, an

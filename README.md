@@ -2,7 +2,7 @@
 
 **Hand your literature review to an AI agent, then check it — no terminal needed**
 
-[日本語](README.ja.md) · **[Guide](https://yoshida-kd.github.io/priorwork/guide/)** · [Website](https://yoshida-kd.github.io/priorwork/)
+[日本語](README.ja.md) · [Quick guide](https://yoshida-kd.github.io/priorwork/quickstart/) · **[Guide](https://yoshida-kd.github.io/priorwork/guide/)** · [Reference](https://yoshida-kd.github.io/priorwork/reference/) (for AI agents; also `./priorwork docs`) · [Website](https://yoshida-kd.github.io/priorwork/)
 
 Priorwork (as in *prior work*) is a toolkit for handing topic-based literature reviews in economics,
 sociology, political science, public administration, management, psychology and neighbouring fields
@@ -381,7 +381,7 @@ The numbers are guides, not limits. The rules and `priorwork check` are the same
 ./priorwork zotero SURVEY --add | --undo [NUMBER ...] [--dry-run]   # only with ZOTERO_WRITE=1
 
 # Finding literature
-./priorwork search "<English query>" [--into SURVEY] [--bulk] [--sort citations|relevance|recent|cpy] [--year 2010-2024] [--ssci-only] [--field social|all] [--limit N]
+./priorwork search "<English query>" [--into SURVEY] [--bulk] [--sort citations|relevance|recent|cpy] [--year 2010-2024] [--journal "<full journal name>" ...] [--ssci-only] [--field social|all] [--limit N]
 ./priorwork snowball SURVEY [--direction both|references|citations] [--limit N] [--min-links N]
 ./priorwork get <DOI>
 ./priorwork citations <DOI> [--sort cited]      ./priorwork references <DOI> [--sort cited]

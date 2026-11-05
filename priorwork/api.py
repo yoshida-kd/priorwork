@@ -19,7 +19,7 @@ import re
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 from urllib.parse import quote, urlencode
 
 import requests
@@ -89,6 +89,19 @@ def _error_detail(resp: requests.Response) -> str:
 
 
 _BOOL_WORDS = {"AND": "+", "OR": "|", "NOT": "-"}
+
+
+def journal_key(name: str) -> str:
+    """誌名を比べるための形: 小文字、先頭の The、& と and、記号と空白の違いを無視する。"""
+    s = html.unescape(name or "").lower().replace("&", " and ")
+    s = re.sub(r"[^\w]+", " ", s).strip()
+    return re.sub(r"^the ", "", s)
+
+
+def in_journals(record: Dict[str, Any], journals: Sequence[str]) -> bool:
+    """論文の誌名が、指定した誌のどれかと同じか。"""
+    keys = {journal_key(j) for j in journals}
+    return journal_key(record.get("journal_name") or "") in keys
 
 
 def bulk_query(query: str) -> str:
@@ -438,14 +451,17 @@ class LiteratureClient:
 
     # ---- Semantic Scholar ----
 
-    def _search_s2(self, query: str, limit: int, year: Optional[str], bulk: bool) -> List[Dict[str, Any]]:
+    def _search_s2(self, query: str, limit: int, year: Optional[str], bulk: bool,
+                   journals: Sequence[str] = ()) -> List[Dict[str, Any]]:
+        # 誌で絞るときは S2 の venue（誌名をカンマで並べる）。誌名にカンマがあると切れるので除く
+        venue = ",".join(j.replace(",", " ") for j in journals) or None
         if bulk:
             # bulk 検索: AND(+) / OR(|) / 除外(-) / "フレーズ" が使え、被引用数順に最大 1000 件返る
             data = self._s2("/paper/search/bulk", {"query": bulk_query(query), "fields": S2_BULK_FIELDS, "year": year,
-                                                    "sort": "citationCount:desc"})
+                                                    "sort": "citationCount:desc", "venue": venue})
         else:
             data = self._s2("/paper/search", {"query": query, "limit": min(limit, 100), "fields": S2_PAPER_FIELDS,
-                                               "year": year})
+                                               "year": year, "venue": venue})
         return [from_s2(p) for p in (data.get("data") or [])[:limit]]
 
     def _get_paper_s2(self, s2_id: str) -> Dict[str, Any]:
@@ -539,9 +555,11 @@ class LiteratureClient:
 
     # ---- Public interface ----
 
-    def search(self, query: str, limit: int = 20, year: Optional[str] = None, bulk: bool = False) -> List[Dict[str, Any]]:
-        """S2 で検索し、結果を OpenAlex で DOI 照合する。S2 が失敗したらエラー（OpenAlex 検索は精度が低いため使わない）。"""
-        return self._verify_with_openalex(self._search_s2(query, limit, year, bulk))
+    def search(self, query: str, limit: int = 20, year: Optional[str] = None, bulk: bool = False,
+               journals: Sequence[str] = ()) -> List[Dict[str, Any]]:
+        """S2 で検索し、結果を OpenAlex で DOI 照合する。S2 が失敗したらエラー（OpenAlex 検索は精度が低いため使わない）。
+        journals を渡すと、その誌（正式な誌名）に載った論文だけ。"""
+        return self._verify_with_openalex(self._search_s2(query, limit, year, bulk, journals))
 
     def get_paper(self, identifier: str) -> Dict[str, Any]:
         """S2 で取得して DOI 照合する。S2 に無い（404）DOI / OpenAlex ID は OpenAlex から取得する。"""

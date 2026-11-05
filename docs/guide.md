@@ -10,8 +10,10 @@ and neighbouring fields. Give it the topic: the agent sets the scope, finds and 
 fills in a card for each paper, writes the review, checks it and exports a version for reading. You read
 the result, then check and correct it in the VS Code sidebar.
 
-This guide covers everything. For a short introduction, see the
-[README](https://github.com/yoshida-kd/priorwork/blob/main/README.md).
+This guide is for people using VS Code: everything here is a button, a menu or something you say to
+the agent. In a hurry? The [quick guide](https://yoshida-kd.github.io/priorwork/quickstart/). Every
+command — what the agent runs — is in the [reference](https://yoshida-kd.github.io/priorwork/reference/),
+written for the agent.
 [日本語の手引き](https://yoshida-kd.github.io/priorwork/ja/guide/)
 
 ---
@@ -88,19 +90,6 @@ folder, without administrator rights, and downloads Python for the workspace.
 - **A server**: connect with VS Code's **Remote - SSH** extension and follow the steps above on the
   server. The extension, Python and the workspace live on the server. Exported reports can be viewed
   inside Priorwork ([4.4](#44-view-the-report)).
-
-### 2.3 On the command line
-
-Without the extension, install the `priorwork` command from PyPI.
-
-```bash
-mkdir my-surveys && cd my-surveys
-python3 -m venv .venv
-.venv/bin/pip install priorwork
-.venv/bin/priorwork init --lang en
-./priorwork settings          # the settings (key values are never shown)
-./priorwork doctor --online   # diagnose the settings and the connections
-```
 
 ---
 
@@ -218,8 +207,7 @@ tell you where it is in one line along the way (except at the stops, without wai
 wrote it) in its chat to "audit the survey <name>" (**Ask Your Agent… → Audit as another model** copies
 the request), since a model rarely catches its own misreadings. The auditor compares every card with the
 full text, checks the direction of each citation, hypotheses passed off as the literature and the
-excluded papers, fixes them and records the audit (`./priorwork audit SURVEY --by "<model>"`, refused for
-the model that wrote it). Without an audit, a survey is not left unfinished.
+excluded papers, fixes them and records the audit (the model that wrote the survey cannot audit it). Without an audit, a survey is not left unfinished.
 
 ### 4.3 Depth
 
@@ -293,8 +281,7 @@ your agent to do it** in the sidebar lets you choose it too.
   it right after the date (`20261012_v2_<slug>`) and the sidebar shows **v2**. When surveys share a
   topic, the sidebar also shows their names and dates side by side. Once you no longer need the old one,
   right-click it → **Archive the Survey…** (or ask the agent). It leaves the list for the **Archived**
-  group at the bottom; nothing is deleted, and the button on it brings it back
-  (`./priorwork archive SURVEY [--undo]`).
+  group at the bottom; nothing is deleted, and the button on it brings it back.
 
 When you come back to a conversation, "let's continue" is enough: the agent checks the state and takes
 the next step.
@@ -328,7 +315,7 @@ to the survey (below), Priorwork puts the included papers into that collection i
   The agent does the same: in the standard mode it shows you the list at the stop before the cards and
   adds it when you agree; in full auto it adds without stopping; in manual it asks each time.
 - No PDFs come with the items: select them in Zotero, right-click → **Find Full Text**.
-- **Undo What Priorwork Added…** (or asking the agent to undo it, `./priorwork zotero <survey> --undo`)
+- **Undo What Priorwork Added…** (or asking the agent to undo it)
   takes back only what Priorwork wrote. Items it made go to the Zotero trash, except those you changed
   or attached a file to since; items that were already in your library only leave the collection.
 
@@ -369,7 +356,7 @@ manuscripts/
 ```
 
 Any format will do. Priorwork turns Markdown, Quarto (.qmd, and the HTML it renders), LaTeX, Word
-(.docx) and PDF into text for the agent (`./priorwork read`). If the results are in separate files
+(.docx) and PDF into text for the agent. If the results are in separate files
 (regression tables in .tex, …), put them in the same folder. The agent reads everything in it.
 
 **How to ask.** **New Survey → Start from my manuscript** in the sidebar lets you choose the manuscript
@@ -386,7 +373,7 @@ into `manuscripts/` (the original stays where it is). You can also ask in the ch
 
 **Leave marks where you want help.** While writing, put `[cite]` where a citation is needed, `[@?]`
 where a paper should be cited, or `TODO(priorwork): <what you need>` on a line of its own (say,
-`TODO(priorwork): the literature on institutions`). `./priorwork read` lists them, and when filling the
+`TODO(priorwork): the literature on institutions`). The agent lists them, and when filling the
 manuscript in, the agent takes them first and says which it could not fill (and why).
 
 **Agreeing what to make.** The agent reads the manuscript, then proposes the purpose (filling it in, a
@@ -426,16 +413,12 @@ your marks, lists the claims that need literature (with the findings that confli
 searches and screens claim by claim, and writes what to add in the manuscript's order: "Write the
 section", "Insert" or "Add citations", each with **Where** (the heading and the sentence it goes before
 or after, quoted) and **Why**, and the text in the language of the manuscript. It fills in only what the
-literature backs, never the content of your methods or results. `./priorwork export SURVEY --draft`
-writes the list with its references; for an Octavo manuscript it goes into the project's inbox
+literature backs, never the content of your methods or results. The agent exports the list with its
+references; for an Octavo manuscript it goes into the project's inbox
 ([4.9](#49-working-with-an-octavo-manuscript)).
 
 Either way, the manuscript itself is never rewritten. Read the draft, the additions or the advice and
 edit your manuscript yourself.
-
-On the command line: `./priorwork new "<topic>" --slug <slug> --manuscript manuscripts/make_or_buy
---purpose complete` (`draft` for a draft, `advice` for advice; without `--purpose`, `complete`), and for
-filling in or a draft, `./priorwork export SURVEY --draft`.
 
 ### 4.9 Working with an Octavo manuscript
 
@@ -447,51 +430,49 @@ Octavo's collection picker, lists of collections and **Ask Priorwork for the Lit
 releases after 0.6.4.
 
 **The link between them is a Zotero collection.** Octavo pulls its `.bib` of references from the
-collection named in its settings (`zotero_collection`, with `octavo bib pull`). Link the Priorwork survey
+collection named in its settings (`zotero_collection`). Link the Priorwork survey
 to the same collection, and the included papers you put there become the Octavo manuscript's references
 too.
 
 1. In the Octavo project, choose the paper's collection (**Choose the Zotero Collection** in Octavo's
-   sidebar, or `octavo config set zotero_collection "<name>"`).
+   sidebar).
 2. Right-click the paper in Octavo's sidebar → **Ask Priorwork for the Literature** (or choose the
    paper in the Octavo project with Priorwork's **New Survey → Start from my manuscript**) to copy a
    request, and paste it into the agent's chat in the window of your Priorwork workspace. The two are
    separate windows, so the request carries it across.
 3. The agent reads the manuscript, the project's results and tables, and the literature it cites (the
-   `.bib`), and registers the papers it cites (`./priorwork add SURVEY --cited`). The survey is linked to
+   `.bib`), and registers the papers it cites. The survey is linked to
    the same Zotero collection as Octavo.
 4. The draft is exported in Octavo's form into the Octavo project's inbox
-   (`./priorwork export SURVEY --draft --octavo` → `literature/priorwork/<survey>.md`, with a `.json`
+   (`literature/priorwork/<survey>.md`, with a `.json`
    manifest and `<survey>.cards.json`, the cards of the included papers for Octavo to show over each
    `[@key]`): citations become `[@key]` from the `.bib`, and Octavo makes the references section.
    Priorwork never changes the manuscript: ask the agent in the Octavo project to "work the draft from
    Priorwork into the manuscript" (or move it yourself).
 5. Papers not in the `.bib` yet are written as `[@PRIORWORK:<DOI>]`, with a list of their DOIs. Put them
-   in the Zotero collection ([4.7](#47-collect-the-papers-in-zotero); Priorwork can do it for you) and run
-   `octavo bib pull` and then `octavo priorwork resolve` in Octavo, which replaces them by `[@key]` from
-   the DOIs (until then, Octavo's checks report them as missing keys). Octavo 0.6.6 and older have no
-   inbox: export again after `octavo bib pull` instead.
+   in the Zotero collection ([4.7](#47-collect-the-papers-in-zotero); Priorwork can do it for you), pull
+   them into Octavo and press **Replace the Marks with the .bib Keys** in Octavo's sidebar (until then,
+   Octavo's checks report them as missing keys).
 
 **Requests without the clipboard.** An Octavo that knows where your Priorwork workspace is puts its
 requests in the workspace's `.priorwork/requests/` instead of copying them. They show under **Requests
 from Octavo** at the top of the sidebar: click one to ask your agent to carry it out (a short request
-that points to it) or to decline it with a reason Octavo can read. The agent records the outcome with
-`./priorwork requests <id> --done --survey <survey>`, and Octavo shows it.
+that points to it) or to decline it with a reason Octavo can read. The agent records the outcome, and
+Octavo shows it.
 
 **One survey for several papers.** A survey on a topic (say, the literature on outsourcing) can serve
 several papers. Right-click the survey → **Link to an Octavo Project…** and choose the project's folder
 (as many as you like); **Export for an Octavo Project…** writes the sections on theories, methods,
-debates and gaps with that project's `.bib` keys to its inbox, `literature/priorwork/<survey>.md`
-(`./priorwork scope SURVEY --octavo <path>`, `./priorwork export SURVEY --octavo <project>`). In Octavo,
+debates and gaps with that project's `.bib` keys to its inbox, `literature/priorwork/<survey>.md`. In Octavo,
 add the survey's collection to the project's (**Choose the Zotero Collection** there lets you mark any
 number).
 
 **Several surveys for one Octavo project.** One paper may get several surveys, by angle (theory,
 methods, …), even from different workspaces. Then make a collection for each survey in Zotero under the
 Octavo project's collection (e.g. "Make or buy / Theory" and "Make or buy / Methods" under "Make or
-buy"), and link each survey to its own. `octavo bib pull` takes the collections under its collection
+buy"), and link each survey to its own. Octavo's pull takes the collections under its collection
 too, so every survey's included papers end up in one `.bib`. The sidebar's list of collections shows
-Octavo's collection and the ones under it first, and `./priorwork status` lists the other surveys for
+Octavo's collection and the ones under it first, and the survey's status lists the other surveys for
 the same Octavo project.
 
 Priorwork never changes the files of the Octavo project. The check tells you when the survey and Octavo
@@ -503,19 +484,17 @@ side in the same way.
 
 You can also ask for a short text based on a survey: a lecture handout, reading notes, a summary of
 the main points ("a lecture handout from this survey, in three parts, about 2,000 characters", say).
-The agent records its purpose, length and structure (`./priorwork derive`) and writes it in
+The agent records its purpose, length and structure and writes it in
 `reports/<name>.<text name>.md`. It sits beside the survey's files, so it goes into Git with them.
 
 - It cites included papers whose cards were checked against the full text, and checks numbers and the
   direction of findings against the cards.
-- The length leaves out citations in parentheses ("(Dell 2010)") unless you say otherwise
-  (`--count-citations`).
+- The length leaves out citations in parentheses ("(Dell 2010)") unless you say otherwise.
 - The references at the end are made from the papers it cites.
-- `./priorwork check` reports citations that are not included papers (ERROR), citations from cards not
+- **Check the Survey** reports citations that are not included papers (ERROR), citations from cards not
   checked against the full text and numbers that are not in the card (WARN), and a length off the
   target (INFO).
-- The version for reading is `./priorwork export SURVEY --derived <text name>`
-  (`reports/<name>.<text name>.html`; `--format docx` for Word).
+- Its version for reading is `reports/<name>.<text name>.html` (Word too, if you ask).
 
 ---
 
@@ -768,7 +747,7 @@ match the engine's version; do not edit them.
   calls a 🟡 (guessed) journal "in the SSCI".
 - It runs the checks before calling anything finished.
 - It never opens the files of Priorwork itself (inside `.venv`).
-- It writes to Zotero only through `./priorwork zotero --add`, when you allow it (it adds the included
+- It writes to Zotero only when you allow it (it adds the included
   papers to the survey's collection). In Git, it commits and pushes on a branch named after the survey and opens
   a pull request; you merge.
 
@@ -812,66 +791,10 @@ workspace's version is older; that also brings `AGENTS.md` and the skills up to 
 
 ---
 
-## 12. On the command line
+## 12. Troubleshooting
 
-Everything the extension does is also a `./priorwork` command (the agent uses them).
-
-```bash
-# Workspace
-./priorwork init [DIR] [--lang en|ja]              # create a workspace
-./priorwork settings [--stdin] [--import-ssci CSV] # API keys, Zotero, the SSCI list
-./priorwork doctor [--online]                      # diagnose the settings and connections
-./priorwork sync [--force|--diff]                  # AGENTS.md and the skills to the engine's version
-./priorwork upgrade [--to X.Y.Z]                   # update the engine
-
-# Surveys
-./priorwork status [SURVEY]                        # the list / progress and next steps
-./priorwork new "<topic>" --slug <slug> [--mode standard|auto|manual] [--depth quick|full] [--question ...]
-./priorwork new "<topic>" --slug <slug> --manuscript manuscripts/<paper> [--purpose draft|advice]   # from a manuscript
-./priorwork scope SURVEY --question "..." [--years ... --fields ... --inclusion ... --exclusion ... --depth ... --mode ...]
-./priorwork read PATH                     # the text of a manuscript (.md, .qmd, .html, .docx, .pdf, …)
-./priorwork add SURVEY --cited            # register the papers the manuscript cites (the DOIs in its .bib)
-./priorwork export SURVEY --draft --octavo   # the draft in Octavo's form ([@key])
-./priorwork archive SURVEY [--undo]       # hide it from the list (the files stay); status --archived lists them
-./priorwork list SURVEY [--status candidate maybe] [--abstract]
-./priorwork include SURVEY 2 5 7 [--reason "..."]
-./priorwork exclude SURVEY 3 --reason "theory only"
-./priorwork maybe SURVEY 9 / ./priorwork reset SURVEY 9
-./priorwork add SURVEY <DOI>... [--candidate]
-./priorwork fix SURVEY N [--id <published DOI>] [--authors "A; B"] [--year Y] [--confirm "<what you checked>"]
-./priorwork card SURVEY 3 [--set rq="..." evidence=abstract]
-./priorwork render SURVEY
-./priorwork check SURVEY [--offline]
-./priorwork export SURVEY [--format html|docx|md] [--with-abstracts]
-./priorwork derive SURVEY [NAME --purpose "..." --length N --structure "a; b"]   # a short text from the survey (no NAME: list them)
-./priorwork export SURVEY --derived NAME [--format html|docx|md]
-./priorwork fulltext SURVEY <number> [--pdf <path>]
-
-# Zotero (read only)
-./priorwork zotero [SURVEY] [--refresh]            # the link / which included papers are in Zotero
-./priorwork zotero --collections                   # list the collections
-./priorwork zotero SURVEY --collection "<name>"    # link a collection ("" unlinks it)
-./priorwork zotero SURVEY --import                 # register the papers of the collection as candidates
-./priorwork zotero SURVEY --dois                   # DOIs of included papers not in Zotero (for the magic wand)
-
-# Finding literature
-./priorwork search "<English query>" [--into SURVEY] [--bulk] [--sort citations|relevance|recent|cpy] [--year 2010-2024] [--ssci-only] [--field social|all] [--limit N]
-./priorwork snowball SURVEY [--direction both|references|citations] [--min-links N]
-./priorwork get <DOI>
-./priorwork citations <DOI> / ./priorwork references <DOI>
-./priorwork journal "<journal or ISSN>"
-```
-
-`SURVEY` is the file name without the extension, or the slug. `--limit` defaults to 25 when registering
-into a full survey, else 10. Most commands print JSON with `--json`.
-
----
-
-## 13. Troubleshooting
-
-**The agent asks you to type commands or skill names.** Check whether `./priorwork status` says the
-skills are out of date; if so, update AGENTS.md and the skills from the row in the sidebar (or
-`./priorwork sync`). If it still asks, name Priorwork in the request: "carry on with the survey in
+**The agent asks you to type commands or skill names.** Check whether the sidebar says the
+skills are out of date; if so, update AGENTS.md and the skills from that row. If it still asks, name Priorwork in the request: "carry on with the survey in
 Priorwork".
 
 **The agent opens files inside `.venv` (such as `i18n.py`).** They are part of Priorwork itself and

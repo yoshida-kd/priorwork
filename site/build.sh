@@ -1,5 +1,6 @@
 #!/bin/sh
-# 手引き（docs/guide*.md）を、Pages に出す HTML にする（Octavo の site/build.sh と同じ形）。
+# 手引き（docs/guide*.md）・クイックガイド（docs/quickstart*.md）・リファレンス（priorwork/docs/reference*.md。
+# パッケージに同梱するので priorwork/ の中にある）を、Pages に出す HTML にする（Octavo の site/build.sh と同じ形）。
 #   sh site/build.sh <出力先>   ->  <出力先>/guide/index.html・<出力先>/ja/guide/index.html
 # .github/workflows/pages.yml とテストが使う。原稿は Markdown のまま docs/ に置く。
 #
@@ -28,8 +29,20 @@ page() {  # page <原稿> <出力> <言語> <題> <説明> <目次の見出し> 
 }
 
 page "$repo/docs/guide.md" "$out/guide/index.html" en "Priorwork guide" \
-  "The full manual for Priorwork: hand literature reviews for the social sciences to your AI agent, then check them from the VS Code sidebar." \
+  "How to use Priorwork in VS Code: hand literature reviews for the social sciences to your AI agent, then check them from the sidebar." \
   "Contents" "../" "../" guide
 page "$repo/docs/guide.ja.md" "$out/ja/guide/index.html" ja "Priorwork 手引き" \
   "Priorwork の手引き。社会科学の先行研究サーベイを AI エージェントに任せ、VS Code のサイドバーで確かめる。" \
   "目次" "../../" "../" guide
+page "$repo/docs/quickstart.md" "$out/quickstart/index.html" en "Priorwork quick guide" \
+  "From installing Priorwork to your first literature review in six short steps, all in VS Code." \
+  "Contents" "../" "../" quickstart
+page "$repo/docs/quickstart.ja.md" "$out/ja/quickstart/index.html" ja "Priorwork クイックガイド" \
+  "Priorwork を入れてから最初の先行研究サーベイまでの6つの手順。すべて VS Code で。" \
+  "目次" "../../" "../" quickstart
+page "$repo/priorwork/docs/reference.md" "$out/reference/index.html" en "Priorwork reference" \
+  "Every Priorwork command, written for AI agents. The same text comes with Priorwork: ./priorwork docs." \
+  "Contents" "../" "../" reference
+page "$repo/priorwork/docs/reference.ja.md" "$out/ja/reference/index.html" ja "Priorwork リファレンス" \
+  "Priorwork のすべてのコマンド。AI エージェント向け。同じ文章が Priorwork に同梱されている（./priorwork docs）。" \
+  "目次" "../../" "../" reference
