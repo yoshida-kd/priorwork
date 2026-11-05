@@ -134,12 +134,25 @@ surveys.
 
 - Default: Semantic Scholar's relevance search. `--bulk`: `+` (and), `|` (or), `-` (not),
   `"phrases"`, most cited first (`AND`, `OR`, `NOT` are turned into these).
-- `--sort citations|relevance|recent|cpy`, `--year`, `--journal` (full name, repeatable),
+- `--sort citations|relevance|recent|cpy`, `--year`, `--journal` (full name or ISSN, repeatable),
   `--ssci-only`, `--field social|all`, `--limit N` (default 25 into a full survey, else 10),
   `--include-preprints` (books, working papers, preprints and unknown venues are left out by
   default).
 - DOIs, journals and ISSNs are checked against OpenAlex; when a working paper and its published
   version are both found, only the published one is kept.
+- `--journal` searches Semantic Scholar (by `venue`) **and** OpenAlex (by the journal's source ID,
+  from its name or ISSN). Semantic Scholar often has no venue for a paper, and the venue filter
+  drops it silently; OpenAlex's results that Semantic Scholar did not have are added (merged by DOI;
+  with `--bulk` re-sorted by citations, otherwise appended after Semantic Scholar's), and a notice
+  says how many. Each record's `found_in` says where it was found, and the search log records
+  `openalex` (`used` / `failed`) and `openalex_added`. When OpenAlex fails, the Semantic Scholar
+  results are returned alone, with a notice. Without `--journal`, OpenAlex is not searched (its
+  keyword search is less precise).
+- A journal paper whose DOI is a preprint / working paper (OSF, SocArXiv, SSRN, arXiv, NBER, …) or
+  unknown to OpenAlex is looked up by title in OpenAlex (with the journal's source ID or ISSN). When
+  the journal version matches (`same_title`, the year within ±2), its DOI and details replace them:
+  the old DOI is kept as `preprint_doi` and a note (ℹ️, `notes`) says so. Otherwise the warning
+  stays. At most 10 such lookups per search.
 
 ### 3.2 Chasing citations
 

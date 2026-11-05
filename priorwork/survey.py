@@ -1008,6 +1008,7 @@ def card_block(entry: Dict[str, Any], body: str, label: str, lang: str) -> str:
         + tl(lang, "cited by {n}", n=r.get("citation_count", 0)) + f" | {doi_link(r, lang)}",
     ]
     lines += [f"- ⚠️ {w}" for w in r.get("warnings", [])]
+    lines += [f"- ℹ️ {n}" for n in r.get("notes", [])]
     return "\n".join(lines) + "\n" + body
 
 

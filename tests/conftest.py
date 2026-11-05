@@ -20,6 +20,11 @@ def isolated(tmp_path, monkeypatch):
     monkeypatch.setenv("PRIORWORK_LANG", "ja")
     # Crossref（要旨の補完）に接続しない。確かめるテストは _crossref を差し替える
     monkeypatch.setattr(api.LiteratureClient, "_crossref", lambda self, path, params: {"message": {"items": []}})
+    # OpenAlex にも接続しない（誌を指定した検索・雑誌版を探す照会が引く）。確かめるテストは _openalex を差し替える
+
+    def no_openalex(self, path, params):
+        raise api.ApiError("OpenAlex", "not reachable in tests")
+    monkeypatch.setattr(api.LiteratureClient, "_openalex", no_openalex)
     for var in ("ZOTERO_API_KEY", "ZOTERO_USER_ID", "ZOTERO_WEBDAV_URL"):  # 本物の Zotero に接続しない
         monkeypatch.delenv(var, raising=False)
     yield

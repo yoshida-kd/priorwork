@@ -25,8 +25,21 @@ MESSAGES = {
     "the search field is one of {choices}: {field}": "検索の分野は {choices} のいずれかです: {field}",
     "Left out {n|# paper|# papers} in other journals (e.g. {example}). Give each journal's full name, as the journal writes it":
         "ほかの誌の論文 {n} 件を除きました（{example} など）。誌名は、誌が名乗る正式な名前で指定してください",
-    "only papers in this journal (its full name; repeat for several)":
-        "この誌の論文だけ（正式な誌名。複数なら繰り返す）",
+    "only papers in this journal (its full name or ISSN; repeat for several). "
+    "Searched in both Semantic Scholar and OpenAlex":
+        "この誌の論文だけ（正式な誌名か ISSN。複数なら繰り返す）。Semantic Scholar と OpenAlex の両方で探す",
+    "Added {n|# paper|# papers} from OpenAlex that the S2 search missed (S2 often has no journal name for them)":
+        "S2 の検索に出なかった {n} 件を OpenAlex から足しました（S2 は誌名を持たないことがよくあります）",
+    "OpenAlex does not know the journal {names}, so it was searched in S2 only":
+        "OpenAlex に誌 {names} が見つからないため、S2 だけで探しました",
+    "{error} → only the S2 results (OpenAlex was not searched for the journals)":
+        "{error} → S2 の結果だけを返します（OpenAlex では誌を探していません）",
+    "Did not look for the journal version of {n|# more paper|# more papers} (at most {max} per search; the warnings stay)":
+        "残り {n} 件は雑誌版を探していません（1 回の検索で {max} 件まで。警告はそのまま）",
+    "{error} → the journal versions of preprint DOIs are not looked for":
+        "{error} → プレプリントの DOI の雑誌版は探していません",
+    "Replaced the preprint / working-paper DOI {old} with the journal version {doi}":
+        "プレプリント・WP の DOI {old} を雑誌版 {doi} に替えました",
     "Left out {n|# paper|# papers} outside the social sciences (e.g. {example}). To keep them, add --field all":
         "社会科学の外の論文 {n} 件を除きました（{example} など）。残すなら --field all を付けてください",
     "social: leave out papers outside the social sciences / all (default: the survey's setting; all without --into)":

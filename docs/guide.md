@@ -523,6 +523,11 @@ The results are registered as candidates. When both a working paper and its publ
 found, only the published one is kept; books, working papers, preprints and papers with no known
 venue are left out by default. A paper whose DOI you already know is added with **Add Papers by DOI**.
 
+To search only certain journals, ask the agent ("search JPART and PAR only"). A search narrowed to
+journals looks in both Semantic Scholar and OpenAlex: Semantic Scholar often has no journal name for
+a paper, so a search there alone silently misses it — sometimes the most cited papers of the field.
+OpenAlex picks the journal by its ID, so it finds them, and what it adds is said in the notice.
+
 ### 5.3 Screen
 
 **Screen Candidates** opens the page of the first unscreened paper.
@@ -542,6 +547,11 @@ Check papers with a warning (⚠️) before including them.
 | The DOI is a working paper / preprint version | a journal is named, but the DOI is an SSRN-style version |
 | OpenAlex does not know the DOI / No DOI / DOI not verified | a wrong or missing DOI, or it could not be checked |
 | May be a book review or comment | a title like "…, by Author", or a single page |
+
+When Semantic Scholar gives a journal paper the DOI of its preprint or working paper, Priorwork looks
+the title up in OpenAlex and, if the journal version matches (the same title, the year within two
+years), takes its DOI and details. The paper then shows a note (ℹ️) with the old DOI instead of a
+warning.
 
 ### 5.4 Chase citations
 

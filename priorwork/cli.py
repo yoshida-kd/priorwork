@@ -129,6 +129,8 @@ def print_paper(p: Dict[str, Any], prefix: str, abstract: bool = False, extra: s
           f"{('DOI: ' + p['doi']) if p['doi'] else ('ID: ' + p['id'])}{extra}")
     for w in p.get("warnings", []):
         print(f"    ⚠️ {w}")
+    for n in p.get("notes", []):
+        print(f"    ℹ️ {n}")
     if p.get("tldr"):
         print(f"    TL;DR: {p['tldr']}")
     elif abstract and p.get("abstract"):
@@ -1303,6 +1305,11 @@ def cmd_search(args, client):
                   file=sys.stderr)
     results = rank_and_filter(papers, args.include_preprints, args.ssci_only, args.sort)[:limit]
     client.complete_abstracts(results)
+    openalex = getattr(client, "last_search", None) or {}
+    from_openalex = sum(1 for p in results if p.get("found_in") == ["OpenAlex"])
+    if from_openalex:
+        print("[Notice] " + t("Added {n|# paper|# papers} from OpenAlex that the S2 search missed "
+                              "(S2 often has no journal name for them)", n=from_openalex), file=sys.stderr)
     if not results:
         print("[Notice] " + (t("No hits. Bulk search takes + (AND), | (OR), - (NOT) and \"phrases\"; "
                                 "try fewer terms or synonyms") if args.bulk
@@ -1320,7 +1327,9 @@ def cmd_search(args, client):
     new = sum(1 for _, is_new in added if is_new)
     s.log_search("bulk" if args.bulk else "search", args.query,
                  {"year": args.year, "sort": args.sort, "ssci_only": args.ssci_only, "limit": limit, "field": field,
-                  "journals": "; ".join(args.journal or []) or None},
+                  "journals": "; ".join(args.journal or []) or None,
+                  # 誌を指定した検索は OpenAlex でも探す。使ったか（used / failed）と、足した件数
+                  "openalex": openalex.get("openalex"), "openalex_added": from_openalex},
                  len(results), new)
     render_and_report(s)
     if args.json:
@@ -1380,6 +1389,8 @@ def cmd_get(args, client):
           + (t(" (DOI verified with OpenAlex)") if p["verified"] and p["source"] != "OpenAlex" else ""))
     for w in p["warnings"]:
         print(f"⚠️  {w}")
+    for n in p.get("notes", []):
+        print(f"ℹ️  {n}")
     print(f"OA PDF:    {p['oa_pdf'] or 'N/A'}")
     if p["tldr"]:
         print(f"TL;DR:     {p['tldr']}")
@@ -1628,7 +1639,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--year", help=t("a year or a range (e.g. 2015-2024)"))
     p.add_argument("--bulk", action="store_true", help=t("bulk search (boolean operators, most cited first)"))
     p.add_argument("--journal", action="append", metavar="NAME",
-                   help=t("only papers in this journal (its full name; repeat for several)"))
+                   help=t("only papers in this journal (its full name or ISSN; repeat for several). "
+                          "Searched in both Semantic Scholar and OpenAlex"))
     p.add_argument("--sort", choices=SORTS, default="citations",
                    help=t("citations / relevance / recent (newest first) / cpy (citations per year)"))
     p.add_argument("--field", choices=list(SEARCH_FIELDS),

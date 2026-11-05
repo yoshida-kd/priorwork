@@ -124,8 +124,10 @@ my-surveys/
 ```
 
 - 既定は Semantic Scholar の関連度検索。`--bulk`: `+`（かつ）、`|`（または）、`-`（除く）、`"句"`、被引用の多い順（`AND`・`OR`・`NOT` はこれに直す）。
-- `--sort citations|relevance|recent|cpy`、`--year`、`--journal`（正式名。繰り返せる）、`--ssci-only`、`--field social|all`、`--limit N`（full のサーベイに入れるときは既定 25、ほかは 10）、`--include-preprints`（本・ワーキングペーパー・プレプリント・掲載先不明は既定で除く）。
+- `--sort citations|relevance|recent|cpy`、`--year`、`--journal`（正式名か ISSN。繰り返せる）、`--ssci-only`、`--field social|all`、`--limit N`（full のサーベイに入れるときは既定 25、ほかは 10）、`--include-preprints`（本・ワーキングペーパー・プレプリント・掲載先不明は既定で除く）。
 - DOI・掲載誌・ISSN は OpenAlex で照合する。ワーキングペーパーと掲載版が両方見つかれば、掲載版だけを残す。
+- `--journal` を付けると、Semantic Scholar（`venue` で絞る）**と** OpenAlex（誌名か ISSN から引いた誌の source ID で絞る）の両方で探す。Semantic Scholar は誌名（venue）を持たない論文が多く、venue での絞り込みから黙って落ちる。OpenAlex の結果のうち Semantic Scholar に無かったものを足し（DOI で重複を除く。`--bulk` なら被引用数で並べ直し、それ以外は Semantic Scholar の結果の後ろに足す）、足した件数をお知らせに出す。どちらで見つかったかは各レコードの `found_in` に、検索ログには `openalex`（`used` / `failed`）と `openalex_added` が残る。OpenAlex が失敗したら、お知らせを出して Semantic Scholar の結果だけを返す。`--journal` が無ければ OpenAlex では検索しない（キーワード検索の精度が低い）。
+- 雑誌の論文なのに DOI がプレプリント・WP のもの（OSF・SocArXiv・SSRN・arXiv・NBER など）か OpenAlex の知らないものは、題名で OpenAlex を引く（誌の source ID か ISSN も添える）。雑誌版が一致すれば（`same_title`、年の差 ±2 以内）その DOI と書誌情報に替え、元の DOI を `preprint_doi` に残し、注記（ℹ️、`notes`）を付ける。一致しなければ警告のまま。1 回の検索で 10 件まで引く。
 
 ### 3.2 引用をたどる
 

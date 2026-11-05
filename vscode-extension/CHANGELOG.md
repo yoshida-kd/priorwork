@@ -3,6 +3,21 @@
 Priorwork's command-line tool (`priorwork` on PyPI) and this extension are
 released together, under one version number.
 
+## 0.1.12
+
+- **`search --journal` no longer misses papers that Semantic Scholar has no journal name for.**
+  Semantic Scholar narrows by journal through its `venue`, which is often empty — Moynihan, Herd &
+  Harvey (2014) in JPART, cited over a thousand times, did not come up. A search narrowed to journals
+  now also searches OpenAlex, with the journal picked by its ID (from its name or ISSN), and adds what
+  Semantic Scholar did not have; the notice says how many, and the search log records it. When
+  OpenAlex fails, the Semantic Scholar results are returned as before. Without `--journal` nothing
+  changes. `--journal` also takes an ISSN.
+- **A preprint DOI on a journal paper is replaced with the journal version.** When Semantic Scholar
+  gives a journal paper the DOI of an OSF / SocArXiv / SSRN / arXiv / NBER version (or one OpenAlex
+  does not know), Priorwork looks the title up in OpenAlex and, when the journal version matches,
+  takes its DOI and details, keeping the old DOI (`preprint_doi`) and a note (ℹ️). Otherwise the
+  warning stays, as before.
+
 ## 0.1.11
 
 - **The documentation, regrouped like Octavo's.** A simpler top page with a quick guide, the guide

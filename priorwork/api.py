@@ -72,6 +72,8 @@ OPENALEX_SELECT = (
 )
 
 OPENALEX_BATCH = 50
+# 雑誌版を題名で探す問い合わせは 1 件ずつなので、1 回の検索・照合で引く件数に上限を設ける
+MAX_VERSION_LOOKUPS = 10
 RETRY_STATUSES = {429, 500, 502, 503, 504}
 BACKOFF_DELAYS = [5, 10, 20, 40, 60]
 
@@ -98,10 +100,70 @@ def journal_key(name: str) -> str:
     return re.sub(r"^the ", "", s)
 
 
+# 誌の OpenAlex source ID（/sources/issn:… で確かめたもの）。よく使う誌は名前から引く問い合わせを省く
+KNOWN_SOURCES = {journal_key(name): sid for name, sid in (
+    ("Journal of Public Administration Research and Theory", "S169433491"),
+    ("American Political Science Review", "S176007004"),
+    ("American Journal of Political Science", "S90314269"),
+    ("British Journal of Political Science", "S95691132"),
+    ("Public Administration Review", "S76877748"),
+    ("Public Administration", "S201221823"),
+)}
+
+ISSN_RE = re.compile(r"^\d{4}-?\d{3}[\dX]$", re.IGNORECASE)
+
+# プレプリント・WP の DOI（OSF 系・SSRN・arXiv・NBER・Research Square・Preprints.org）
+PREPRINT_DOI_RE = re.compile(
+    r"^10\.(?:3121\d|3122\d|3123\d|31124)/|^10\.2139/ssrn|^10\.48550/arxiv|^10\.3386/w\d|"
+    r"^10\.21203/rs\.|^10\.20944/preprints", re.IGNORECASE)
+
+
+def preprint_doi(doi: str) -> bool:
+    return bool(PREPRINT_DOI_RE.search(doi or ""))
+
+
+def openalex_years(year: Optional[str]) -> str:
+    """S2 の年の指定（2019 / 2013-2022 / 2013- / -2022）を OpenAlex の filter にする。"""
+    m = re.fullmatch(r"\s*(\d{4})?\s*(-)?\s*(\d{4})?\s*", year or "")
+    if not m or not (m.group(1) or m.group(3)):
+        return ""
+    start, dash, end = m.groups()
+    if not dash:
+        return f"publication_year:{start or end}"
+    if start and end:
+        return f"publication_year:{start}-{end}"
+    return f"publication_year:>{int(start) - 1}" if start else f"publication_year:<{int(end) + 1}"
+
+
+def openalex_query(query: str) -> str:
+    """検索語を OpenAlex の .search の形にする: + / | / -（bulk の書き方）を AND / OR / NOT に、
+    カンマ（filter の区切り）は空白に。引用符の中は変えない。"""
+    parts = re.split(r'("[^"]*")', bulk_query(query))
+    for i in range(0, len(parts), 2):
+        p = parts[i].replace(",", " ")
+        p = re.sub(r"\s*\|\s*", " OR ", p)
+        p = re.sub(r"\s*\+\s*", " AND ", p)
+        parts[i] = re.sub(r"(^|\s)-(?=[\w(\"])", r"\1NOT ", p)
+    return re.sub(r"\s+", " ", "".join(parts)).strip()
+
+
+def title_query(title: str) -> str:
+    """題名を OpenAlex の title.search に渡せる形にする（カンマを除き、AND / OR / NOT を演算子にしない）。"""
+    s = re.sub(r"[,\"]", " ", title or "")
+    s = re.sub(r"\b(AND|OR|NOT)\b", lambda m: m.group(1).lower(), s)
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def _close_years(a: Optional[int], b: Optional[int], within: int = 2) -> bool:
+    return not a or not b or abs(a - b) <= within
+
+
 def in_journals(record: Dict[str, Any], journals: Sequence[str]) -> bool:
-    """論文の誌名が、指定した誌のどれかと同じか。"""
-    keys = {journal_key(j) for j in journals}
-    return journal_key(record.get("journal_name") or "") in keys
+    """論文の誌が、指定した誌（誌名か ISSN）のどれかと同じか。"""
+    issns = {j.strip().upper().replace("-", "") for j in journals if ISSN_RE.match(j.strip())}
+    keys = {journal_key(j) for j in journals if not ISSN_RE.match(j.strip())}
+    return journal_key(record.get("journal_name") or "") in keys or \
+        any(i.upper().replace("-", "") in issns for i in record.get("issns") or [])
 
 
 def bulk_query(query: str) -> str:
@@ -232,12 +294,14 @@ def _record(**kw) -> Dict[str, Any]:
         "openalex_id": "",
         "verified": False,   # OpenAlex で DOI 照合済みか
         "warnings": [],
+        "notes": [],         # 知らせるだけのこと（DOI を雑誌版に替えた、など）。確かめる必要のあるものは warnings
     }
     rec.update({k: v for k, v in kw.items() if v is not None})
     # 雑誌側の脚注記号（"...Jobs*" など）が Markdown の強調を壊すので落とす
     rec["title"] = re.sub(r"\s*[*†‡]+$", "", rec["title"])
     rec["authors"] = [author_name(a) for a in rec["authors"] if author_name(a)]
     rec["warnings"] = list(rec["warnings"])
+    rec["notes"] = list(rec["notes"])
     if re.search(r",\s*(?:edited\s+)?by\s+[A-Z]", rec["title"]) or re.fullmatch(r"(\d+)\s*-+\s*\1", rec["pages"]):
         rec["warnings"].append(t("May be a book review or comment (guessed from the title or the page range)"))
     rec["ssci"] = classify_paper(rec)
@@ -323,6 +387,28 @@ def _date_year(part: Any) -> Optional[int]:
     return y if 1800 < y < 2200 else None
 
 
+def merge_found(s2: List[Dict[str, Any]], oa: List[Dict[str, Any]], bulk: bool) -> List[Dict[str, Any]]:
+    """S2 の結果に、OpenAlex の結果のうち S2 に無かったものを足す（DOI・OpenAlex ID・題名と年で同じ論文を見る）。
+
+    bulk（被引用順）なら被引用数で並べ直し、関連度順なら S2 の順のまま後ろに足す。どちらで見つかったかは
+    found_in に残す。同じ論文で S2 の側がプレプリント版なら、OpenAlex の雑誌版に替える。"""
+    out = list(s2)
+    for r in oa:
+        same = next((p for p in out if (r["doi"] and r["doi"].lower() in {p["doi"].lower(), (p.get("preprint_doi") or "").lower()})
+                     or (r["openalex_id"] and r["openalex_id"] == p.get("openalex_id"))
+                     or (ssci.same_title(p["title"], r["title"]) and _close_years(p.get("year"), r.get("year")))), None)
+        if same is None:
+            out.append(r)
+            continue
+        found = list(dict.fromkeys([*same.get("found_in", []), "OpenAlex"]))
+        if r["ssci"]["tier"] > same["ssci"]["tier"] and r["doi"] and same["doi"] and r["doi"].lower() != same["doi"].lower():
+            LiteratureClient._take_journal_version(same, r, list(same["warnings"]))
+        same["found_in"] = found
+    if bulk:
+        out.sort(key=lambda p: p.get("citation_count") or 0, reverse=True)
+    return out
+
+
 # ---------------- Client ----------------
 
 class LiteratureClient:
@@ -333,6 +419,8 @@ class LiteratureClient:
         self.use_cache = use_cache and os.environ.get("PRIORWORK_NO_CACHE") != "1"
         self.max_retries = int(os.environ.get("PRIORWORK_MAX_RETRIES") or 5)
         self._last_request: Dict[str, float] = {}
+        self._source_ids: Dict[str, str] = {}     # journal_key -> OpenAlex source ID（この実行で分かったもの）
+        self.last_search: Dict[str, Any] = {}     # 直前の search() で OpenAlex をどう使ったか（検索ログ用）
 
     # ---- HTTP ----
 
@@ -512,15 +600,23 @@ class LiteratureClient:
                 r["warnings"].append(t("DOI not verified"))
             return records
 
+        # 雑誌版を探す候補: S2 の誌名は雑誌なのに、DOI がプレプリント・WP のもの、または OpenAlex が知らないもの
+        versions: List[tuple] = []
         for r in with_doi:
             w = works.get(r["doi"].lower())
+            s2_journal, s2_status, s2_issns = r["journal_name"], r["ssci"]["status"], list(r["issns"])
+            journal_like = bool(s2_journal) and s2_status != ssci.PREPRINT
             if not w:
-                r["warnings"].append(t("OpenAlex does not know the DOI (verify the DOI)"))
+                warning = t("OpenAlex does not know the DOI (verify the DOI)")
+                r["warnings"].append(warning)
+                if journal_like:
+                    versions.append((r, s2_journal, s2_issns, [warning]))
                 continue
             oa = from_openalex(w)
+            added = []
             if not ssci.same_title(oa["title"], r["title"]):
-                r["warnings"].append(t("The DOI points to another title: \"{title}\" (verify the DOI)", title=oa["title"]))
-            s2_journal, s2_status = r["journal_name"], r["ssci"]["status"]
+                added.append(t("The DOI points to another title: \"{title}\" (verify the DOI)", title=oa["title"]))
+                r["warnings"].append(added[-1])
             # Zotero 取り込み・SSCI 照合に使う書誌情報は、DOI の実体（OpenAlex）側で丸ごと置き換える
             for field in ("journal_name", "issns", "source_type", "publication_types", "volume", "issue", "pages"):
                 r[field] = oa[field]
@@ -533,9 +629,108 @@ class LiteratureClient:
             r["openalex_id"] = oa["openalex_id"]
             r["ssci"] = ssci.classify_paper(r)
             if r["ssci"]["status"] == ssci.PREPRINT and s2_status != ssci.PREPRINT and s2_journal:
-                r["warnings"].append(t("S2 gives the journal as \"{journal}\", but the DOI is a working paper / preprint version "
-                                         "(find the DOI of the published version)", journal=s2_journal))
+                added.append(t("S2 gives the journal as \"{journal}\", but the DOI is a working paper / preprint version "
+                               "(find the DOI of the published version)", journal=s2_journal))
+                r["warnings"].append(added[-1])
+            if journal_like and (preprint_doi(r["doi"]) or r["ssci"]["status"] == ssci.PREPRINT):
+                versions.append((r, s2_journal, s2_issns, added))
+        self._use_journal_versions(versions)
         return records
+
+    def _journal_version(self, r: Dict[str, Any], journal: str, issns: Sequence[str]) -> Optional[Dict[str, Any]]:
+        """題名（と、分かれば誌）で OpenAlex を引き、同じ論文の雑誌版を返す。無ければ None。"""
+        filters = [f"title.search:{title_query(r['title'])}"]
+        sid = self._source_ids.get(journal_key(journal)) or KNOWN_SOURCES.get(journal_key(journal))
+        if sid:
+            filters.append(f"primary_location.source.id:{sid}")
+        elif issns:
+            filters.append(f"primary_location.source.issn:{issns[0]}")
+        data = self._openalex("/works", {"filter": ",".join(filters), "per_page": 5, "select": OPENALEX_SELECT})
+        for w in data.get("results") or []:
+            oa = from_openalex(w)
+            if (oa["doi"] and oa["doi"].lower() != r["doi"].lower() and not preprint_doi(oa["doi"])
+                    and oa["ssci"]["status"] != ssci.PREPRINT and ssci.same_title(oa["title"], r["title"])
+                    and _close_years(oa["year"], r["year"])):
+                return oa
+        return None
+
+    def _use_journal_versions(self, versions: List[tuple]):
+        """プレプリント・WP の DOI が付いた雑誌論文の DOI と書誌情報を、OpenAlex で見つけた雑誌版に替える。
+        見つからなければ警告のまま。問い合わせは MAX_VERSION_LOOKUPS 件まで。"""
+        for n, (r, journal, issns, added) in enumerate(versions):
+            if n >= MAX_VERSION_LOOKUPS:
+                print("[Notice] " + t("Did not look for the journal version of {n|# more paper|# more papers} "
+                                      "(at most {max} per search; the warnings stay)",
+                                      n=len(versions) - n, max=MAX_VERSION_LOOKUPS), file=sys.stderr)
+                return
+            try:
+                oa = self._journal_version(r, journal, issns)
+            except ApiError as e:
+                print("[Notice] " + t("{error} → the journal versions of preprint DOIs are not looked for", error=e),
+                      file=sys.stderr)
+                return
+            if oa:
+                self._take_journal_version(r, oa, added)
+
+    @staticmethod
+    def _take_journal_version(r: Dict[str, Any], oa: Dict[str, Any], dropped_warnings: Sequence[str] = ()):
+        old = r["doi"]
+        for field in ("journal_name", "issns", "source_type", "publication_types", "volume", "issue", "pages",
+                      "doi", "url", "openalex_id"):
+            r[field] = oa[field]
+        if oa["year"]:
+            r["year"] = oa["year"]
+        if not r["abstract"]:
+            r["abstract"] = oa["abstract"]
+        r["preprint_doi"] = old
+        r["verified"] = True
+        r["warnings"] = [w for w in r["warnings"] if w not in dropped_warnings
+                         and w != t("OpenAlex does not know the DOI (verify the DOI)")]
+        r["notes"].append(t("Replaced the preprint / working-paper DOI {old} with the journal version {doi}",
+                            old=old, doi=oa["doi"]))
+        r["ssci"] = ssci.classify_paper(r)
+
+    def journal_source_ids(self, journals: Sequence[str]) -> Dict[str, str]:
+        """誌名か ISSN ごとの OpenAlex source ID。OpenAlex に見つからない誌は入らない。"""
+        ids: Dict[str, str] = {}
+        for j in journals:
+            key = journal_key(j)
+            sid = self._source_ids.get(key) or KNOWN_SOURCES.get(key)
+            if not sid and ISSN_RE.match(j.strip()):
+                try:
+                    sid = self._openalex(f"/sources/issn:{j.strip().upper()}", {"select": "id,display_name"}).get("id")
+                except ApiError as e:
+                    if e.status != 404:
+                        raise
+            elif not sid:
+                data = self._openalex("/sources", {"search": j, "per_page": 10,
+                                                   "select": "id,display_name,alternate_titles"})
+                for src in data.get("results") or []:
+                    names = [src.get("display_name") or "", *(src.get("alternate_titles") or [])]
+                    if key in {journal_key(n) for n in names}:
+                        sid = src.get("id")
+                        break
+            if sid:
+                sid = sid.replace("https://openalex.org/", "")
+                self._source_ids[key] = sid
+                ids[j] = sid
+        return ids
+
+    def _search_openalex(self, query: str, limit: int, year: Optional[str], bulk: bool,
+                         source_ids: Sequence[str]) -> List[Dict[str, Any]]:
+        """誌（source ID）で絞って OpenAlex を検索する。誌の絞り込みが ID で確かに効くときだけ使う。"""
+        filters = ["primary_location.source.id:" + "|".join(source_ids)]
+        years = openalex_years(year)
+        if years:
+            filters.append(years)
+        q = openalex_query(query)
+        if q:
+            filters.append(f"title_and_abstract.search:{q}")
+        params = {"filter": ",".join(filters), "per_page": min(max(limit, 1), 200), "select": OPENALEX_SELECT}
+        if bulk:
+            params["sort"] = "cited_by_count:desc"
+        data = self._openalex("/works", params)
+        return [dict(from_openalex(w), verified=True, found_in=["OpenAlex"]) for w in data.get("results") or []]
 
     def _linked_openalex(self, ident: Dict[str, str], kind: str, limit: int) -> List[Dict[str, Any]]:
         if ident["type"] in ("s2", "arxiv"):
@@ -557,9 +752,42 @@ class LiteratureClient:
 
     def search(self, query: str, limit: int = 20, year: Optional[str] = None, bulk: bool = False,
                journals: Sequence[str] = ()) -> List[Dict[str, Any]]:
-        """S2 で検索し、結果を OpenAlex で DOI 照合する。S2 が失敗したらエラー（OpenAlex 検索は精度が低いため使わない）。
-        journals を渡すと、その誌（正式な誌名）に載った論文だけ。"""
-        return self._verify_with_openalex(self._search_s2(query, limit, year, bulk, journals))
+        """S2 で検索し、結果を OpenAlex で DOI 照合する。S2 が失敗したらエラー。
+
+        誌を指定しない検索では OpenAlex の検索は使わない（題名・要旨の検索の精度が低い）。
+        journals を渡すと、その誌（正式な誌名か ISSN）に載った論文だけ。このときは OpenAlex でも、誌を
+        source ID で絞って検索し、S2 に無かったものを足す: S2 は誌名（venue）が空の論文が多く、venue での
+        絞り込みからは黙って落ちる。誌の絞り込みは ID で確かに効くので、取りこぼしを拾う補助に使える。
+        OpenAlex が失敗したら S2 の結果だけを返す。どう使ったかは self.last_search に残す。"""
+        s2 = [dict(r, found_in=["SemanticScholar"]) for r in self._search_s2(query, limit, year, bulk, journals)]
+        self.last_search = {}
+        failed: Optional[ApiError] = None
+        ids: Dict[str, str] = {}
+        if journals:
+            try:
+                ids = self.journal_source_ids(journals)
+            except ApiError as e:
+                failed = e
+        records = self._verify_with_openalex(s2)
+        if not journals:
+            return records
+        missing = [j for j in journals if j not in ids]
+        if not failed and missing:
+            print("[Notice] " + t("OpenAlex does not know the journal {names}, so it was searched in S2 only",
+                                  names=" / ".join(missing)), file=sys.stderr)
+        if not failed and ids:
+            try:
+                extra = self._search_openalex(query, limit, year, bulk, list(ids.values()))
+            except ApiError as e:
+                failed = e
+            else:
+                records = merge_found(records, extra, bulk)
+                self.last_search = {"openalex": "used", "sources": ids}
+        if failed:
+            print("[Notice] " + t("{error} → only the S2 results (OpenAlex was not searched for the journals)",
+                                  error=failed), file=sys.stderr)
+            self.last_search = {"openalex": "failed"}
+        return records
 
     def get_paper(self, identifier: str) -> Dict[str, Any]:
         """S2 で取得して DOI 照合する。S2 に無い（404）DOI / OpenAlex ID は OpenAlex から取得する。"""
