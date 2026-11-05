@@ -143,8 +143,10 @@ surveys.
 - `--journal` searches Semantic Scholar (by `venue`) **and** OpenAlex (by the journal's source ID,
   from its name or ISSN). Semantic Scholar often has no venue for a paper, and the venue filter
   drops it silently; OpenAlex's results that Semantic Scholar did not have are added (merged by DOI;
-  with `--bulk` re-sorted by citations, otherwise appended after Semantic Scholar's), and a notice
-  says how many. Each record's `found_in` says where it was found, and the search log records
+  with `--bulk` re-sorted by citations; otherwise Semantic Scholar's order is kept and each added
+  paper goes in at its OpenAlex rank), and a notice says how many. With `--journal` the results are
+  not grouped by SSCI status (same journals). Each record's `found_in` says where it was found (the
+  list shows it as "found in: S2 / OpenAlex / S2 + OpenAlex"), and the search log records
   `openalex` (`used` / `failed`) and `openalex_added`. When OpenAlex fails, the Semantic Scholar
   results are returned alone, with a notice. Without `--journal`, OpenAlex is not searched (its
   keyword search is less precise).
@@ -362,6 +364,10 @@ checked in the full text, and the length leaves out citations in parentheses unl
   before the cards and add once the user agrees; in auto add without stopping; in manual ask.
 - Once linked, "in Zotero" means in that collection (and those under it); full texts come from
   its PDFs first.
+- The library is read from zotero.org and kept in `.priorwork/cache/zotero/` (only the changes are
+  read; `--refresh` reads all). When a paper has no PDF there, `fulltext` asks Zotero for that
+  paper's attachments again. When the library has the same paper twice, the one with a PDF is used
+  and a notice names both: ask the user to merge them in Zotero (Duplicate Items).
 
 ---
 

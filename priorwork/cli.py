@@ -91,8 +91,9 @@ USAGE_LINES = [
 # ---------------- Helpers ----------------
 
 def rank_and_filter(papers: List[Dict[str, Any]], include_preprints: bool = False, ssci_only: bool = False,
-                    sort: str = "citations") -> List[Dict[str, Any]]:
-    """同一論文を統合し、除外ルールを適用して「SSCI 判定 → 指定した順」に並べる。"""
+                    sort: str = "citations", by_tier: bool = True) -> List[Dict[str, Any]]:
+    """同一論文を統合し、除外ルールを適用して「SSCI 判定 → 指定した順」に並べる。by_tier=False なら
+    SSCI 判定では並べない（誌を指定した検索では誌は同じで、判定の差はデータの揃い方の差でしかない）。"""
     this_year = date.today().year
 
     def secondary(p):
@@ -118,7 +119,7 @@ def rank_and_filter(papers: List[Dict[str, Any]], include_preprints: bool = Fals
         if ssci_only and status not in (ssci.SSCI, ssci.SSCI_LIKELY):
             continue
         kept.append(p)
-    return sorted(kept, key=lambda p: (p["ssci"]["tier"], secondary(p)), reverse=True)
+    return sorted(kept, key=lambda p: (p["ssci"]["tier"] if by_tier else 0, secondary(p)), reverse=True)
 
 
 def print_paper(p: Dict[str, Any], prefix: str, abstract: bool = False, extra: str = ""):
@@ -1303,7 +1304,10 @@ def cmd_search(args, client):
                                   "To keep them, add --field all", n=len(dropped),
                                   example=", ".join(sorted({f for p in dropped for f in p["fields"]})[:3])),
                   file=sys.stderr)
-    results = rank_and_filter(papers, args.include_preprints, args.ssci_only, args.sort)[:limit]
+    # 誌を指定したら SSCI 判定では並べない: OpenAlex で補った論文は ISSN が揃って判定が上がりやすく、
+    # 関連度順でもまとめて先頭に来てしまう
+    results = rank_and_filter(papers, args.include_preprints, args.ssci_only, args.sort,
+                              by_tier=not args.journal)[:limit]
     client.complete_abstracts(results)
     openalex = getattr(client, "last_search", None) or {}
     from_openalex = sum(1 for p in results if p.get("found_in") == ["OpenAlex"])
@@ -1320,7 +1324,7 @@ def cmd_search(args, client):
             return dump_json(results)
         print(t("Results for '{query}': {n|# paper|# papers}", query=args.query, n=len(results)) + "\n")
         for i, p in enumerate(results, 1):
-            print_paper(p, f"[{i}]")
+            print_paper(p, f"[{i}]", extra=found_in_label(p) if args.journal else "")
         return
 
     added = add_records(s, results, "search")
@@ -1336,8 +1340,16 @@ def cmd_search(args, client):
         return dump_json({"query": args.query, "hits": len(results), "new": new, "added": added_json(added)})
     print(t("'{query}' → {n|# paper|# papers} ({new} new {new|candidate|candidates} added to {name})",
             query=args.query, n=len(results), new=new, name=s.name) + "\n")
-    for entry, is_new in added:
-        print_paper(entry["record"], entry_prefix(entry, is_new), abstract=args.abstract)
+    for (entry, is_new), p in zip(added, results):
+        print_paper(entry["record"], entry_prefix(entry, is_new), abstract=args.abstract,
+                    extra=found_in_label(p) if args.journal else "")
+
+
+def found_in_label(p: Dict[str, Any]) -> str:
+    """誌を指定した検索で、どちらで見つかったか（S2 だけ / OpenAlex だけ / 両方）。"""
+    names = {"SemanticScholar": "S2", "OpenAlex": "OpenAlex"}
+    found = [names.get(f, f) for f in p.get("found_in") or []]
+    return (" | " + t("found in: {sources}", sources=" + ".join(found))) if found else ""
 
 
 def cmd_snowball(args, client):

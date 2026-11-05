@@ -211,7 +211,7 @@ def fetch_fulltext(entry: Dict[str, Any], client: Any, pdf_path: Optional[str] =
     if pdf is None and zotero is not None:
         try:
             item = zotero.find_item(record)
-            attachments = zotero.pdf_attachments(item["key"]) if item else []
+            attachments = zotero.pdf_attachments(item["key"], refresh=True) if item else []
             if not item:
                 attempts.append(t("Not in the Zotero library (matched by DOI and title)"))
             elif not attachments:

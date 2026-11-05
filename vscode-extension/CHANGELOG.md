@@ -3,6 +3,24 @@
 Priorwork's command-line tool (`priorwork` on PyPI) and this extension are
 released together, under one version number.
 
+## 0.1.13
+
+- **Zotero: PDFs attached while the Zotero app was syncing are no longer lost.** The library was
+  read page by page and the version of the last page was kept, so attachments that arrived while it
+  was being read were never read, and later reads of the changes skipped them too (only `--refresh`
+  found them). Now the changes are listed by key (`format=versions`, attachments included) and
+  fetched by key, and a full read that saw the library change reads the changes again. When a paper
+  still has no PDF in the list, `fulltext` asks Zotero for that paper's attachments
+  (`pdf_attachments(key, refresh=True)`).
+- **Zotero: when the same paper is in the library twice, the one with a PDF is used.** The items
+  with the same DOI (or the same title and no other DOI) are ordered: in the survey's collection,
+  with a PDF, with any attachment. A notice names the duplicates, to merge in Zotero.
+  `ZoteroClient.find_items()` returns them all.
+- **`search --journal --sort relevance` keeps Semantic Scholar's order.** The papers added from
+  OpenAlex had their ISSNs and so a higher SSCI status, and came first as a block; with `--journal`
+  the results are no longer grouped by SSCI status, and each added paper goes in at its OpenAlex
+  rank. The list shows where each paper was found (S2 / OpenAlex / both).
+
 ## 0.1.12
 
 - **`search --journal` no longer misses papers that Semantic Scholar has no journal name for.**

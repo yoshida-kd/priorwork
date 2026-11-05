@@ -290,6 +290,8 @@ MESSAGES = {
         "認証に失敗しました（HTTP {status}）。.env のキー・ユーザー ID・パスワードと、キーの権限（library access）を確認してください",
     "Gave up after too many retries": "再試行の上限に達しました",
     "Cannot read the library (HTTP {status}): {detail}": "ライブラリを取得できません（HTTP {status}）: {detail}",
+    "The Zotero library has {n} items for \"{title}\" ({keys}); using {key}. Merge them in Zotero (Duplicate Items)":
+        "Zotero のライブラリに「{title}」が {n} 件あります（{keys}）。{key} を使います。Zotero の「重複アイテム」で統合してください",
     "A linked file ({name}) is not synced to the server, so it cannot be fetched":
         "リンクされたファイル（{name}）はサーバーに同期されないため取得できません",
     "{file} is not on the WebDAV server (Zotero may not have synced the file yet)":
@@ -374,6 +376,7 @@ MESSAGES = {
 
     # -- CLI（cli.py） ---------------------------------------------------------------
     "Abstract: {text}": "要旨: {text}",
+    "found in: {sources}": "見つけた所: {sources}",
     "No SSCI journal list is set, so the SSCI status is guessed from the journal name.":
         "SSCI 収録リストが未設定のため、SSCI 判定は誌名による推定です。",
     "new candidate": "新規候補",

@@ -126,46 +126,19 @@ class ZoteroClient:
     # ---- Library index ----
 
     def sync(self, force: bool = False) -> Dict[str, Any]:
-        """ライブラリの論文・添付ファイルの一覧を差分同期して .priorwork/cache/zotero/index.json に保存する。"""
+        """ライブラリの論文・添付ファイルの一覧を差分同期して .priorwork/cache/zotero/index.json に保存する。
+
+        差分は、前の版より後に変わったアイテム（親も、添付などの子も）のキーを `format=versions` で一度に
+        受け取り、その中身をキーで取ってくる。Zotero のアプリが同期している最中に読んでも取りこぼさない:
+        以前はページをめくって読み、最後のページの版を覚えていたので、読んでいる間に増えた添付が
+        （最初のページより前に並ぶため）一度も読まれないまま「済み」になっていた。"""
         index = self._load_index()
-        if force:
+        if force or not index.get("version"):
             index = {"version": 0, "items": {}}
+            new_version = self._read_all(index)
+        else:
+            new_version = self._read_changes(index, index["version"])
         since = index["version"]
-
-        headers = {"If-Modified-Since-Version": str(since)} if since else {}
-        start, new_version = 0, since
-        while True:
-            resp = self._get(f"{self.prefix}/items", {"format": "json", "limit": 100, "start": start, "since": since},
-                             headers=headers)
-            if resp.status_code == 304:
-                break
-            if not resp.ok:
-                raise ZoteroError("[Zotero] " + t("Cannot read the library (HTTP {status}): {detail}", status=resp.status_code, detail=resp.text[:200]))
-            new_version = int(resp.headers.get("Last-Modified-Version", new_version))
-            batch = resp.json()
-            for item in batch:
-                data = item.get("data") or {}
-                if data.get("deleted") or data.get("itemType") in ("note", "annotation"):
-                    index["items"].pop(item["key"], None)
-                    continue
-                index["items"][item["key"]] = {
-                    "key": item["key"],
-                    "itemType": data.get("itemType", ""),
-                    "title": data.get("title", ""),
-                    "doi": normalize_doi(data.get("DOI") or "") or
-                           normalize_doi((_DOI_IN_EXTRA.search(data.get("extra") or "") or [None, ""])[1]),
-                    "year": (re.search(r"\d{4}", data.get("date") or "") or [""])[0],
-                    "parentItem": data.get("parentItem", ""),
-                    "contentType": data.get("contentType", ""),
-                    "linkMode": data.get("linkMode", ""),
-                    "filename": data.get("filename", ""),
-                    "collections": data.get("collections") or [],
-                }
-            total = int(resp.headers.get("Total-Results", len(batch)))
-            start += len(batch)
-            if not batch or start >= total:
-                break
-
         if new_version != since or "collections" not in index:
             index["collections"] = self._fetch_collections()
         if since and new_version != since:
@@ -178,6 +151,84 @@ class ZoteroClient:
         self._save_index(index)
         self._index = index
         return index
+
+    def _read_all(self, index: Dict[str, Any]) -> int:
+        """ライブラリ全体をページをめくって読み、最初のページの版を返す。読んでいる間に変わったものは、
+        その版からの差分でもう一度読む（後ろで _read_changes）。"""
+        start, first = 0, None
+        while True:
+            resp = self._get(f"{self.prefix}/items", {"format": "json", "limit": 100, "start": start,
+                                                      "sort": "dateAdded", "direction": "asc"})
+            if not resp.ok:
+                raise ZoteroError("[Zotero] " + t("Cannot read the library (HTTP {status}): {detail}",
+                                                  status=resp.status_code, detail=resp.text[:200]))
+            version = int(resp.headers.get("Last-Modified-Version") or 0)
+            first = version if first is None else first
+            batch = resp.json()
+            self._take(index, batch)
+            start += len(batch)
+            if not batch or start >= int(resp.headers.get("Total-Results", len(batch))):
+                break
+        if version != first:
+            return self._read_changes(index, first)
+        return first
+
+    def _read_changes(self, index: Dict[str, Any], since: int) -> int:
+        """since より後に変わったアイテム（子も含む）を読み、今のライブラリの版を返す。"""
+        resp = self._get(f"{self.prefix}/items", {"format": "versions", "since": since, "includeTrashed": 1},
+                         headers={"If-Modified-Since-Version": str(since)})
+        if resp.status_code == 304:
+            return since
+        if not resp.ok:
+            raise ZoteroError("[Zotero] " + t("Cannot read the library (HTTP {status}): {detail}",
+                                              status=resp.status_code, detail=resp.text[:200]))
+        version = int(resp.headers.get("Last-Modified-Version") or since)
+        keys = list(resp.json() or {})
+        for i in range(0, len(keys), WRITE_BATCH):   # キーで引けるのは一度に 50 件まで
+            chunk = keys[i:i + WRITE_BATCH]
+            resp = self._get(f"{self.prefix}/items", {"format": "json", "itemKey": ",".join(chunk),
+                                                      "includeTrashed": 1, "limit": WRITE_BATCH})
+            if not resp.ok:
+                raise ZoteroError("[Zotero] " + t("Cannot read the library (HTTP {status}): {detail}",
+                                                  status=resp.status_code, detail=resp.text[:200]))
+            self._take(index, resp.json())
+        return version
+
+    @staticmethod
+    def _take(index: Dict[str, Any], batch: List[Dict[str, Any]]):
+        for item in batch:
+            data = item.get("data") or {}
+            if data.get("deleted") or data.get("itemType") in ("note", "annotation"):
+                index["items"].pop(item["key"], None)
+                continue
+            index["items"][item["key"]] = {
+                "key": item["key"],
+                "itemType": data.get("itemType", ""),
+                "title": data.get("title", ""),
+                "doi": normalize_doi(data.get("DOI") or "") or
+                       normalize_doi((_DOI_IN_EXTRA.search(data.get("extra") or "") or [None, ""])[1]),
+                "year": (re.search(r"\d{4}", data.get("date") or "") or [""])[0],
+                "parentItem": data.get("parentItem", ""),
+                "contentType": data.get("contentType", ""),
+                "linkMode": data.get("linkMode", ""),
+                "filename": data.get("filename", ""),
+                "collections": data.get("collections") or [],
+            }
+
+    def refresh_children(self, parent_key: str) -> List[Dict[str, Any]]:
+        """一つの親の子（添付）だけを Zotero から読み直して一覧に映し、その子を返す。"""
+        resp = self._get(f"{self.prefix}/items/{parent_key}/children", {"format": "json", "limit": 100})
+        if resp.status_code == 404:
+            return []
+        if not resp.ok:
+            raise ZoteroError("[Zotero] " + t("Cannot read the library (HTTP {status}): {detail}",
+                                              status=resp.status_code, detail=resp.text[:200]))
+        index = self.index
+        for k in [k for k, i in index["items"].items() if i["parentItem"] == parent_key]:
+            index["items"].pop(k)
+        self._take(index, resp.json())
+        self._save_index(index)
+        return [i for i in index["items"].values() if i["parentItem"] == parent_key]
 
     def _fetch_collections(self) -> Dict[str, Dict[str, str]]:
         collections: Dict[str, Dict[str, str]] = {}
@@ -297,29 +348,52 @@ class ZoteroClient:
 
     # ---- Lookup ----
 
-    def find_item(self, record: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """DOI（無ければタイトル）で、論文に対応する Zotero の親アイテムを探す。"""
-        preferred = self.subtree(self.prefer_collection) if self.prefer_collection else set()
-        items = sorted(self._parents(), key=lambda i: not (preferred & set(i.get("collections", []))))
+    def find_items(self, record: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """論文に当たる Zotero の親アイテムをすべて、使いたい順に返す。同じ DOI のものと、DOI の無い
+        （または同じ DOI の）同じタイトルのもの。並びは、結び付けたコレクションの中のもの → PDF のあるもの →
+        添付のあるもの → DOI で一致したもの。"""
         doi = normalize_doi(record.get("doi", ""))
-        if doi:
-            for i in items:
-                if i["doi"] == doi:
-                    return i
         title = ssci.normalize_title(record.get("title", ""))
-        if len(title) > 20:
-            for i in items:
-                if ssci.normalize_title(i["title"]) == title:
-                    return i
-        return None
+        by_doi, by_title = [], []
+        for i in self._parents():
+            if doi and i["doi"] == doi:
+                by_doi.append(i)
+            elif len(title) > 20 and (not i["doi"] or not doi) and ssci.normalize_title(i["title"]) == title:
+                by_title.append(i)
+        hits = by_doi + by_title
+        if len(hits) < 2:
+            return hits
+        preferred = self.subtree(self.prefer_collection) if self.prefer_collection else set()
+        children: Dict[str, List[Dict[str, Any]]] = {}
+        for i in self.index["items"].values():
+            if i["parentItem"]:
+                children.setdefault(i["parentItem"], []).append(i)
+        return sorted(hits, key=lambda i: (not (preferred & set(i.get("collections", []))),
+                                           not any(c["contentType"] == "application/pdf" for c in children.get(i["key"], [])),
+                                           not children.get(i["key"]), i not in by_doi))
 
-    def pdf_attachments(self, parent_key: str) -> List[Dict[str, Any]]:
-        return [i for i in self.index["items"].values()
+    def find_item(self, record: Dict[str, Any], warn: bool = True) -> Optional[Dict[str, Any]]:
+        """DOI（無ければタイトル）で、論文に対応する Zotero の親アイテムを探す。同じ論文が複数あれば
+        PDF のあるものを返し、warn なら重複を知らせる（Zotero の「重複アイテム」で統合してもらう）。"""
+        hits = self.find_items(record)
+        if len(hits) > 1 and warn:
+            print("[Notice] " + t("The Zotero library has {n} items for \"{title}\" ({keys}); using {key}. Merge them "
+                                  "in Zotero (Duplicate Items)", n=len(hits), title=(record.get("title") or "")[:60],
+                                  keys=", ".join(i["key"] for i in hits), key=hits[0]["key"]), file=sys.stderr)
+        return hits[0] if hits else None
+
+    def pdf_attachments(self, parent_key: str, refresh: bool = False) -> List[Dict[str, Any]]:
+        """その親の PDF の添付。refresh なら、手元の一覧に無いときにその親の子だけを Zotero から読み直す
+        （一覧の後に添付した PDF でも見つかる）。"""
+        pdfs = [i for i in self.index["items"].values()
                 if i["parentItem"] == parent_key and i["contentType"] == "application/pdf"]
+        if pdfs or not refresh:
+            return pdfs
+        return [i for i in self.refresh_children(parent_key) if i["contentType"] == "application/pdf"]
 
     def status(self, record: Dict[str, Any], collection: str = "") -> Dict[str, Any]:
         """Zotero にあるか。collection を渡すと、そのコレクションに入っているか（in_collection）も見る。"""
-        item = self.find_item(record)
+        item = self.find_item(record, warn=False)
         if not item:
             return {"registered": False, "key": "", "pdfs": 0, "in_collection": False}
         return {"registered": True, "key": item["key"], "pdfs": len(self.pdf_attachments(item["key"])),

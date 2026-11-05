@@ -390,15 +390,18 @@ def _date_year(part: Any) -> Optional[int]:
 def merge_found(s2: List[Dict[str, Any]], oa: List[Dict[str, Any]], bulk: bool) -> List[Dict[str, Any]]:
     """S2 の結果に、OpenAlex の結果のうち S2 に無かったものを足す（DOI・OpenAlex ID・題名と年で同じ論文を見る）。
 
-    bulk（被引用順）なら被引用数で並べ直し、関連度順なら S2 の順のまま後ろに足す。どちらで見つかったかは
+    bulk（被引用順）なら被引用数で並べ直す。関連度順なら S2 の順を保ち、OpenAlex にだけあった論文は
+    OpenAlex での順位の位置に差し込む（OpenAlex の 3 位なら S2 の 3 位の後ろ）。どちらで見つかったかは
     found_in に残す。同じ論文で S2 の側がプレプリント版なら、OpenAlex の雑誌版に替える。"""
     out = list(s2)
-    for r in oa:
+    rank = {id(p): n for n, p in enumerate(s2)}
+    for n, r in enumerate(oa):
         same = next((p for p in out if (r["doi"] and r["doi"].lower() in {p["doi"].lower(), (p.get("preprint_doi") or "").lower()})
                      or (r["openalex_id"] and r["openalex_id"] == p.get("openalex_id"))
                      or (ssci.same_title(p["title"], r["title"]) and _close_years(p.get("year"), r.get("year")))), None)
         if same is None:
             out.append(r)
+            rank[id(r)] = n + 0.5
             continue
         found = list(dict.fromkeys([*same.get("found_in", []), "OpenAlex"]))
         if r["ssci"]["tier"] > same["ssci"]["tier"] and r["doi"] and same["doi"] and r["doi"].lower() != same["doi"].lower():
@@ -406,6 +409,8 @@ def merge_found(s2: List[Dict[str, Any]], oa: List[Dict[str, Any]], bulk: bool) 
         same["found_in"] = found
     if bulk:
         out.sort(key=lambda p: p.get("citation_count") or 0, reverse=True)
+    else:
+        out.sort(key=lambda p: rank[id(p)])
     return out
 
 

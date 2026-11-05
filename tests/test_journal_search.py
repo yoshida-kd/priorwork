@@ -110,11 +110,28 @@ def test_openalex_fills_in_what_s2_missed(capsys):
     assert c.last_search["openalex"] == "used" and c.last_search["sources"] == {JPART: "S169433491"}
 
 
-def test_relevance_order_keeps_s2_first_and_adds_the_rest_after():
+def test_relevance_order_keeps_s2_and_puts_the_rest_at_their_openalex_rank():
     c = FakeClient(s2=S2_JPART, search=OA_JPART, by_doi=OA_BY_DOI)
     out = c.search("administrative burden", limit=5, journals=[JPART])
     assert "sort" not in searched(c)[0]
-    assert [r["found_in"][0] for r in out] == ["SemanticScholar", "SemanticScholar", "OpenAlex", "OpenAlex"]
+    # S2: Discretion, Racialized。OpenAlex: Moynihan（1位）, Bite（2位）, Discretion（3位、S2 と同じ）
+    assert [r["title"].split()[0] for r in out] == ["Bureaucratic", "Administrative", "Racialized", "The"]
+    assert [r["found_in"] for r in out] == [["SemanticScholar", "OpenAlex"], ["OpenAlex"], ["SemanticScholar"],
+                                            ["OpenAlex"]]
+
+
+def test_with_journals_the_ssci_status_does_not_reorder(ws, monkeypatch, capsys):  # noqa: F811
+    """OpenAlex で補った論文は ISSN が揃い SSCI 判定が上がりやすい。誌を指定したら判定では並べない。"""
+    papers = [dict(from_s2(p), found_in=["SemanticScholar"]) for p in S2_JPART[:1]]
+    papers[0]["ssci"] = dict(papers[0]["ssci"], tier=3)
+    oa = dict(from_s2(S2_JPART[0]), title="Another paper on administrative burden in JPART", doi="10.1093/x",
+              found_in=["OpenAlex"])
+    oa["ssci"] = dict(oa["ssci"], tier=5)
+    assert [p["doi"] for p in cli.rank_and_filter(papers + [oa], sort="relevance")][0] == "10.1093/x"
+    assert [p["doi"] for p in cli.rank_and_filter(papers + [oa], sort="relevance", by_tier=False)][0] == \
+        papers[0]["doi"]
+    assert cli.found_in_label(oa) == " | 見つけた所: OpenAlex"
+    assert cli.found_in_label(dict(oa, found_in=["SemanticScholar", "OpenAlex"])) == " | 見つけた所: S2 + OpenAlex"
 
 
 def test_a_preprint_doi_is_replaced_with_the_journal_version():

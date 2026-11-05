@@ -126,7 +126,7 @@ my-surveys/
 - 既定は Semantic Scholar の関連度検索。`--bulk`: `+`（かつ）、`|`（または）、`-`（除く）、`"句"`、被引用の多い順（`AND`・`OR`・`NOT` はこれに直す）。
 - `--sort citations|relevance|recent|cpy`、`--year`、`--journal`（正式名か ISSN。繰り返せる）、`--ssci-only`、`--field social|all`、`--limit N`（full のサーベイに入れるときは既定 25、ほかは 10）、`--include-preprints`（本・ワーキングペーパー・プレプリント・掲載先不明は既定で除く）。
 - DOI・掲載誌・ISSN は OpenAlex で照合する。ワーキングペーパーと掲載版が両方見つかれば、掲載版だけを残す。
-- `--journal` を付けると、Semantic Scholar（`venue` で絞る）**と** OpenAlex（誌名か ISSN から引いた誌の source ID で絞る）の両方で探す。Semantic Scholar は誌名（venue）を持たない論文が多く、venue での絞り込みから黙って落ちる。OpenAlex の結果のうち Semantic Scholar に無かったものを足し（DOI で重複を除く。`--bulk` なら被引用数で並べ直し、それ以外は Semantic Scholar の結果の後ろに足す）、足した件数をお知らせに出す。どちらで見つかったかは各レコードの `found_in` に、検索ログには `openalex`（`used` / `failed`）と `openalex_added` が残る。OpenAlex が失敗したら、お知らせを出して Semantic Scholar の結果だけを返す。`--journal` が無ければ OpenAlex では検索しない（キーワード検索の精度が低い）。
+- `--journal` を付けると、Semantic Scholar（`venue` で絞る）**と** OpenAlex（誌名か ISSN から引いた誌の source ID で絞る）の両方で探す。Semantic Scholar は誌名（venue）を持たない論文が多く、venue での絞り込みから黙って落ちる。OpenAlex の結果のうち Semantic Scholar に無かったものを足し（DOI で重複を除く。`--bulk` なら被引用数で並べ直し、それ以外は Semantic Scholar の順を保って、足した論文を OpenAlex での順位の位置に差し込む）、足した件数をお知らせに出す。`--journal` のときは SSCI 判定で並べ直さない（誌が同じなので）。どちらで見つかったかは各レコードの `found_in` に（一覧では「見つけた所: S2 / OpenAlex / S2 + OpenAlex」）、検索ログには `openalex`（`used` / `failed`）と `openalex_added` が残る。OpenAlex が失敗したら、お知らせを出して Semantic Scholar の結果だけを返す。`--journal` が無ければ OpenAlex では検索しない（キーワード検索の精度が低い）。
 - 雑誌の論文なのに DOI がプレプリント・WP のもの（OSF・SocArXiv・SSRN・arXiv・NBER など）か OpenAlex の知らないものは、題名で OpenAlex を引く（誌の source ID か ISSN も添える）。雑誌版が一致すれば（`same_title`、年の差 ±2 以内）その DOI と書誌情報に替え、元の DOI を `preprint_doi` に残し、注記（ℹ️、`notes`）を付ける。一致しなければ警告のまま。1 回の検索で 10 件まで引く。
 
 ### 3.2 引用をたどる
@@ -308,6 +308,7 @@ my-surveys/
 - `.env` の設定: `ZOTERO_API_KEY`、`ZOTERO_USER_ID`、`ZOTERO_DATA_DIR`（ローカルの Zotero）、`ZOTERO_WEBDAV_URL` / `_USER` / `_PASSWORD`（WebDAV のファイル同期）、`ZOTERO_WRITE`。
 - 既定では読むだけだ。`--add` には `ZOTERO_WRITE=1` と書き込める鍵が要る。ライブラリにある項目（同じ DOI か題）はコレクションに加え、無ければ新しく作る。項目を変えたり消したりせず、ほかのコレクションに触れず、コレクションも作らない。`--undo` は Priorwork が書いたものだけを戻す。標準の進め方ではカードの前の停止で一覧を示し、利用者が同意してから入れる。全自動では止まらずに入れ、手動では毎回尋ねる。
 - 結び付けると、「Zotero にある」はそのコレクション（とその下）にあることで、本文もまずその PDF から取る。
+- ライブラリは zotero.org から読み、`.priorwork/cache/zotero/` に置く（変わった分だけ読む。`--refresh` で全部）。そこで PDF の無い論文は、`fulltext` がその論文の添付だけを Zotero に聞き直す。同じ論文がライブラリに2件あれば PDF のある方を使い、両方のキーをお知らせに出す。Zotero の「重複アイテム」で統合するようユーザーに頼む。
 
 ---
 
