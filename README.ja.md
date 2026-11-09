@@ -2,374 +2,47 @@
 
 **先行研究サーベイを AI エージェントに任せて、確かめる — ターミナルは不要**
 
-[English](README.md) · [クイックガイド](https://yoshida-kd.github.io/priorwork/ja/quickstart/) · **[手引き](https://yoshida-kd.github.io/priorwork/ja/guide/)** · [リファレンス](https://yoshida-kd.github.io/priorwork/ja/reference/)（AI エージェント向け。`./priorwork docs` でも読める） · [ウェブページ](https://yoshida-kd.github.io/priorwork/ja/)
+[![tests](https://github.com/yoshida-kd/priorwork/actions/workflows/tests.yml/badge.svg)](https://github.com/yoshida-kd/priorwork/actions/workflows/tests.yml)
 
-Priorwork（prior work ＝ 先行研究）は、社会科学（経済学・社会学・政治学・行政学・経営学・心理学など）のテーマ別文献サーベイを、AI エージェント（Claude Code・Antigravity など）に任せて作るためのツールです。
+[English README](https://github.com/yoshida-kd/priorwork/blob/main/README.md)
 
-**頼むのは普通の言葉で、確かめるのはサイドバーで。** エージェントに「〇〇について先行研究を full でまとめて」と頼むと（VS Code の **新しいサーベイ → エージェントに任せる** でも）、範囲の設定・検索・選別・引用の追跡・論文カードの記入・文章・検査・書き出しまで、止まらずに進めます。あなたはレポートを読み、Priorwork のサイドバーで覆したり直したりします。ターミナルも、覚えるコマンドやスキル名もありません。拡張機能が自分で AI のサービスを呼ぶことはないので、いま使っているエージェントのほかに費用はかかりません。
-
-- **判断には必ず理由が残る。** エージェントは採否ごとに理由を記録し、決めた範囲をレポートに書き込みます。論文ごとのページでキー 1 つで覆せ、エージェントはあなたの判断に従い、覆しません。一つずつ自分で決めたいときは「相談しながら進めて」と頼みます
-- **覚えるのはリポジトリ。** 論文の候補・採否・検索履歴は `.priorwork/surveys/` の JSON に残るので、会話をまたいで続きから作業できます
-- **確かめられるカード。** 採用論文ごとの論文カード（RQ・X・Y・データ・識別戦略・結果・限界）は、要旨・本文に書かれていることだけで書かれ、何で確かめたか（確認レベル）が残ります
-- **でっち上げを機械的に検出する。** 本文中の「著者 (年)」が登録済みの論文に対応しているか、DOI が別の論文を指していないかを `priorwork check` で検査します
-- **人が読むのは `reports/` のレポートだけ。** `priorwork export` が読むための版（HTML）を作ります。状態ファイルやキャッシュは `.priorwork/` に隠れています
+Priorwork（prior work ＝ 先行研究）は、社会科学と臨床研究のテーマ別の先行研究サーベイを、AI エージェント（Claude Code・Antigravity など）に任せて作るための道具。普通の言葉で頼むと、エージェントが範囲の設定・検索・選別・引用の追跡・論文カードの記入・文章・検査・書き出しまで進める。あなたはレポートを読み、VS Code のサイドバーで確かめて直す。
 
 ```
-① 範囲を決める → ② 検索 → ③ 選別 → ④ 引用をたどる → ⑤ カードを記入 → ⑥ 文章 → ⑦ 検査と書き出し
+範囲 → 検索 → 選別 → 引用をたどる → 論文カード → 文章 → 検査と書き出し
 ```
 
-## 構成
+## できること
 
-| | エンジン（`priorwork` コマンド・VS Code 拡張機能） | ワークスペース |
-| :--- | :--- | :--- |
-| 持つもの | コード、AGENTS.md・スキルの原本 | サーベイのレポート、状態、`.env` |
-| 入手 | PyPI（`pip install priorwork`）・VS Code Marketplace（Priorwork） | 自分で作る（GitHub の非公開リポジトリ） |
-| 更新 | 版を切ってリリース | `./priorwork upgrade` |
+- **判断には必ず理由が残る。** エージェントは採否ごとに理由を記録し、範囲をレポートに書き込む。論文ごとのページでキー 1 つで覆せ、エージェントはあなたの判断を覆さない。
+- **覚えるのはリポジトリ。** 候補・採否・検索履歴は JSON に残るので、会話をまたいで続けられる。
+- **確かめられるカード。** 採用論文ごとのカードは要旨か本文に書かれていることだけで書かれ、どちらで確かめたかとページが残る。
+- **でっち上げを検出する。** 文章中の「著者 (年)」は登録済みの論文に、DOI はその論文に対応していなければならない。撤回された論文はエラーになる。
+- **いくつもの文献の出どころ。** Semantic Scholar と OpenAlex。医学のサーベイでは PubMed も使い、MEDLINE の判定、臨床上の問いと効果量のカード、PMC の公開された本文が加わる。
+- **自分の原稿から。** 書きかけでも出来上がりでも、原稿を渡すと 1 本のレポートになる。どこに何を足すか、引用の点検、足りない先行研究、論の組み立てへのコメント。原稿は書き換えない。
+- **Zotero と Octavo。** Zotero のコレクションをサーベイに結び付けて、論文を集め、PDF を読む。[Octavo](https://github.com/yoshida-kd/octavo) のプロジェクトへ、その `.bib` のキーで文章を渡す。
+- **AI の API キーは要らない。** 拡張機能が自分で AI のサービスを呼ぶことはない。AI の手助けは、ふだん使っているエージェントを通してだけ入る。
 
-ワークスペースは `requirements.txt` でエンジンの版を固定しているので、意図しない更新は起きません。新しい版に上げるときは `./priorwork upgrade` の1コマンドです（コードのコピーを持たないので、マージの衝突は起きません）。
+## インストール
 
----
+[VS Code の拡張機能](https://marketplace.visualstudio.com/items?itemName=yoshida-kd.priorwork)を入れ、空のフォルダを開いて、Priorwork のサイドバーの **ワークスペースを作る** を押す。Python は拡張機能が用意する。Windows とサーバーは [Priorwork のインストール](https://yoshida-kd.github.io/priorwork/ja/install/)を参照。
 
-## セットアップ
+## 始め方
 
-### VS Code から始める
+ワークスペースで、エージェントに頼む。
 
-1. VS Code の拡張機能で **Priorwork** を入れます。始めるのにほかに入れるものはありません。Python 3.10 以上があればそれを使い、無ければ [uv](https://docs.astral.sh/uv/) を入れて Python を取ってきます（ホームフォルダーに入り、管理者権限は要りません）。VS Code で動く AI エージェント（Claude Code・Antigravity など）と、ワークスペースを GitHub に置くための **git** を用意してください
-2. アクティビティバーの Priorwork から **ワークスペースを作る** を選び、空のフォルダとレポートの言語（日本語・英語）を選びます。拡張機能がそのフォルダに `.venv` を作り、PyPI から `priorwork` を入れてワークスペースを用意します
-3. サイドバーの歯車の **設定** を開き、Semantic Scholar の無料 API キー（推奨）と、あれば Zotero・SSCI リストを設定します。**保存して接続を確かめる** で動くかを確かめられます
-4. サイドバーに出る行から、**GitHub の非公開リポジトリ**として公開します。エージェントはサーベイ名のブランチでコミット・push し、PR を作ります。マージはあなたがします
-5. **新しいサーベイ** → **エージェントに任せる** でテーマを入れ、コピーされた依頼文をエージェントのチャットに貼ります（チャットで直接頼んでも同じです）。エージェントが進めます。標準では、範囲を決めたところと、カードの記入の前（Zotero に論文を集めてもらうため）で止まって待ちます
-6. レポートを読みます（**レポートを書き出して見る**、または `reports/*.html` を右クリック → **Priorwork でレポートを見る**。SSH でつないだサーバーでも見られます）。論文ごとのページで採否とカードを確かめ、違うところを直します
-7. 続きは、サーベイの **エージェントに頼む…** か、チャットで（「もっと検索して」「続けて」）
+> 最低賃金が雇用に与える影響の先行研究を full でまとめて
 
-拡張機能でできること:
+サイドバーの **新しいサーベイ → エージェントに任せる** でもよい。エージェントは、範囲の確認と Zotero への論文の収集のために止まる（止まらないようにも頼める）。あとはレポートを読み、サイドバーで直す。
 
-- サイドバーに、サーベイごとの「次にやること」と、未選別・保留・採用・除外の論文。論文の上で採用・保留・除外（複数選択も可）
-- 論文ごとのページ: 要旨・SSCI の判定・警告・調査範囲の採否基準を見ながら、**I** 採用・**M** 保留・**X** 除外（理由つき）。決めると次の未選別の論文に進みます。採用論文のページでは論文カードも表示・編集でき、エージェントが書いた内容を確かめて直せます（**Ctrl+S** で保存）
-- 検索（関連度順・bulk 検索・SSCI 収録誌のみ）、引用をたどる、DOI で追加、本文の取得、Zotero、検査（問題パネル）、読むための版の表示、設定、診断、エンジンの更新
-- エージェントへの依頼文のコピー。エージェントが状態やレポートを変えると、サイドバーと論文のページが追随します
+## 手引き
 
-別のマシンで続けるときは、VS Code でリポジトリを clone し、サイドバーのメニューの **Python の環境（.venv）を用意する** を実行して、**設定** でキーを入れ直します（`.env` は Git に載らないため）。
+- [クイックガイド](https://yoshida-kd.github.io/priorwork/ja/quickstart/) — インストールから最初のサーベイまで、6つの手順で
+- [Priorwork のインストール](https://yoshida-kd.github.io/priorwork/ja/install/) — 手元のコンピューター、Windows、サーバー
+- [手引き](https://yoshida-kd.github.io/priorwork/ja/guide/) — VS Code での使い方
+- [原稿から始める](https://yoshida-kd.github.io/priorwork/ja/manuscripts/) — 自分の原稿から、Octavo と一緒に
+- [リファレンス](https://yoshida-kd.github.io/priorwork/ja/reference/) — すべてのコマンド。AI エージェント向け（`./priorwork docs` でも読める）
 
-### コマンドラインで始める
+## 貢献とライセンス
 
-```bash
-mkdir my-surveys && cd my-surveys
-python3 -m venv .venv
-.venv/bin/pip install priorwork
-.venv/bin/priorwork init --lang ja     # git init し、reports/ .priorwork/ AGENTS.md スキル ./priorwork .env.example などを作る
-cp .env.example .env                   # API キーなどを記入（.env は Git 管理外）
-./priorwork doctor                     # 設定を診断（--online で接続も確認）
-git add -A && git commit -m "Initialize priorwork workspace"
-gh repo create my-surveys --private --source=. --push   # GitHub に作って push（Web で作って git remote add しても可）
-```
-
-ワークスペースは GitHub の**非公開**リポジトリで管理する前提です（レポートと状態 JSON には論文の要旨などが入るため）。別のマシンで続けるときは、clone して `python3 -m venv .venv && .venv/bin/pip install -r requirements.txt` し、`.env` を作り直します（`priorwork settings` で設定済みの項目が分かります）。
-
-`--lang` はワークスペースの言語です（レポートの見出し・AGENTS.md・スキル。後から変えられません）。CLI の表示の言語はこれとは別で、`PRIORWORK_LANG=ja` かロケールで決まります（VS Code の拡張機能は VS Code の表示言語に合わせます）。
-
-Git に載るもの・載らないもの（`.gitignore` は `priorwork sync` が管理します）:
-
-| Git に載る | Git に載らない |
-| :--- | :--- |
-| `reports/*.md`、`.priorwork/surveys/`（状態）、`.priorwork/config.json`、`.priorwork/sync.json`、AGENTS.md・スキル、`./priorwork`、`requirements.txt`、`.env.example` | `.env`（API キー）、`.venv/`、`.priorwork/cache/`（本文テキスト）、`.priorwork/data/`（SSCI リスト。ライセンス上共有しない）、`priorwork export` の出力 |
-
-`./priorwork doctor` は、Git のリポジトリか、GitHub のリモートがあるか、`.env` が誤って Git に載っていないかも確認します。
-
-`priorwork init` が作るもの:
-
-```text
-my-surveys/
-├── reports/                 # レポート（作業用の .md と、priorwork export の出力 .html など）
-├── AGENTS.md, CLAUDE.md     # エージェント向けの指示（priorwork sync が生成。直接編集しない）
-├── AGENTS.local.md          # このワークスペース固有の指示（自由に編集）
-├── .claude/skills/          # 工程ごとのスキル（.agent/skills への symlink）
-├── .agent/skills/           # priorwork sync が生成
-├── priorwork                # 実行用ラッパー（./priorwork。.venv があればそれを使う）
-├── requirements.txt         # エンジンの版（priorwork==X.Y.Z）
-├── .env / .env.example
-└── .priorwork/
-    ├── config.json          # ワークスペースの言語
-    ├── surveys/             # 状態 JSON（Git 管理）
-    ├── cache/               # 抽出した本文・Zotero の一覧（Git 管理外）
-    └── data/                # SSCI 収録リストの CSV（Git 管理外）
-```
-
-### エンジンを更新する
-
-```bash
-./priorwork upgrade                  # PyPI の最新の版に上げる（--to 0.4.0 で指定）
-```
-
-`requirements.txt` を書き換え、`pip install` して、AGENTS.md・スキルを同期します。`pip install` に失敗したときは `requirements.txt` を元に戻します。
-
-`./priorwork status` は、AGENTS.md・スキルがエンジンの版と合っていないと警告します。`priorwork sync` が上書きするのは、`priorwork sync` 自身が書き出したファイルだけです。由来の分からないファイルは、`--force` を付けない限り上書きしません。
-
-### API キー
-
-ワークスペースの `.env`（Git 管理外）に保存します。VS Code では **設定** のページで入れます。コマンドラインでは `.env` を直接書くか、`priorwork settings --stdin` に JSON を渡します。
-
-| 変数 | 用途 |
-| :--- | :--- |
-| `SEMANTIC_SCHOLAR_API_KEY` | [Semantic Scholar API キー](https://www.semanticscholar.org/product/api#api-key-form)（推奨）。無いとレート制限で検索が失敗しやすい |
-| `OPENALEX_API_KEY` / `OPENALEX_MAILTO` | 任意。OpenAlex はキー無しでも使えるが、1 日の利用量に上限がある |
-| `ZOTERO_API_KEY` / `ZOTERO_USER_ID` | 任意。Zotero 連携（読み取り専用）。下の「Zotero 連携」を参照 |
-| `ZOTERO_WEBDAV_URL` / `ZOTERO_WEBDAV_USER` / `ZOTERO_WEBDAV_PASSWORD` | 任意。Zotero のファイル同期に WebDAV（Nextcloud など）を使っている場合 |
-| `ZOTERO_DATA_DIR` | 任意。このマシンで Zotero を動かしている場合のデータフォルダ（既定: `~/Zotero`） |
-
-### Zotero 連携（任意）
-
-設定すると、採用論文の Zotero 登録状況の確認（`priorwork zotero`、`status`、`check`）と、Zotero に添付した PDF からの本文取得（`priorwork fulltext`）ができます。Zotero・WebDAV のどちらにも書き込みはしません。
-
-1. https://www.zotero.org/settings/keys で API キーを作成する。権限は **「Allow library access」だけ**（notes・write は外す）。同じページの「Your user ID for use in API calls」がユーザー ID
-2. WebDAV 同期の場合は、PDF の zip が置かれているフォルダ（Zotero に設定した URL ＋ `zotero/`）の URL と認証情報を設定する。Nextcloud なら、専用ユーザーに `zotero` フォルダを**閲覧のみ**で共有し、そのユーザーのアプリパスワードを使うと安全
-3. `./priorwork zotero` で接続を確認する（ライブラリの件数と WebDAV の接続結果が出る）
-
-WebDAV が「フォルダが見つかりません」になる場合は URL を見直してください。Nextcloud をサブパス（例: `https://example.com/nextcloud/`）に置いている場合は、そのパスも含める必要があります。
-
-```
-https://example.com/nextcloud/remote.php/dav/files/<ユーザー名>/zotero/
-```
-
-### SSCI 収録リスト（推奨）
-
-SSCI に収録されているかは、Clarivate の [Master Journal List](https://mjl.clarivate.com/) でしか確定できません。SSCI の収録誌リストを CSV でダウンロードし、VS Code の **設定** のページか `./priorwork settings --import-ssci <CSV>` で取り込んでください（`.priorwork/data/` にコピーされます。Git 管理外）。
-
-リストが無い場合は、主要誌約 100 誌の内蔵リストによる**推定**になります。
-
-| 表示 | 意味 |
-| :--- | :--- |
-| ✅ SSCI収録（リスト照合済） | 収録リストと ISSN または誌名が一致 |
-| 🟡 SSCI収録の可能性大（誌名推定・要確認） | リスト未設定で、内蔵リストと一致 |
-| 🔍 学術誌（SSCI未確認） / ⚪ SSCI非収録誌 | 学術誌だが SSCI 不明 / 収録リストに無い |
-| 📕 書籍 / ❌ WP・プレプリント / ❓ 掲載誌不明 | 既定では検索結果から除外 |
-
----
-
-## 使い方
-
-### エージェントと進める
-
-エージェントでワークスペースを開き、普通の言葉で頼みます（例:「最低賃金の雇用効果について先行研究を full でまとめて」）。エージェントは AGENTS.md とスキル（`.agent/skills/`。`.claude/skills/` からも見える）に従い、入口の `priorwork` スキルが状態を見て次の工程に進み、書き出しまで続けます（止まる場所は下の「進め方」）。スキル名を打つ必要はありません（`/priorwork` と打っても構いません）。VS Code では、**新しいサーベイ → エージェントに任せる** と、サーベイの **エージェントに頼む…** が依頼文をコピーします。
-
-| スキル | やること |
-| :--- | :--- |
-| `priorwork` | 入口。状態を見て、サーベイ全体を工程ごとに進める |
-| `priorwork-new` | 範囲を決めてサーベイを作成し、深さに見合う検索をする |
-| `priorwork-screen` | 候補を採否の基準に照らして、理由つきで判断する（手動の進め方では推薦して答えを待つ） |
-| `priorwork-snowball` | 採用論文の参考文献・被引用から見落としを探す |
-| `priorwork-extract` | 本文を取得し、論文カード（RQ・識別戦略など）を記入する |
-| `priorwork-check` | 検査して問題を直し、レポートを書き出す |
-| `priorwork-audit` | （頼まれたときだけ）別のモデルが書いたサーベイを監査する: カードを本文と突き合わせ、引用の向き・先行研究と仮説の混同・機械的な除外・SSCI を確かめて直し、`./priorwork audit` で記録する |
-| `priorwork-derive` | サーベイから講義資料・読書メモ・要点の整理などの短い文章を作る（用途・字数・構成を記録し、本文確認済のカードから引いて、数値と結論の向きをカードと照合する） |
-| `priorwork-manuscript` | 原稿（形式は問わない）を読み、何を作るかを相談して決め、原稿の 1〜3 章（イントロ・先行研究・理論と仮説）の下書きや、原稿への助言（足りない先行研究・引用の向き・論の組み立て）を書く |
-
-### 進め方（どこで止まるか）
-
-エージェントがどこで止まって待つかは 3 つから選べます。依頼の言葉（「全自動で」「相談しながら」など）か `AGENTS.local.md` で指定でき、何も言わなければ標準です。進め方はサーベイに記録され（`--mode`）、次の会話でも同じ進め方で続きます。
-
-| 進め方 | 止まる場所 |
-| :--- | :--- |
-| **標準**（既定） | 範囲を決めたところと、カードの記入の前の 2 か所。カードの前では Zotero に入れる DOI の一覧を示して止まるので、論文と PDF を Zotero に集めてから「続きをやって」と言います。本文で確かめたカードが増え、結果として手間が減ります |
-| **全自動** | 止まらずに最後まで進める |
-| **手動** | 工程ごとに止まって確かめる（採否も推薦を示して答えを待つ） |
-
-止まる場所以外では、エージェントが理由を残しながら自分で判断します。会話を再開したときは「続きをやろう」と言えば、エージェントが `./priorwork status` で進捗と次の作業を確認します。報告では、論文を `#232` のような番号ではなく「著者 (年)」で示します。
-
-### 原稿から
-
-自分の原稿があれば、ワークスペースの `manuscripts/<論文名>/` に原稿と結果の表を入れ、「manuscripts/<論文名> の原稿のイントロ・先行研究・仮説を書いて」「この原稿に足りない先行研究を指摘して」などと頼みます（サイドバーの **新しいサーベイ → 原稿から始める** でも依頼文を作れます）。原稿の形式は問いません（Markdown・Quarto・HTML・Word・PDF。`./priorwork read` がテキストにします）。エージェントは原稿を読み、何を作るか・原稿のどこを対象にするか・検索の範囲・何本作るかを提案し、相談しながら決めます。作れるレポートは 2 種類で、1 つの原稿から両方を別々に作れます（`./priorwork new … --manuscript manuscripts/<論文名> --purpose draft|advice`）。
-
-- **1〜3 章の下書き**（`draft`）: 分析まで済んだ原稿から、文献で支える主張（重要性・研究の流れ・メカニズム・方法の先例）を洗い出し、結果と食い違う知見も含めて主張ごとに探し、各論文カードに「原稿での役割」を記入して、1〜3 章を原稿の言語で下書きします。下書きは `./priorwork export SURVEY --draft` で `reports/<名前>.draft.md`（引用した論文の参考文献つき）に書き出されます。結果を見てから仮説を立てることにならないよう、仮説ごとの根拠と、探索的に扱う結果の案を、レポートに別に記録します。
-- **原稿への助言**（`advice`）: 出来上がった（または書きかけの）原稿について、引用の点検（引いた論文の結論の向き・言い過ぎ）、足りない先行研究、論の組み立てへのコメントを、優先度の高い順のまとめとともに書きます。
-
-原稿そのものは書き換えません。
-
-**Octavo の原稿。** [Octavo](https://github.com/yoshida-kd/octavo) のプロジェクト（別のリポジトリ）の原稿は、写さずにその場所のまま使えます（Octavo のサイドバーの **Priorwork で先行研究を頼む** が依頼文をコピーします）。つなぎ目は Zotero のコレクションで、Octavo が `.bib` を取るコレクション（設定の `zotero_collection`）にサーベイも結び付けます。エージェントは原稿が引いている文献を登録し（`./priorwork add SURVEY --cited`）、下書きを Octavo の形で書き出します（`./priorwork export SURVEY --draft --octavo`。引用は `.bib` のキーで `[@key]`、まだ `.bib` に無い論文は `[@PRIORWORK:…]` と DOI の一覧）。
-
-監査は任意です。別のモデルにも確かめさせたいときは、そのモデル（例: Gemini が書いたなら Claude）のチャットで「サーベイ <名前> を監査して」と頼みます（サイドバーの **エージェントに頼む… → 別のモデルとして監査する** でも依頼文を作れます）。書くエージェントは `--by` で自分のモデル名を残し、監査は `./priorwork audit SURVEY --by "<モデル名>"` で記録されます（書いたモデルの名前では記録できません）。
-
-### 深さ（quick / full）
-
-サーベイには深さがあります。依頼の言葉から（無ければエージェントが）決め、あとから `./priorwork scope SURVEY --depth full` で変えられます。
-
-| | quick（簡易） | full（本格） |
-| :--- | :--- | :--- |
-| 向くテーマ | 狭い・概観だけ欲しい | 広い・サブテーマが複数ある・網羅性が要る |
-| 検索 | 2〜3 クエリ（1 回 10 件） | サブテーマごとに 2〜4 クエリ（1 回 25 件）、候補 100 本以上 |
-| スナウボール | 任意 | 行う |
-| カード | 要旨のみでよい | 採用論文すべてを本文で確かめる（本文が見つからないものだけ要旨のみ） |
-
-件数などは目安で、固定の上限はありません。ルールと `priorwork check` は深さによらず同じです。
-
-### サーベイのファイル
-
-| ファイル | 中身 | 編集 |
-| :--- | :--- | :--- |
-| `reports/YYYYMMDD_<slug>.md` | 作業用のレポート本体（やり直した版は `YYYYMMDD_v2_<slug>.md`。同じ slug で `new` すると版が振られる） | 文章と論文カードの記入欄は手で書く。`<!-- BEGIN priorwork:… -->` 〜 `<!-- END priorwork:… -->` の範囲は `priorwork` が再生成 |
-| `.priorwork/surveys/YYYYMMDD_<slug>.json` | 論文候補・採否と理由（変更の履歴つき）・検索履歴・調査範囲・深さ・レポートの言語 | `priorwork` コマンド（と VS Code の拡張機能）だけで変更する |
-
-- **読むための版**は `./priorwork export <survey>` で作ります（`reports/YYYYMMDD_<slug>.html`。ブラウザで開くか、印刷して PDF にできます）。管理ブロックのコメント、未記入の記入欄、テンプレートの説明文を除き、要旨も省きます（`--with-abstracts` で載せる）。`--format docx`（pandoc が必要）、`--format md` も選べます。未記入・未確認の論文カード・`check` の ERROR が残っていると、冒頭に「下書き」と表示されます。出力は Git 管理外です
-- **レポートの構成**は、まとめが先で個々の論文が後です: 背景（1 章）、先行研究の理論・手法・論争・空白（2〜5 章。主張ごとに採用論文を引く）、本研究の仮説と示唆（6 章。先行研究と分けて書く）、比較マトリクス（7 章）、各論文の詳細（8 章）、参照文献（9 章）、付録。各節の下に「書く内容」の指示があります（0.1.5 までに作ったレポートは、以前の並びのまま動きます）
-- **比較マトリクス**（7 章）は、各論文カード（8 章）の記入欄から自動で作られます。カードを書き換えたら `./priorwork render`。Markdown に書いた Mermaid の図（```` ```mermaid ````）は、HTML では図として表示されます
-- **参照文献**（9 章）は採用論文から DOI つきで自動生成されます（引用キーは作りません。Zotero へは手作業で登録）。本文で同じ「著者 (年)」になる採用論文が複数あると、タイトル順に 2001a / 2001b と区別します（カード・比較マトリクスも同じ表記）
-- **文献探索の記録**（付録）には、実行した検索・件数・除外理由と、採否を見直した論文の件数が自動で残ります。採否の経緯（例: 保留 → 除外（理論のみ） → 採用）は `./priorwork list` に表示されます
-- 採用を取り消した論文のカードは、記入内容ごと JSON に退避され、再び採用すると復元されます
-
-### コマンド一覧
-
-```bash
-# ワークスペースの管理
-./priorwork init [DIR] [--lang ja|en]                          # ワークスペースを初期化
-./priorwork sync [--force|--diff]                              # AGENTS.md・スキル・./priorwork をエンジンの版に更新
-./priorwork upgrade [--to X.Y.Z]                               # エンジンを更新して sync
-./priorwork doctor [--online]                                  # 設定（API キー・SSCI リスト・エンジンの版）を診断
-./priorwork settings [--stdin] [--import-ssci CSV]             # API キー・Zotero・SSCI リストの設定
-
-# サーベイの管理
-./priorwork status [SURVEY]                                    # 一覧 / 進捗と次にやること
-./priorwork new "<テーマ>" --slug <slug> [--by "<モデル名>"] [--mode standard|auto|manual] [--depth quick|full] [--manuscript PATH [--purpose draft|advice]] [--question ... --years ... --fields ... --inclusion ... --exclusion ...]
-./priorwork scope SURVEY --question "..." [--mode standard|auto|manual] [--go-on] [--depth quick|full] [--search-field social|all] [--by "<モデル名>"]  # 範囲・進め方の変更
-./priorwork read PATH [--out FILE]                             # 原稿（.md・.qmd・.html・.docx・.pdf など、フォルダも可）をテキストにする
-./priorwork add SURVEY --cited                                 # 原稿が引いている論文（.bib の DOI）を登録
-./priorwork export SURVEY --draft [--octavo]                   # 原稿の 1〜3 章の下書き（--octavo: Octavo の形で [@key]）
-./priorwork archive SURVEY [--undo]                          # 一覧から隠す（ファイルは残る）
-./priorwork list SURVEY [--status candidate maybe] [--abstract]
-./priorwork include SURVEY 2 5 7
-./priorwork exclude SURVEY 3 --reason "理論モデルのみ"          # 除外には理由が必須
-./priorwork maybe SURVEY 9          ./priorwork reset SURVEY 9 # 保留 / 候補に戻す
-./priorwork add SURVEY <DOI>... [--candidate]                  # DOI を指定して登録（既定で採用）
-./priorwork fix SURVEY 3 [--id <DOI>] [--authors ...] [--confirm "..."] # 書誌を直す（掲載版の DOI・著者・年）・確かめた警告を解除
-./priorwork card SURVEY 3 [--set rq="..." evidence=abstract]   # 論文カードを表示・記入
-./priorwork render SURVEY
-./priorwork check SURVEY [--offline]
-./priorwork audit SURVEY [--by "<モデル名>" --note "..."]       # 別のモデルによる監査（任意）を記録 / 記録を見る
-./priorwork export SURVEY [--format html|docx|md] [-o PATH] [--with-abstracts]   # 読むための版を書き出す
-./priorwork fulltext SURVEY <番号> [--pdf <パス>]
-./priorwork zotero [SURVEY] [--refresh]                         # Zotero 接続確認 / 採用論文の登録状況
-./priorwork zotero --collections | SURVEY --collection 名前 | SURVEY --import | SURVEY --dois  # コレクション
-
-# 文献の探索
-./priorwork search "<English query>" [--into SURVEY] [--bulk] [--sort citations|relevance|recent|cpy] [--year 2010-2024] [--journal "<full journal name>" ...] [--ssci-only] [--field social|all] [--limit N]
-./priorwork snowball SURVEY [--direction both|references|citations] [--limit N] [--min-links N]
-./priorwork get <DOI>
-./priorwork citations <DOI> [--sort cited]      ./priorwork references <DOI> [--sort cited]
-./priorwork journal "<誌名 or ISSN>"
-```
-
-`SURVEY` はファイル名（拡張子なし）か slug で指定します（やり直した版は `v2_<slug>` のように版を付けて）。多くのコマンドは `--json` で JSON を出力します（VS Code の拡張機能・スクリプト向け）。
-
----
-
-## しくみ
-
-### 検索
-
-- **通常の検索**は Semantic Scholar の関連度検索です
-- **`--bulk`** は Semantic Scholar の bulk 検索で、`+`（AND）、`|`（OR）、`-`（除外）、`"フレーズ"` が使え、被引用数の多い順に取得します。キーワード検索では埋もれやすい定番論文を拾えます
-- 並び順（`--sort`）: `citations` 被引用数 / `relevance` 関連度 / `recent` 新しい順 / `cpy` 年あたり被引用数。いずれも SSCI 判定の高いものが先です
-- 同じ論文の WP 版と掲載版が両方あれば、掲載版だけを残します
-
-### データソースの役割分担
-
-| 処理 | Semantic Scholar | OpenAlex |
-| :--- | :--- | :--- |
-| 検索 | ✔ | 使わない（関連度が低いため） |
-| 書誌情報の照合 | — | ✔ S2 の結果を DOI でまとめて照合し、誌名・ISSN・巻号を置き換える |
-| 論文取得（`get` / `add`） | ✔ まず S2 | S2 に無い DOI のとき |
-| 引用関係（`citations` / `references`） | ✔ `--sort recent` | `--sort cited`、S2 に無い・出版社が非公開のとき |
-| `snowball` / `check` の DOI 再確認 | — | ✔ |
-
-Semantic Scholar は検索の質が高い一方、定番論文ほどレコードが壊れていることがあります（別論文や SSRN 版の DOI、ISSN の欠落、未登録）。そのため DOI と ISSN は OpenAlex で実体を確認した値を使い、問題があれば ⚠️ を表示します。
-
-| 警告 | 意味 |
-| :--- | :--- |
-| DOI が別タイトルを指している | S2 の DOI が別の論文（リプライ論文など）のもの |
-| DOI は WP / プレプリント版 | S2 は掲載誌を示しているが、DOI は SSRN などの WP 版 |
-| OpenAlex に DOI が見つからない / DOI なし / DOI 未照合 | DOI の誤り、欠落、または照合できなかった |
-| 書評・コメントの可能性 | タイトルが「…, by 著者名」の形、または 1 ページだけ |
-
-### 引用をたどる（snowball）
-
-採用論文の参考文献と被引用論文を OpenAlex から集め、「採用論文のうち何本と引用関係にあるか（リンク数）」の多い順に候補を登録します。採用論文が 3 本以上なら、既定ではリンク数 2 以上だけを候補にします。
-
-### 本文の取得（fulltext）
-
-PDF はワークスペースに置きません。次の順で PDF を探し、抽出したテキストだけを Git 管理外の `.priorwork/cache/fulltext/` に保存します。
-
-1. `--pdf` で指定したファイル
-2. このマシンの Zotero の添付 PDF（`zotero.sqlite` を読み取り専用で開き、DOI で照合）
-3. Zotero Web API で見つけた添付 PDF（WebDAV の `<キー>.zip`、または Zotero File Storage から取得）
-4. Zotero が索引化した本文テキスト（ページ区切りが無いため、PDF が取れないときの予備）
-5. オープンアクセス版の PDF（OpenAlex が知っている所在をすべて試す。機関リポジトリなどのランディングページは、その中の PDF のリンクをたどる）
-
-出版社のサイトは自動ダウンロードを拒否することが多いため、非 OA の論文は Zotero に PDF を添付してから実行してください。
-
-Zotero の論文一覧は `.priorwork/cache/zotero/index.json` に保存し、次回からは変更分だけを取得します。論文と照合するときは DOI（「その他」欄の `DOI: ...` も含む）を使い、DOI の無い論文だけタイトルで照合します。
-
-### 検査（check）
-
-| 検査 | レベル |
-| :--- | :--- |
-| 本文・カード中の「著者 (年)」「(著者, 年; 著者, 年)」が登録済みの論文に対応しているか | ERROR（未登録）/ WARN（未採用） |
-| 2001a / 2001b の区別が参照文献と合っているか | WARN |
-| 本文中の DOI が登録済みか | ERROR |
-| 採用論文の ⚠️、OpenAlex での DOI とタイトルの一致 | ERROR |
-| カードの確認レベル（未確認 / 要旨のみ / 本文確認済）と未記入の欄 | WARN |
-| Markdown が状態ファイルと一致しているか（`render` 忘れ） | WARN |
-| 未選別の候補、SSCI 以外の採用論文、Zotero 未登録の採用論文（連携設定時）、組織名・図表番号とみなして照合しなかった引用 | INFO |
-
-著者年引用の検出は正規表現によるもので、すべての書き方を拾えるわけではありません。叙述型（`Acemoglu et al. (2001, 2005)`、`Dell (2010, p. 5)`）と、括弧にまとめた型（`(e.g., Dell 2010; Acemoglu et al., 2001a)`）を検出します。
-
-「World Bank (2010)」「OECD (2019)」のような組織名・略語は、未登録でも ERROR にせず INFO で伝えます。論文ではないのに引用と誤認されたものは、レポートに次のコメントを書くと検査から外せます。
-
-```markdown
-<!-- priorwork:ignore-citation Smith (2015) -->
-```
-
-### 扱えない文献
-
-国内学会誌（J-STAGE など）の論文は Semantic Scholar・OpenAlex のどちらにも登録されていないことが多く、`priorwork get` / `priorwork add` で登録できません（`... は Semantic Scholar にも OpenAlex にも見つかりません` と表示されます）。国際査読誌を対象とする方針のため、現状は対象外です。
-
-### その他
-
-- **リトライ**: HTTP 429 / 5xx / 通信エラーは、5→10→20→40→60 秒と待ち時間を延ばして最大 5 回再試行（`PRIORWORK_MAX_RETRIES`）
-- **キャッシュ**: API レスポンスを `~/.cache/priorwork/` に 7 日間保存（`PRIORWORK_CACHE_TTL_DAYS`、`PRIORWORK_NO_CACHE=1`、`--no-cache`）
-- **表示の言語**: `PRIORWORK_LANG=ja|en`、無ければロケール
-
----
-
-## 開発
-
-```bash
-python3 -m venv .venv
-.venv/bin/pip install -e ".[dev]"
-.venv/bin/python -m pytest          # ネットワーク不要
-bin/priorwork --help                # このチェックアウトのコードで動かす
-```
-
-```text
-.
-├── priorwork/
-│   ├── cli.py                  # コマンド（--json の出力を含む）
-│   ├── i18n.py / lang_ja.py    # 表示の言語（英語が原文、日本語は対訳表）
-│   ├── workspace.py            # ワークスペースのパスと言語
-│   ├── scaffold.py             # init / sync / upgrade
-│   ├── survey.py               # 状態ファイルと Markdown 生成
-│   ├── api.py                  # Semantic Scholar / OpenAlex
-│   ├── ssci.py                 # SSCI 判定
-│   ├── snowball.py             # 引用をたどる
-│   ├── fulltext.py             # 本文取得（Zotero / OA）
-│   ├── zotero.py               # Zotero Web API / WebDAV（読み取り専用）
-│   ├── check.py                # 検査
-│   ├── export.py               # 読むための版の書き出し
-│   ├── doctor.py               # 設定の診断
-│   └── assets/                 # ワークスペースに配る原本（en/・ja/ ごとの AGENTS.md・skills・レポートのテンプレート、env.example）
-├── vscode-extension/           # VS Code の拡張機能（TypeScript）
-├── tests/
-└── bin/priorwork               # 開発用ラッパー
-```
-
-AGENTS.md・スキルを直すときは、`priorwork/assets/en/` と `priorwork/assets/ja/` の両方を編集します。ワークスペースには `priorwork sync` で配られます。
-
-不具合の報告や要望は [Issues](https://github.com/yoshida-kd/priorwork/issues) へどうぞ。
+Issue や Pull Request を歓迎する。詳しくは [CONTRIBUTING.md](https://github.com/yoshida-kd/priorwork/blob/main/CONTRIBUTING.md) を参照。MIT ライセンス。

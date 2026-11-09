@@ -36,6 +36,10 @@ export function badge(status: string): string {
         case 'journal': return vscode.l10n.t('🔍 Journal (SSCI not verified)');
         case 'not_ssci': return vscode.l10n.t('⚪ Not in SSCI (checked against the list)');
         case 'book': return vscode.l10n.t('📕 Book (outside SSCI)');
+        case 'scie': return vscode.l10n.t('✅ SCIE (checked against the list)');
+        case 'medline': return vscode.l10n.t('✅ MEDLINE (indexed, per PubMed)');
+        case 'pubmed': return vscode.l10n.t('🔍 In PubMed (not indexed for MEDLINE)');
+        case 'not_pubmed': return vscode.l10n.t('🔍 Journal (not found in PubMed)');
         case 'preprint': return vscode.l10n.t('❌ Working paper / preprint');
         default: return vscode.l10n.t('❓ Unknown venue');
     }

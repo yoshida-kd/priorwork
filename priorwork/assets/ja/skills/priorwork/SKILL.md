@@ -1,7 +1,7 @@
 ---
 name: priorwork
 description: >-
-  The entry point of Priorwork. Makes or continues a social-science literature survey end to end with
+  The entry point of Priorwork. Makes or continues a literature survey (social sciences or clinical research) end to end with
   `./priorwork` (scope, searches, screening, citation chasing, paper cards, text, check, export), stopping
   for the user where its mode says (standard: after the scope and before the cards). Use whenever the user asks, in any words or language, for a literature survey,
   literature review or prior work on a topic, for the literature behind their own manuscript, or to
@@ -54,6 +54,8 @@ description: >-
 | コンセンサスと未解決の論争点 | 合意のある知見と、結論が分かれる点 |
 | 研究の空白 | 先行研究がまだ答えていない問い |
 | 本研究の仮説と示唆 | ここだけは本研究（ユーザー）の枠組み・作業仮説 |
+
+医学のサーベイのレポートは、代わりに専用の節を持つ（研究デザイン別のエビデンス、主要なアウトカムへの効果、安全性と有害事象、コンセンサスと争点、ギャップ、仮説）。その見出しと、AGENTS.md の「医学のサーベイ」に従う。
 
 - 見出しの下の `<!-- 書く内容: … -->` に従う。テンプレートの見出しと節を消さない。
 - 学説・手法・論争・空白の 4 節は**先行研究の知見だけ**を書き、主張ごとに採用論文を著者 (年) で引く（`<!-- priorwork:synthesis -->` のある節。引用が無いと `check` が WARN にする）。

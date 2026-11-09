@@ -67,6 +67,8 @@ In each section from the background to "Hypotheses and implications for this stu
 
 For included papers marked `✅ SSCI`, check that the ISSN and publisher, not just the title, match the listed journal (different journals can share a title). Use `./priorwork journal "<ISSN>"`.
 
+In a medical survey, check instead that no included paper is retracted, that `✅ MEDLINE` and `✅ SCIE` are not described as more than they are, and, against the full text, that each effect size has the right outcome, CI and comparator.
+
 ## 6. Record and report
 
 ```bash

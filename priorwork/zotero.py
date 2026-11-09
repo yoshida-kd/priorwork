@@ -393,11 +393,15 @@ class ZoteroClient:
 
     def status(self, record: Dict[str, Any], collection: str = "") -> Dict[str, Any]:
         """Zotero にあるか。collection を渡すと、そのコレクションに入っているか（in_collection）も見る。"""
-        item = self.find_item(record, warn=False)
-        if not item:
+        items = self.find_items(record)
+        if not items:
             return {"registered": False, "key": "", "pdfs": 0, "in_collection": False}
+        # 同じ論文のアイテムが複数あれば、どれかがコレクションにあればよい（別のアイテムを足し直さない）
+        inside = self.subtree(collection) if collection else set()
+        holder = next((i for i in items if inside & set(i.get("collections", []))), None)
+        item = holder or items[0]
         return {"registered": True, "key": item["key"], "pdfs": len(self.pdf_attachments(item["key"])),
-                "in_collection": bool(collection) and bool(self.subtree(collection) & set(item.get("collections", [])))}
+                "in_collection": holder is not None}
 
     # ---- Content ----
 

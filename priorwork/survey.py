@@ -39,14 +39,21 @@ DEFAULT_DEPTH = "full"
 # 取り込み）で止まる。auto: 止まらずに最後まで。manual: 工程ごとに止まる。mode を持たないサーベイは standard
 MODES = ("standard", "auto", "manual")
 DEFAULT_MODE = "standard"
-# 原稿から始めるサーベイの目的。draft: 原稿の 1〜3 章の下書き。advice: 出来上がった原稿への助言
-# 原稿から始めるサーベイの目的。draft は目的を持たない古いサーベイの既定でもある（並びの先頭）。
-# 新しいサーベイの既定は complete（書きかけの原稿の欠けを補う。draft・advice はその特別な場合）
+# 原稿から始めるサーベイの目的。新しいサーベイはすべて complete（1 本のレポートに補完・引用の点検・助言がある）。
+# draft（原稿の 1〜3 章の下書き）と advice（助言）は前の版で作ったサーベイにだけある。draft は目的を持たない
+# さらに古いサーベイの既定でもある（並びの先頭）
 PURPOSES = ("draft", "advice", "complete")
 DEFAULT_PURPOSE = "complete"
 # 検索で残す分野。social: S2 の分野が社会科学に無い論文（医学・計算機科学など）を落とす。
 # 分野の付いていない論文は残す。search_field を持たない既存サーベイは all
-SEARCH_FIELDS = {"social": "social sciences only (papers with no field are kept)", "all": "all fields"}
+# medical: 医学のサーベイの既定。S2 の分野が医学・生命科学などに無い論文を落とす（PubMed の論文は落とさない）
+SEARCH_FIELDS = {"social": "social sciences only (papers with no field are kept)",
+                 "medical": "medicine and the life sciences only (papers with no field are kept)",
+                 "all": "all fields"}
+# サーベイの分野。カードの欄・レポートの形・検索先・雑誌の判定が変わる。discipline を持たない既存サーベイは social
+DISCIPLINES = ("social", "medical")
+MEDICAL_FIELDS = {"Medicine", "Biology", "Psychology", "Chemistry", "Environmental Science",
+                  "Agricultural and Food Sciences"}
 SOCIAL_FIELDS = {"Economics", "Political Science", "Sociology", "Business", "Psychology", "Law", "Geography",
                  "History", "Education", "Linguistics", "Philosophy", "Environmental Science"}
 BLOCKS = ("scope", "matrix", "papers", "references", "log")
@@ -65,11 +72,25 @@ CARD_FIELDS = [
     ("limits", "Limitations"),
     ("memo", "Notes"),
 ]
+# 医学のサーベイのカード: 欄のキーは同じ（マトリクス・check・拡張機能はキーで読む）で、名前が PICO になる
+MEDICAL_CARD_FIELDS = [
+    ("evidence", "Evidence"),
+    ("rq", "Clinical question"),
+    ("data", "Population / setting"),
+    ("x", "Intervention or exposure (and comparator)"),
+    ("y", "Outcomes"),
+    ("method", "Study design"),
+    ("findings", "Main findings (effect sizes with 95% CI)"),
+    ("limits", "Limitations"),
+    ("memo", "Notes"),
+]
 BIBLIO_LABEL = "Source"
 MATRIX_FIELDS = ["rq", "x", "y", "data", "method", "findings", "limits"]
+MEDICAL_MATRIX_FIELDS = ["rq", "data", "x", "y", "method", "findings", "limits"]
 # 原稿から始めるサーベイ（`new --manuscript`）だけのカードの記入欄: 論文が原稿のどの主張を支える・食い違うか
 ROLE_FIELD = ("role", "Role in the manuscript")
 MANUSCRIPT_CARD_FIELDS = [CARD_FIELDS[0], ROLE_FIELD, *CARD_FIELDS[1:]]
+MEDICAL_MANUSCRIPT_CARD_FIELDS = [MEDICAL_CARD_FIELDS[0], ROLE_FIELD, *MEDICAL_CARD_FIELDS[1:]]
 
 # 確認レベル。キーは状態の判定に使い、表記はサーベイの言語で書く（読むときは両方の言語を受け付ける）
 EVIDENCE_UNCHECKED, EVIDENCE_ABSTRACT, EVIDENCE_FULLTEXT = "unchecked", "abstract", "fulltext"
@@ -82,6 +103,8 @@ SCOPE_ROWS = [("question", "Research question"), ("years", "Period"), ("fields",
               ("inclusion", "Inclusion criteria"), ("exclusion", "Exclusion criteria")]
 MATRIX_HEADS = ["Paper", "Journal", "RQ", "X", "Y", "Data / sample", "Identification", "Main findings", "Limitations",
                 "Checked"]
+MEDICAL_MATRIX_HEADS = ["Paper", "Journal", "Question", "Population", "Intervention / exposure", "Outcomes",
+                        "Study design", "Main findings", "Limitations", "Checked"]
 LOG_HEADS = ["Time", "Kind", "Query / target", "Conditions", "Hits", "New candidates"]
 
 _CARD_MARKER = re.compile(r"^<!-- paper: (\S+) -->\s*$")
@@ -133,10 +156,11 @@ def better_record(new: Dict[str, Any], old: Dict[str, Any]) -> bool:
             and (not old.get("verified") or bool(old.get("warnings"))))
 
 
-def off_field(record: Dict[str, Any]) -> bool:
-    """S2 が付けた分野があり、そのどれも社会科学でない（医学・計算機科学だけなど）。"""
+def off_field(record: Dict[str, Any], field: str = "social") -> bool:
+    """S2 が付けた分野があり、そのどれも検索の分野（social / medical）に入らない。"""
     fields = set(record.get("fields") or [])
-    return record.get("source") == "SemanticScholar" and bool(fields) and not fields & SOCIAL_FIELDS
+    wanted = MEDICAL_FIELDS if field == "medical" else SOCIAL_FIELDS
+    return record.get("source") == "SemanticScholar" and bool(fields) and not fields & wanted
 
 
 # 姓の中のハイフン（Fernández‐i‐Marín の U+2010 など）。ASCII の - にそろえる（落とすと
@@ -151,17 +175,43 @@ def ascii_fold(text: str) -> str:
 _NAME_SUFFIXES = {"jr", "sr", "ii", "iii", "iv"}
 
 
+# 姓の前置詞。小文字なら何でも。大文字で始まるものは、名前と紛れにくいものだけ（"Le"・"Da" は東アジアの名前にもある）
+_PARTICLES = {"van", "von", "de", "der", "den", "del", "della", "du", "da", "di", "le", "la", "dos", "das", "ten", "ter"}
+_CAPITAL_PARTICLES = {"Van", "Von", "De", "Del", "Der", "Den", "La", "Dos"}
+# 団体の著者（"RECOVERY Collaborative Group"）。最後の語は姓ではないので、全体を示す
+_GROUP_WORDS = {"group", "groups", "collaborators", "collaboration", "collaborative", "consortium", "investigators",
+                "committee", "team", "trialists", "network", "working", "study"}
+
+
+def split_name(name: str) -> Tuple[str, str]:
+    """(名, 姓)。"Last, First" の形も読む（"Lucas, Jr." の後ろは名ではない）。"""
+    parts = [p.strip() for p in name.split(",")]
+    if len(parts) >= 2 and parts[0] and parts[1].rstrip(".").lower() not in _NAME_SUFFIXES:
+        return parts[1], parts[0]
+    words = name.replace(",", " ").split()
+    while len(words) > 1 and words[-1].rstrip(".").lower() in _NAME_SUFFIXES:
+        words.pop()
+    if not words:
+        return "", ""
+    i = len(words) - 1
+    while i > 1 and (words[i - 1] in _PARTICLES or words[i - 1] in _CAPITAL_PARTICLES):
+        i -= 1   # 最初の語は名として残す（"Van Morrison" の Van）
+    return " ".join(words[:i]), " ".join(words[i:])
+
+
 def display_surname(name: str) -> str:
-    """姓（表示用）。"Robert E. Lucas Jr." → "Lucas" のように Jr. などの接尾辞を除く。"""
-    parts = name.replace(",", " ").split()
-    while len(parts) > 1 and parts[-1].rstrip(".").lower() in _NAME_SUFFIXES:
-        parts.pop()
-    return parts[-1].rstrip(".") if parts else ""
+    """姓（表示用）。接尾辞を除き（"Robert E. Lucas Jr." → "Lucas"）、前置詞は残す（"Andrew H. Van de Ven" → "Van de Ven"）。
+    団体の著者は全体を返す。"""
+    words = name.replace(",", " ").split()
+    if len(words) > 1 and words[-1].lower() in _GROUP_WORDS and "," not in name:
+        return " ".join(words)
+    return split_name(name)[1].rstrip(".")
 
 
 def surname(name: str) -> str:
-    """照合用の姓（アクセントを落とした小文字）。"""
-    return ascii_fold(display_surname(name)).lower()
+    """照合用の姓（アクセントを落とした小文字）。前置詞は除く: 本文に "Van de Ven" とも "Ven" とも書かれる。"""
+    words = display_surname(name).split()
+    return ascii_fold(words[-1]).lower() if words else ""
 
 
 def author_short(authors: List[str]) -> str:
@@ -276,7 +326,8 @@ class Survey:
     def create(cls, topic: str, slug: str, scope: Dict[str, str], today: Optional[date] = None,
                reports_dir: Optional[Path] = None, state_dir: Optional[Path] = None,
                template: Optional[Path] = None, depth: str = DEFAULT_DEPTH, lang: Optional[str] = None,
-               manuscript: Optional[str] = None, purpose: Optional[str] = None) -> "Survey":
+               manuscript: Optional[str] = None, purpose: Optional[str] = None,
+               discipline: str = "social") -> "Survey":
         if depth not in DEPTHS:
             raise SurveyError(t("depth is one of {choices}: {depth}", choices=" / ".join(DEPTHS), depth=depth))
         lang = i18n.normalize(lang or workspace_lang(ROOT))
@@ -285,11 +336,12 @@ class Survey:
         state_dir = state_dir or STATE_DIR
         if purpose and not manuscript:
             raise SurveyError(t("--purpose is for a survey made from a manuscript (give --manuscript)"))
-        if purpose and purpose not in PURPOSES:
-            raise SurveyError(t("the purpose is one of {choices}: {purpose}", choices=" / ".join(PURPOSES),
-                                purpose=purpose))
-        purpose = (purpose or DEFAULT_PURPOSE) if manuscript else None
-        template = template or template_path(lang, manuscript=bool(manuscript), purpose=purpose)
+        if discipline not in DISCIPLINES:
+            raise SurveyError(t("the discipline is one of {choices}: {discipline}", choices=" / ".join(DISCIPLINES),
+                                discipline=discipline))
+        medical = discipline == "medical"
+        purpose = DEFAULT_PURPOSE if manuscript else None
+        template = template or template_path(lang, manuscript=bool(manuscript), medical=medical)
         slug = sanitize_slug(slug) or "survey"
         # やり直し（同じ slug がある）なら版を振る: 20261012_v2_<slug>。日付の直後に置き、一覧で版が見えるようにする
         slug = name_parts(f"00000000_{slug}")[2]   # エージェントが付けた末尾の _v2 は外して数え直す
@@ -306,12 +358,14 @@ class Survey:
             "created": today.isoformat(),
             "lang": lang,
             "depth": depth,
-            "search_field": "social",
+            "search_field": "medical" if medical else "social",
             "scope": {k: scope.get(k, "") for k in ("question", "years", "fields", "inclusion", "exclusion")},
             "next_number": 1,
             "papers": {},
             "searches": [],
         }
+        if medical:   # 社会科学のサーベイの状態ファイルは前のまま
+            data["discipline"] = discipline
         if manuscript:
             data["manuscript"] = manuscript_ref(manuscript, reports_dir.parent)
             data["purpose"] = purpose
@@ -321,6 +375,8 @@ class Survey:
         values = {"topic": topic, "topic_yaml": topic.replace("\\", "\\\\").replace('"', '\\"'),
                   "date": today.isoformat()}
         text = template.read_text(encoding="utf-8")
+        if medical:
+            text = text.replace("  - social-science\n", "  - medicine\n")
         reports_dir.mkdir(parents=True, exist_ok=True)
         state_dir.mkdir(parents=True, exist_ok=True)
         md_path.write_text(re.sub(r"\{(\w+)\}", lambda m: values.get(m.group(1), m.group(0)), text),
@@ -458,6 +514,10 @@ class Survey:
         """書誌情報を手で直す（authors・year・title）。confirm に理由を渡すと、今の警告を確かめたものとして解除する。"""
         e = self.get(number)
         fields = {k: v for k, v in fields.items() if v not in (None, "", [])}
+        if fields.get("authors"):   # "Van de Ven, Andrew H." の形でも受け取る
+            fields["authors"] = [" ".join(x for x in split_name(a) if x) for a in fields["authors"]]
+        if fields.get("title"):
+            fields["title"] = one_line(fields["title"])
         if fields:
             e.setdefault("fixed", {}).update(fields)
             e["record"].update(fields)
@@ -483,6 +543,10 @@ class Survey:
         self.data["searches"].append({"at": now_iso(), "kind": kind, "query": query,
                                       "params": {k: v for k, v in params.items() if v not in (None, False, "")},
                                       "hits": hits, "new": new})
+
+    @property
+    def medical(self) -> bool:
+        return self.data.get("discipline") == "medical"
 
     @property
     def search_field(self) -> str:
@@ -630,11 +694,13 @@ class Survey:
     @property
     def card_spec(self) -> List[Tuple[str, str]]:
         """このサーベイのカードの記入欄。原稿から始めるサーベイには「原稿での役割」がある。"""
+        if self.medical:
+            return MEDICAL_MANUSCRIPT_CARD_FIELDS if self.manuscript else MEDICAL_CARD_FIELDS
         return MANUSCRIPT_CARD_FIELDS if self.manuscript else CARD_FIELDS
 
     @property
     def matrix_fields(self) -> List[str]:
-        return (["role"] if self.manuscript else []) + MATRIX_FIELDS
+        return (["role"] if self.manuscript else []) + (MEDICAL_MATRIX_FIELDS if self.medical else MATRIX_FIELDS)
 
     @property
     def archived(self) -> str:
@@ -714,7 +780,7 @@ class Survey:
         self.render()
         md = self.md_path.read_text(encoding="utf-8")
         cards = parse_cards(extract_blocks(md)["papers"])
-        cards[key] = set_card_fields(cards.get(key, ""), values, self.lang)
+        cards[key] = set_card_fields(cards.get(key, ""), values, self.lang, self.card_spec)
         papers = "\n\n".join(f"<!-- paper: {k} -->\n{body}" for k, body in cards.items())
         new_md = self.rendered_markdown(replace_blocks(md, {"papers": papers}))
         if new_md == md:
@@ -734,7 +800,7 @@ class Survey:
     def reclassify(self) -> bool:
         """SSCI の判定を今の収録リストで付け直す（照合の規則やリストが変わったとき）。変わったら True。
         収録リストが無いときは、前にリストで照合した判定を消さないよう何もしない。"""
-        if not ssci.get_ssci_list().loaded:
+        if not (ssci.get_ssci_list().loaded or ssci.get_scie_list().loaded):
             return False
         changed = False
         for e in self.papers:
@@ -792,7 +858,7 @@ class Survey:
         none_yet = "*" + tl(lang, "(No included papers yet)") + "*"
         rendered = {
             "scope": render_scope(self.data, lang),
-            "matrix": render_matrix(included, fields, labels, lang, role=bool(self.manuscript)),
+            "matrix": render_matrix(included, fields, labels, lang, role=bool(self.manuscript), medical=self.medical),
             "papers": "\n\n".join(card_texts) if card_texts else none_yet,
             "references": render_references(included, labels, lang),
             "log": render_log(self.data, self.papers, lang),
@@ -894,7 +960,8 @@ def parse_cards(papers_block: str) -> Dict[str, str]:
 
 def _field_stems() -> List[Tuple[str, str]]:
     """(ラベルの括弧前の部分, キー)。両方の言語。長いものから照合する（"RQ" と "Data" などの前方一致の取り違え防止）。"""
-    stems = {(_label_stem(tl(lang, label)), key) for key, label in MANUSCRIPT_CARD_FIELDS for lang in i18n.LANGS}
+    stems = {(_label_stem(tl(lang, label)), key) for key, label in [*MANUSCRIPT_CARD_FIELDS, *MEDICAL_CARD_FIELDS]
+             for lang in i18n.LANGS}
     return sorted(stems, key=lambda s: -len(s[0]))
 
 
@@ -950,10 +1017,11 @@ def card_values(body: str) -> Dict[str, str]:
     return values
 
 
-def set_card_fields(body: str, values: Dict[str, str], lang: str) -> str:
+def set_card_fields(body: str, values: Dict[str, str], lang: str,
+                    fields: Optional[List[Tuple[str, str]]] = None) -> str:
     """記入欄を書き換えたカード本文（card_values の逆）。ほかの行はそのまま。消されていた欄は最後の欄の後ろに足す。"""
     lines = body.splitlines()
-    labels = dict(MANUSCRIPT_CARD_FIELDS)
+    labels = dict(fields or MANUSCRIPT_CARD_FIELDS)
     for key, value in values.items():
         spans = _field_spans(lines)
         parts = value.replace("\r\n", "\n").split("\n")
@@ -984,6 +1052,17 @@ def new_card_body(record: Dict[str, Any], lang: str, fields: Optional[List[Tuple
     return "\n".join(lines)
 
 
+def study_design(record: Dict[str, Any]) -> str:
+    """PubMed の出版の種類のうち、いちばん強い研究デザイン（無ければ空）。"""
+    types = set(record.get("publication_types") or [])
+    return next((d for d in ssci.PUBMED_DESIGNS if d in types), "")
+
+
+def one_line(text: str) -> str:
+    """題名などの改行・連続した空白を、空白 1 つにする（改行があるとカードの見出しが崩れる）。"""
+    return re.sub(r"\s+", " ", text or "").strip()
+
+
 def biblio(record: Dict[str, Any]) -> str:
     s = f"*{record.get('journal_name') or 'N/A'}*"
     if record.get("volume"):
@@ -1003,9 +1082,11 @@ def card_block(entry: Dict[str, Any], body: str, label: str, lang: str) -> str:
     r = entry["record"]
     lines = [
         f"<!-- paper: {entry['key']} -->",
-        f"### #{entry['number']} {author_short(r['authors'])} ({label or r.get('year') or 'n.d.'}): {r['title']}",
+        f"### #{entry['number']} {author_short(r['authors'])} ({label or r.get('year') or 'n.d.'}): {one_line(r['title'])}",
         f"- **{tl(lang, BIBLIO_LABEL)}**: {biblio(r)} | {ssci.badge(r['ssci']['status'], lang)} | "
-        + tl(lang, "cited by {n}", n=r.get("citation_count", 0)) + f" | {doi_link(r, lang)}",
+        + tl(lang, "cited by {n}", n=r.get("citation_count", 0)) + f" | {doi_link(r, lang)}"
+        + (f" | [PMID {r['pmid']}](https://pubmed.ncbi.nlm.nih.gov/{r['pmid']}/)" if r.get("pmid") else "")
+        + (f" | {study_design(r)}" if study_design(r) else ""),
     ]
     lines += [f"- ⚠️ {w}" for w in r.get("warnings", [])]
     lines += [f"- ℹ️ {n}" for n in r.get("notes", [])]
@@ -1018,6 +1099,10 @@ def render_scope(data: Dict[str, Any], lang: str) -> str:
     basis = ssci.get_ssci_list()
     ssci_text = (tl(lang, "checked against the Clarivate list ({file})", file=basis.path.name) if basis.loaded
                  else tl(lang, "guessed from the journal name with the built-in list of major journals (verify)"))
+    scie = ssci.get_scie_list()
+    medical_text = tl(lang, "PubMed's record of each paper (MEDLINE)")
+    if scie.loaded:
+        medical_text += " + " + tl(lang, "checked against the Clarivate list ({file})", file=scie.path.name)
     unset = tl(lang, "(not set — set it with `priorwork scope`)")
     lines = [f"- **{tl(lang, k)}**: {v or unset}" for k, v in rows]
     if data.get("manuscript"):
@@ -1026,19 +1111,24 @@ def render_scope(data: Dict[str, Any], lang: str) -> str:
     lines.append(f"- **{tl(lang, 'Depth')}**: {depth} — {tl(lang, DEPTHS[depth])}")
     field = data.get("search_field", "all")
     lines.append(f"- **{tl(lang, 'Fields searched')}**: {field} — {tl(lang, SEARCH_FIELDS[field])}")
-    lines.append(f"- **{tl(lang, 'Basis of the SSCI status')}**: {ssci_text}")
+    if data.get("discipline") == "medical":
+        lines.append(f"- **{tl(lang, 'Basis of the journal status')}**: {medical_text}")
+        kind = tl(lang, "narrative review prepared with an AI agent; not a systematic review and not clinical guidance")
+        lines.append(f"- **{tl(lang, 'Kind of review')}**: {kind}")
+    else:
+        lines.append(f"- **{tl(lang, 'Basis of the SSCI status')}**: {ssci_text}")
     return "\n".join(lines)
 
 
 def render_matrix(included: List[Dict[str, Any]], fields: Dict[str, Dict[str, str]],
-                  labels: Optional[Dict[str, str]], lang: str, role: bool = False) -> str:
+                  labels: Optional[Dict[str, str]], lang: str, role: bool = False, medical: bool = False) -> str:
     """比較マトリクス。role（原稿から始めるサーベイ）なら、雑誌の次に「役割」の列を置く。"""
     labels = labels or {}
-    heads = [tl(lang, h) for h in MATRIX_HEADS]
-    keys = MATRIX_FIELDS
+    heads = [tl(lang, h) for h in (MEDICAL_MATRIX_HEADS if medical else MATRIX_HEADS)]
+    keys = MEDICAL_MATRIX_FIELDS if medical else MATRIX_FIELDS
     if role:
         heads.insert(2, tl(lang, "Role"))
-        keys = ["role", *MATRIX_FIELDS]
+        keys = ["role", *keys]
     header = "| " + " | ".join(heads) + " |\n|" + " :--- |" * len(heads)
     if not included:
         return header + "\n| " + tl(lang, "(No included papers yet)") + " |" + " |" * (len(heads) - 1)
@@ -1071,7 +1161,7 @@ def render_references(included: List[Dict[str, Any]], labels: Optional[Dict[str,
             vol += f", {r['pages']}"
         link = f"https://doi.org/{r['doi']}" if r.get("doi") else (r.get("url") or "")
         year = labels.get(e["key"]) or r.get("year") or "n.d."
-        lines.append(f"- {', '.join(r['authors']) or 'Unknown'} ({year}). {r['title']}. "
+        lines.append(f"- {', '.join(r['authors']) or 'Unknown'} ({year}). {one_line(r['title'])}. "
                      f"*{r.get('journal_name') or 'N/A'}*{vol}. {link}")
     return "\n".join(lines)
 

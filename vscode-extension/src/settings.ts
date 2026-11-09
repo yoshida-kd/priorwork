@@ -19,7 +19,8 @@ const FLAGS = new Set(['ZOTERO_WRITE']);
 type Msg =
     | { type: 'save'; values: Values }
     | { type: 'check'; values: Values }
-    | { type: 'importSsci'; values: Values };
+    | { type: 'importSsci'; values: Values }
+    | { type: 'importScie'; values: Values };
 
 function esc(s: unknown): string {
     return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
@@ -70,6 +71,8 @@ export class SettingsPanel implements vscode.Disposable {
                 this.checks = r.checks;
             } else if (m.type === 'importSsci') {
                 await this.importSsci();
+            } else if (m.type === 'importScie') {
+                await this.importScie();
             }
         } catch (e) {
             this.actions.fail(e);
@@ -88,6 +91,22 @@ export class SettingsPanel implements vscode.Disposable {
             this.actions.fail(e);
             return false;
         }
+    }
+
+    private async importScie(): Promise<void> {
+        const picked = await vscode.window.showOpenDialog({
+            canSelectMany: false,
+            filters: { CSV: ['csv'] },
+            openLabel: vscode.l10n.t('Import'),
+            title: vscode.l10n.t('The SCIE list downloaded from the Master Journal List (CSV)'),
+        });
+        if (!picked?.length) {
+            return;
+        }
+        const r = await runJson<SettingsReport>(this.model.root, ['settings', '--import-scie', picked[0].fsPath]);
+        this.model.refresh();
+        void vscode.window.showInformationMessage(vscode.l10n.t('Priorwork: imported the SCIE list ({0} journals).',
+                                                                r.scie?.journals ?? 0));
     }
 
     private async importSsci(): Promise<void> {
@@ -129,6 +148,7 @@ export class SettingsPanel implements vscode.Disposable {
             SEMANTIC_SCHOLAR_API_KEY: L.t('API key'),
             OPENALEX_API_KEY: L.t('API key'),
             OPENALEX_MAILTO: L.t('Your email address (sent with requests, as OpenAlex asks)'),
+            NCBI_API_KEY: L.t('API key'),
             ZOTERO_API_KEY: L.t('API key'),
             ZOTERO_USER_ID: L.t('User ID ("Your user ID for use in API calls" on the same page)'),
             ZOTERO_WRITE: L.t('Let Priorwork add the included papers to the survey\'s collection (the key then needs "Allow write access" too)'),
@@ -146,6 +166,10 @@ export class SettingsPanel implements vscode.Disposable {
             { title: 'OpenAlex',
               note: L.t('Optional. Used to verify DOIs and journals; works without a key, with a daily usage cap.'),
               keys: ['OPENALEX_API_KEY', 'OPENALEX_MAILTO'] },
+            { title: 'PubMed',
+              note: L.t('Optional, for medical surveys. PubMed works without a key, at 3 requests a second; a free NCBI key allows 10.') + ' '
+                  + link('https://www.ncbi.nlm.nih.gov/account/settings/', L.t('Create a key in your NCBI account')),
+              keys: ['NCBI_API_KEY'] },
             { title: 'Zotero',
               note: L.t('Optional: shows which included papers are in Zotero and gets full texts from the PDFs attached there. Read only, unless you let Priorwork add the included papers to the collection you link to the survey (it never changes or deletes your items, and can undo what it added).') + ' '
                   + link('https://www.zotero.org/settings/keys', L.t('Create a key with only "Allow library access"')),
@@ -193,6 +217,12 @@ export class SettingsPanel implements vscode.Disposable {
              ${link('https://mjl.clarivate.com/', 'Master Journal List')}</p>
           ${ssci}
           <button data-action="importSsci">${esc(L.t('Import the SSCI List (CSV)…'))}</button>
+        </section>
+        <section class="group"><h2>${esc(L.t('SCIE journal list'))}</h2>
+          <p class="muted">${esc(L.t('Optional, for medical surveys, which also show whether PubMed has indexed each paper for MEDLINE. Download the SCIE list as CSV from the same site and import it.'))}
+             ${link('https://mjl.clarivate.com/', 'Master Journal List')}</p>
+          ${r.scie?.file ? `<p>✅ ${esc(L.t('{0} ({1} journals)', r.scie.file, r.scie.journals))}</p>` : ''}
+          <button data-action="importScie">${esc(L.t('Import the SCIE List (CSV)…'))}</button>
         </section>
         <div class="actions">
           <button class="include" data-action="save">${esc(L.t('Save'))} <kbd>Ctrl+S</kbd></button>

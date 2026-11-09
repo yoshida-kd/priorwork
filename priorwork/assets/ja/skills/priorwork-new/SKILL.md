@@ -1,7 +1,7 @@
 ---
 name: priorwork-new
 description: >-
-  Starts a new social-science literature survey: settles the scope (research question, period, criteria,
+  Starts a new literature survey (social sciences or clinical research): settles the scope (research question, period, criteria,
   depth), creates reports/YYYYMMDD_<slug>.md with `./priorwork new`, and runs enough searches for the depth.
   Use when a survey on a new topic is needed, or when an existing survey needs more searches.
 ---
@@ -21,11 +21,14 @@ description: >-
 - 除外基準（例: 理論のみ、WP）
 - 英語の slug（例: `minimum_wage_employment`）。やり直しなら元と同じ slug にする（版はエンジンが `20261012_v2_<slug>` と振る。`_v2` を自分で付けない）
 - 深さ（`quick` / `full`）: AGENTS.md「深さ」の表で決める。
+- 分野: 臨床研究なら `--discipline medical` を付ける（AGENTS.md「医学のサーベイ」）。問いは対象集団・介入または曝露・対照・アウトカムの形で書く。
 - 進め方（`standard` / `auto` / `manual`）: AGENTS.md「進め方」で決める。何も言われなければ `standard`。
 
 ```bash
 ./priorwork new "<テーマ（日本語可）>" --slug <slug> --by "<自分のモデル名>" --mode standard|auto|manual --depth quick|full --question "..." --years "..." --fields "..." --inclusion "..." --exclusion "..."
 ```
+
+このフォルダで別のサーベイが進行中かもしれないなら、`--worktree` を付けて、作られたフォルダで作業する（AGENTS.md「Git」）。
 
 `--by` には自分のモデル名（例: `"Gemini 3.1 Pro"`、`"Claude Opus 5.5"`）を書く。
 
@@ -48,6 +51,7 @@ description: >-
 - 0 件・数件だったクエリは、語を減らす・同義語に変える・`--bulk` を外すなどして検索し直す。
 - 検索語の例: 概念の英語表現と同義語、代表的な理論の名前（`"transaction cost"` など）、識別戦略（`"difference-in-differences"`）、対象国・地域。
 - 新しいサーベイの検索は、社会科学の外（医学・計算機科学だけなど）の論文を除く（S2 の分野で判定し、分野の無い論文は残す）。テーマが自然科学・工学にまたがるなら `./priorwork scope <survey> --search-field all` にする。
+- **医学のサーベイでは**、検索語は PubMed と S2 の両方に行く。PubMed のタグが使える（`"heart failure"[MeSH Terms]`、`aspirin[tiab]`、`Randomized Controlled Trial[pt]`。S2 には外して渡す）。普通の語は PubMed が MeSH に対応させ、引用符の語句は書いたとおりに探すので、両方使う。薬のクラスと個々の薬の名前を探し、試験とメタ分析は別に探す。結果には PubMed の研究デザインが出る。
 - 特定の誌に限るとき（「分野の主要誌に限って」など）は、誌ごとに `--journal "<正式な誌名>"` を付ける（誌が名乗る英語の名前。例: `--journal "American Political Science Review" --journal "American Journal of Political Science"`）。ほかの誌の論文は除かれ、件数が表示される。
 - 要旨がデータベースに無い論文は、Crossref の要旨で補われる。それでも無い論文は、タイトルと誌名だけで除外せず保留にし、本文で確かめる。
 - 有名な論文が分かっていれば `./priorwork add <survey> <DOI>` で直接登録してよい（`get` で書誌を確かめてから）。

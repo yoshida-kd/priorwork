@@ -1,5 +1,5 @@
 {
-  "extension.description": "社会科学の先行研究サーベイを AI エージェントに任せて作る。検索（Semantic Scholar・OpenAlex）・選別・論文カード・文章はエージェントが行い、あなたはサイドバーで確かめて直す。ターミナルは不要。",
+  "extension.description": "社会科学と臨床研究の先行研究サーベイを AI エージェントに任せて作る。検索（Semantic Scholar・OpenAlex）・選別・論文カード・文章はエージェントが行い、あなたはサイドバーで確かめて直す。ターミナルは不要。",
   "view.surveys.name": "サーベイ",
   "welcome.noWorkspace": "Priorwork は、サーベイごとのレポートと状態を「ワークスペース」（フォルダ。GitHub の非公開リポジトリで管理する）に置きます。\n[ワークスペースを作る](command:priorwork.initWorkspace)\n既にある場合は、そのフォルダを開いてください。\n[フォルダを開く](command:vscode.openFolder)\n[設定を診断する](command:priorwork.doctor)",
   "welcome.noSurveys": "サーベイはまだありません。いちばん簡単なのは、テーマを伝えてエージェント（Claude Code・Antigravity など）に任せることです。\n[サーベイを始める](command:priorwork.newSurvey)\n検索を速くするため、先に API キーを設定しておくことをお勧めします。\n[設定を開く](command:priorwork.openSettings)",

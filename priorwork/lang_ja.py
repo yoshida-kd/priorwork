@@ -40,13 +40,6 @@ MESSAGES = {
         "{error} → プレプリントの DOI の雑誌版は探していません",
     "Replaced the preprint / working-paper DOI {old} with the journal version {doi}":
         "プレプリント・WP の DOI {old} を雑誌版 {doi} に替えました",
-    "Left out {n|# paper|# papers} outside the social sciences (e.g. {example}). To keep them, add --field all":
-        "社会科学の外の論文 {n} 件を除きました（{example} など）。残すなら --field all を付けてください",
-    "social: leave out papers outside the social sciences / all (default: the survey's setting; all without --into)":
-        "social: 社会科学の外の論文を除く / all（既定: サーベイの設定。--into が無ければ all）",
-    "the fields that searches into the survey keep (social: leave out papers outside the social sciences, "
-    "the default for new surveys; all: keep everything)":
-        "サーベイへの検索で残す分野（social: 社会科学の外の論文を除く。新しいサーベイの既定 / all: すべて残す）",
     "{error} → abstracts are not filled in from Crossref": "{error} → Crossref から要旨を補いません",
     "unchecked": "未確認",
     "abstract only": "要旨のみ",
@@ -64,6 +57,70 @@ MESSAGES = {
     "Notes": "メモ",
     "Source": "書誌",
     "Role in the manuscript": "原稿での役割",
+    "  new ... --worktree         make it in its own folder and branch, alongside other surveys":
+        "  new ... --worktree         専用のフォルダとブランチに作る（ほかのサーベイと同時に進める）",
+    "  worktree [--remove NAME]   list the surveys' worktrees, or remove one":
+        "  worktree [--remove NAME]   サーベイの worktree を一覧する、または消す",
+    "It is in the worktree {path}: run this there": "worktree {path} にあります。そこで実行してください",
+    "git is not available: {error}": "git を使えません: {error}",
+    "This workspace is not a Git repository, so it cannot have worktrees": "このワークスペースは Git のリポジトリではないので、worktree を作れません",
+    "There is no main branch to start the survey from": "サーベイの元にする main ブランチがありません",
+    "{path} already exists. Continue there, or choose another slug": "{path} はすでにあります。そこで続けるか、別の slug にしてください",
+    "Could not create the worktree: {error}": "worktree を作れませんでした: {error}",
+    "Could not create the branch {name}: {error}": "ブランチ {name} を作れませんでした: {error}",
+    "No worktree named {name}. See `priorwork worktree`": "{name} という worktree はありません。`priorwork worktree` で確かめてください",
+    "You are inside this worktree. Run this from the workspace's main folder ({path})": "この worktree の中にいます。ワークスペースの本体のフォルダ（{path}）で実行してください",
+    "{name} has {changes|# uncommitted change|# uncommitted changes} and {unpushed|# commit|# commits} not pushed. Commit and push first (--force throws them away)":
+        "{name} には未コミットの変更が {changes} 件、push していないコミットが {unpushed} 件あります。先にコミットして push してください（--force を付けると失われます）",
+    "Could not remove the worktree: {error}": "worktree を消せませんでした: {error}",
+    "Worktree: {path} (branch {branch}). Work there from now on: open that folder, or `cd` to it. The workspace's keys, journal lists, Python and cache are shared with it":
+        "worktree: {path}（ブランチ {branch}）。以後はそこで作業してください（そのフォルダを開くか、`cd` する）。ワークスペースのキー・雑誌のリスト・Python・キャッシュは共有されます",
+    "Not in the workspace, so not shared: {names}": "ワークスペースに無いので共有していません: {names}",
+    "Removed the worktree {path}. The branch {branch} stays": "worktree {path} を消しました。ブランチ {branch} は残っています",
+    "No worktrees. `priorwork new ... --worktree` starts a survey in one": "worktree はありません。`priorwork new ... --worktree` で、worktree でサーベイを始められます",
+    "{changes|# uncommitted change|# uncommitted changes}, {unpushed|# commit|# commits} not pushed": "未コミットの変更 {changes} 件、未 push のコミット {unpushed} 件",
+    "In a worktree: {branch} ({path}). Work on it there": "worktree にあるサーベイ: {branch}（{path}）。そこで作業してください",
+    "list the surveys' worktrees, or remove one (--remove)": "サーベイの worktree を一覧する、または消す（--remove）",
+    "remove this worktree; its branch stays": "この worktree を消す（ブランチは残る）",
+    "with --remove: remove it even with uncommitted changes or commits not pushed, which are lost": "--remove と使い、未コミットの変更や未 push のコミットがあっても消す（それらは失われる）",
+    "make it in its own folder and branch (worktrees/<slug>), so that it runs alongside other surveys without switching branches":
+        "専用のフォルダとブランチ（worktrees/<slug>）に作る。ブランチを切り替えずに、ほかのサーベイと同時に進められる",
+    "* The first page looks like a working paper or a manuscript, not the published version. Its numbers and pages may differ: attach the published PDF in Zotero, or say in the card's notes which version you read":
+        "* 1 ページ目がワーキングペーパーか原稿の版に見えます。掲載版とは数値やページが違うことがあります。掲載版の PDF を Zotero に添付するか、読んだ版をカードのメモに書いてください",
+    "Added, but Zotero does not show {numbers} in the collection \"{name}\" yet. If it stays so, the library may hold another item for the same paper: merge them in Zotero (Duplicate Items)":
+        "足しましたが、Zotero ではまだ {numbers} がコレクション「{name}」にありません。このままなら、同じ論文の別のアイテムがライブラリにあるのかもしれません。Zotero で統合してください（重複アイテム）",
+    "The years of {n|# included paper|# included papers} could not be checked against the journal issues (Crossref did not answer). Run `priorwork check` again later":
+        "採用論文 {n} 本の年を、掲載号と照合できませんでした（Crossref が応答しません）。後で `priorwork check` をもう一度実行してください",
+    "with --add: also add them to this collection, such as the one an Octavo project pulls from (repeat for several; the survey stays linked to its own)":
+        "--add と使い、このコレクションにも入れる（Octavo のプロジェクトが読むコレクションなど。繰り返せる。サーベイの結び付けは変わらない）",
+    "{n|# citation|# citations} in the text for the Octavo project {project} cannot become [@key]: {citations}. Write {n|it|them} as in the report's references":
+        "Octavo のプロジェクト {project} への本文の引用 {n} 件を [@key] にできません: {citations}。レポートの参照文献の書き方に合わせてください",
+    "{n|# citation|# citations} could not become [@key] and {n|stays|stay} as written: {citations}. Write {n|it|them} as in the report's references, and export again":
+        "引用 {n} 件を [@key] にできず、書いたままになっています: {citations}。レポートの参照文献の書き方に合わせて、書き出し直してください",
+    "For the author (not text for the manuscript)": "著者へ（原稿の本文には入れない）",
+    "--purpose is no longer needed: one report from a manuscript covers what to add, the check of its citations and advice":
+        "--purpose は不要になりました。原稿からのレポートは 1 本で、補完・引用の点検・助言を扱います",
+    "  new ... --manuscript PATH  start from your manuscript: what to add and where, a check of its citations, advice on it":
+        "  new ... --manuscript PATH  原稿から始める（どこに何を足すか・引用の点検・原稿への助言）",
+    "Write the report on the manuscript: what it lacks, what to add and where (the author's marks first), the check of its citations and comments, then export it":
+        "原稿のレポートを書く（欠け、どこに何を足すか。作者の印を先に。引用の点検とコメント）。それから書き出す",
+    "your manuscript (a file in any format, or a folder under manuscripts/ with the manuscript and its tables): the survey then says what to add and where, checks its citations and advises on it":
+        "原稿（形式は問わない。ファイル、または原稿と結果の表を入れた manuscripts/ の下のフォルダ）。サーベイは、どこに何を足すかを示し、引用を点検し、原稿に助言する",
+    # 医学のサーベイのカード（survey.MEDICAL_CARD_FIELDS。これもレポートから読み返す）
+    "Clinical question": "臨床上の問い",
+    "Population / setting": "対象集団・場",
+    "Intervention or exposure (and comparator)": "介入・曝露（と対照）",
+    "Outcomes": "アウトカム",
+    "Study design": "研究デザイン",
+    "Main findings (effect sizes with 95% CI)": "主な結果（効果量と95%信頼区間）",
+    "Question": "問い",
+    "Population": "対象集団",
+    "Intervention / exposure": "介入・曝露",
+    "Basis of the journal status": "雑誌の判定の根拠",
+    "Kind of review": "レビューの種類",
+    "narrative review prepared with an AI agent; not a systematic review and not clinical guidance":
+        "AI エージェントと作った叙述的レビュー。システマティックレビューでも診療指針でもない",
+    "PubMed's record of each paper (MEDLINE)": "論文ごとの PubMed の記録（MEDLINE）",
 
     # -- レポートの管理ブロック（survey.py） ----------------------------------------------
     "Research question": "リサーチクエスチョン",
@@ -120,6 +177,10 @@ MESSAGES = {
     "🔍 Journal (SSCI not verified)": "🔍 学術誌（SSCI未確認）",
     "⚪ Not in SSCI (checked against the list)": "⚪ SSCI非収録誌（リスト照合）",
     "📕 Book (outside SSCI)": "📕 書籍（SSCI対象外）",
+    "✅ SCIE (checked against the list)": "✅ SCIE収録（リスト照合済）",
+    "✅ MEDLINE (indexed, per PubMed)": "✅ MEDLINE索引済（PubMed の記録）",
+    "🔍 In PubMed (not indexed for MEDLINE)": "🔍 PubMed 収載（MEDLINE 未索引）",
+    "🔍 Journal (not found in PubMed)": "🔍 学術誌（PubMed に見つからない）",
     "❓ Unknown venue": "❓ 掲載誌不明",
     "❌ Working paper / preprint": "❌ ワーキングペーパー / プレプリント",
 
@@ -171,7 +232,6 @@ MESSAGES = {
     "read the values to write as a JSON object from stdin (an empty string removes one)": "書き込む値を標準入力から JSON のオブジェクトで読む（空文字で削除）",
     "set": "設定済み",
     "show or change the settings in .env (API keys, Zotero) and the SSCI list": ".env の設定（API キー・Zotero）と SSCI リストを表示・変更",
-    "{file} has no journal title or ISSN column. Download the SSCI list as CSV from the Master Journal List": "{file} に誌名・ISSN の列がありません。Master Journal List から SSCI のリストを CSV でダウンロードしてください",
     "#{number} is not included, so it has no card": "#{number} は採用論文ではないため、カードがありません",
     "Unknown card fields: {names} (use {known})": "カードに無い欄です: {names}（使える欄: {known}）",
     "The evidence level is one of: {keys}": "確認レベルは次のいずれかです: {keys}",
@@ -186,6 +246,47 @@ MESSAGES = {
     "{label}: the evidence level is still \"{unchecked}\"": "{label}: 確認レベルが「{unchecked}」のままです",
     "{label}: some fields are empty ({fields})": "{label}: 未記入の欄があります（{fields}）",
     "{label}: not an SSCI journal ({badge})": "{label}: SSCI 収録誌ではありません（{badge}）",
+    "{label}: not in MEDLINE or SCIE ({badge})": "{label}: MEDLINE・SCIE の雑誌ではありません（{badge}）",
+    "{label}: this paper has been retracted. Exclude it (if the survey is about the retraction itself, say so in your report)":
+        "{label}: この論文は撤回されています。除外してください（撤回そのものを扱うサーベイなら、報告にそう書いてください）",
+    "Retracted: do not rely on this paper (the retraction is recorded in PubMed or OpenAlex)":
+        "撤回済み: この論文に依拠しないでください（PubMed か OpenAlex に撤回の記録があります）",
+    "the discipline is one of {choices}: {discipline}": "分野は {choices} のどれかです: {discipline}",
+    "could not read the response: {error}": "応答を読めませんでした: {error}",
+    "{error} → the citation counts of the PubMed results are not filled in": "{error} → PubMed の結果の被引用数は補えませんでした",
+    "{error} → PubMed's details are not added": "{error} → PubMed の情報は付けられませんでした",
+    "{error} → only the S2 results (PubMed was not searched)": "{error} → S2 の結果だけです（PubMed は検索していません）",
+    "{error} → only the PubMed results": "{error} → PubMed の結果だけです",
+    "PubMed does not know the PMID {id}": "PubMed にこの PMID はありません: {id}",
+    "PMC has no open full text ({id})": "PMC に公開された本文がありません（{id}）",
+    "Imported the SCIE list: {file} ({n|# journal|# journals})": "SCIE リストを取り込みました: {file}（{n} 誌）",
+    "import the SCIE list downloaded from the Master Journal List": "Master Journal List からダウンロードした SCIE リストを取り込む",
+    "SCIE journal list": "SCIE 収録リスト",
+    "Not set (not needed: all the surveys are medical)": "未設定（不要: すべて医学のサーベイです）",
+    "Not set (optional, for medical surveys: `priorwork settings --import-scie CSV`)": "未設定（任意。医学のサーベイ用: `priorwork settings --import-scie CSV`）",
+    "No key (optional: it works, at 3 requests a second)": "キーなし（任意。毎秒 3 件までで動きます）",
+    "Left out {n|# paper|# papers} outside the field {field} (e.g. {example}). To keep them, add --field all":
+        "分野 {field} の外の論文を {n} 本除きました（例: {example}）。残すなら --field all を付けてください",
+    "Left out {n|# letter, editorial or comment|# letters, editorials and comments} (by PubMed's publication type). To keep them, add --include-preprints":
+        "レター・論説・コメントを {n} 本除きました（PubMed の出版の種類による）。残すなら --include-preprints を付けてください",
+    "Currently indexed for MEDLINE (NLM Catalog)": "現在 MEDLINE に索引されています（NLM Catalog）",
+    "Not found among the journals currently indexed for MEDLINE (NLM Catalog)": "現在 MEDLINE に索引されている雑誌には見つかりません（NLM Catalog）",
+    "also ask the NLM Catalog whether MEDLINE indexes it now": "現在 MEDLINE に索引されているかも NLM Catalog で確かめる",
+    "social (the default) or medical: a clinical survey searches PubMed too, judges journals by MEDLINE and SCIE, and has PICO cards and its own report":
+        "social（既定）か medical: 臨床のサーベイは PubMed も検索し、雑誌を MEDLINE と SCIE で判定し、PICO のカードと専用のレポートを使う",
+    "where to search (auto: PubMed and S2 in a medical survey, else S2; pubmed: PubMed and S2; s2: S2 only)":
+        "検索先（auto: 医学のサーベイは PubMed と S2、ほかは S2 / pubmed: PubMed と S2 / s2: S2 だけ）",
+    "social / medical: leave out papers outside that field / all (default: the survey's setting; all without --into)":
+        "social / medical: その分野の外の論文を除く / all（既定: サーベイの設定。--into が無ければ all）",
+    "the fields that searches into the survey keep (social: leave out papers outside the social sciences, the default for new surveys; medical: the same for medicine and the life sciences, the default for medical surveys; all: keep everything)":
+        "サーベイへの検索で残す分野（social: 社会科学の外の論文を除く。新しいサーベイの既定 / medical: 医学・生命科学について同じ。医学のサーベイの既定 / all: すべて残す）",
+    "medicine and the life sciences only (papers with no field are kept)": "医学・生命科学だけ（分野の無い論文は残す）",
+    "only papers in SSCI journals (including guessed ones); in a medical survey, only papers in MEDLINE or SCIE":
+        "SSCI 収録（推定含む）誌の論文だけにする。医学のサーベイでは MEDLINE・SCIE の論文だけ",
+    "also include working papers, preprints, books and unknown venues (and, from PubMed, letters, editorials and comments)":
+        "WP・プレプリント・書籍・掲載誌不明も含める（PubMed のレター・論説・コメントも）",
+    "{file} has no journal title or ISSN column. Download the list as CSV from the Master Journal List":
+        "{file} に誌名・ISSN の列がありません。Master Journal List からリストを CSV でダウンロードしてください",
     "The citation \"{cite}\" in the text has no registered paper "
     "(check that it exists with `priorwork get`, then register it with `priorwork add`). "
     "If it is not a paper for this survey (e.g. a data source named in a card), "
@@ -486,6 +587,8 @@ MESSAGES = {
     "Written as a draft (marked at the top):": "下書きとして書き出しました（冒頭に表示があります）:",
     "Full text: {path} ({pages} pages, {chars} characters)": "本文テキスト: {path}（{pages} ページ, {chars} 文字）",
     "Source: {source}": "取得元: {source}",
+    "* This is PMC's full text, which has no page breaks. Check the PDF before giving page numbers.":
+        "* PMC の本文で、ページの区切りがありません。ページを示すときは PDF で確かめてください。",
     "* This is Zotero's index text, which has no page breaks. Check the PDF before giving page numbers.":
         "※ Zotero の索引テキストのためページ区切りがありません。ページ番号を書くときは PDF で確認してください。",
     "* Extracted text can garble columns, tables and formulas. Check numbers against the page in the PDF too.":
@@ -539,8 +642,6 @@ MESSAGES = {
         "  status [SURVEY]            サーベイ一覧 / 進捗と次にやること",
     "  new TOPIC --slug SLUG      create a survey (reports/YYYYMMDD_<slug>.md and .priorwork/surveys/*.json)":
         "  new TOPIC --slug SLUG      サーベイを作成（reports/YYYYMMDD_<slug>.md と .priorwork/surveys/*.json）",
-    "  new ... --manuscript PATH  start from your manuscript (--purpose complete: fill in what it lacks; draft: its sections 1–3; advice: advice on it)":
-        "  new ... --manuscript PATH  原稿から始める（--purpose complete: 欠けを補う、draft: 1〜3 章の下書き、advice: 原稿への助言）",
     "  read PATH                  print the text of a manuscript (.md, .qmd, .html, .docx, .pdf, … or a folder)":
         "  read PATH                  原稿をテキストにして出す（.md・.qmd・.html・.docx・.pdf など。フォルダも可）",
     "  scope SURVEY ...           set the scope (research question, period, criteria)":
@@ -561,8 +662,8 @@ MESSAGES = {
         "  render SURVEY              Markdown の管理ブロックを再生成",
     "  export SURVEY              write the report for reading (HTML / Word / Markdown)":
         "  export SURVEY              読むためのレポートを書き出す（HTML / Word / Markdown）",
-    "  export SURVEY --draft      write the draft of the manuscript's sections 1–3 with its references":
-        "  export SURVEY --draft      原稿の 1〜3 章の下書きを参考文献つきで書き出す",
+    "  export SURVEY --draft      write what to add to the manuscript, with its references":
+        "  export SURVEY --draft      原稿に足すものを参考文献つきで書き出す",
     "  check SURVEY               find empty fields, unregistered citations and DOI mismatches":
         "  check SURVEY               記入漏れ・未登録の引用・DOI の不整合を検査",
     "  fulltext SURVEY N          get the full text (Zotero / open-access PDF)":
@@ -581,8 +682,6 @@ MESSAGES = {
     "do not use the cache of API responses": "API レスポンスのキャッシュを使わない",
     "print JSON (for the VS Code extension and scripts)": "JSON で出力する（VS Code の拡張機能・スクリプト向け）",
     "number of papers (default: 10)": "件数 (default: 10)",
-    "only papers in SSCI journals (including guessed ones)": "SSCI 収録（推定含む）誌の論文だけにする",
-    "also include working papers, preprints, books and unknown venues": "WP・プレプリント・書籍・掲載誌不明も含める",
     "show the start of the abstract when there is no TL;DR": "TL;DR が無い論文は要旨の冒頭を表示",
     "set up a workspace": "ワークスペースを初期化",
     "the directory (default: the current workspace)": "初期化するディレクトリ（既定: 現在のワークスペース）",
@@ -630,25 +729,12 @@ MESSAGES = {
     "the format (default: html; md with --draft)": "出力形式（既定: html。--draft のときは md）",
     "where to write it (default: next to the report in reports/)": "出力先（既定: reports/ 内、レポートと同じ名前）",
     "also include each paper's abstract": "各論文の要旨も載せる",
-    "write only the draft of the manuscript's sections 1–3, with its references (a survey made with --manuscript)":
-        "原稿の 1〜3 章の下書きだけを、参考文献つきで書き出す（--manuscript で作ったサーベイ）",
-    "your manuscript (a file in any format, or a folder under manuscripts/ with the manuscript and its tables): "
-    "the survey then fills in what it lacks, drafts its sections 1–3 or advises on it (--purpose)":
-        "原稿（形式は問わない。ファイル、または原稿と結果の表を入れた manuscripts/ の下のフォルダ）。"
-        "サーベイは、その欠けを補うか、1〜3 章を下書きするか、原稿に助言する（--purpose）",
-    "with --manuscript, what the report is for (complete: fill in what a manuscript in progress lacks, from the "
-    "literature, the default; draft: a draft of the sections 1–3 of a manuscript whose analysis is done; advice: "
-    "advice on a finished manuscript — missing literature, the direction of its citations, the argument)":
-        "--manuscript のとき、レポートの目的（complete: 書きかけの原稿の欠けを先行研究で補う。既定。draft: 分析まで済んだ"
-        "原稿の 1〜3 章の下書き。advice: 出来上がった原稿への助言（足りない先行研究・引用の向き・論の組み立て））",
+    "write only what to add to the manuscript, with its references (a survey made with --manuscript)":
+        "原稿に足すものだけを、参考文献つきで書き出す（--manuscript で作ったサーベイ）",
     "--purpose is for a survey made from a manuscript (give --manuscript)":
         "--purpose は原稿から作るサーベイのためのものです（--manuscript を指定してください）",
-    "the purpose is one of {choices}: {purpose}": "目的は {choices} のどれかです: {purpose}",
     "purpose: a draft of its sections 1–3": "目的: 1〜3 章の下書き",
     "purpose: advice on the manuscript": "目的: 原稿への助言",
-    "purpose: filling in what the manuscript lacks": "目的: 原稿の欠けを補う",
-    "Map what the manuscript lacks and write what to add, where (the author's marks first), then export it":
-        "原稿の欠けを地図にし、どこに何を足すかを書いて（作者の印を先に）、書き出す",
     "What to add to the manuscript is not written yet": "原稿に足すもの（補完の一覧）がまだ書かれていません",
     "Author's marks for Priorwork: {n}": "作者の印（Priorwork への頼みごと）: {n} 件",
     "{n|# item|# items} in what to add to the manuscript {n|does|do} not say where (\"Where\": the section and the "

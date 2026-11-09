@@ -25,6 +25,12 @@ def isolated(tmp_path, monkeypatch):
     def no_openalex(self, path, params):
         raise api.ApiError("OpenAlex", "not reachable in tests")
     monkeypatch.setattr(api.LiteratureClient, "_openalex", no_openalex)
+    def no_pubmed(self, path, params, raw=False):
+        raise api.ApiError("PubMed", "not reachable in tests")
+    monkeypatch.setattr(api.LiteratureClient, "_pubmed", no_pubmed)
+    def no_europepmc(self, path):
+        raise api.ApiError("EuropePMC", "not reachable in tests")
+    monkeypatch.setattr(api.LiteratureClient, "_europepmc", no_europepmc)
     for var in ("ZOTERO_API_KEY", "ZOTERO_USER_ID", "ZOTERO_WEBDAV_URL"):  # 本物の Zotero に接続しない
         monkeypatch.delenv(var, raising=False)
     yield

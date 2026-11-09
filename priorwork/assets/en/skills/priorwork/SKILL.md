@@ -1,7 +1,7 @@
 ---
 name: priorwork
 description: >-
-  The entry point of Priorwork. Makes or continues a social-science literature survey end to end with
+  The entry point of Priorwork. Makes or continues a literature survey (social sciences or clinical research) end to end with
   `./priorwork` (scope, searches, screening, citation chasing, paper cards, text, check, export), stopping
   for the user where its mode says (standard: after the scope and before the cards). Use whenever the user asks, in any words or language, for a literature survey,
   literature review or prior work on a topic, for the literature behind their own manuscript, or to
@@ -54,6 +54,8 @@ For a survey made from a manuscript, write as in `priorwork-manuscript`. Otherwi
 | Consensus and open debates | what is agreed and where results diverge |
 | Gaps in the literature | questions the literature has not answered yet |
 | Hypotheses and implications for this study | only here, the framework and working hypotheses of this study (the user's) |
+
+A medical survey's report has its own sections instead (the evidence by study design, effects on the main outcomes, safety and harms, consensus and debates, gaps, hypotheses). Keep to its headings, and to AGENTS.md, "Medical surveys".
 
 - Follow the `<!-- What to write: … -->` under each heading. Do not delete the template's headings or sections.
 - The four sections on traditions, methods, debates and gaps hold **only what the literature found**, citing included papers as Author (year) for each claim (the sections with `<!-- priorwork:synthesis -->`; `check` gives a WARN when one cites nothing).

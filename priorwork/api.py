@@ -5,6 +5,8 @@ Literature API client.
 - Semantic Scholar: 検索・論文取得・引用関係（主）
 - OpenAlex: S2 の結果を DOI で照合して書誌情報（誌名・ISSN・巻号）を補正、
   S2 に無い DOI の取得、被引用数順の引用関係
+- PubMed（医学のサーベイ）: 検索と、PMID・PMC ID・出版の種類・MeSH・MEDLINE 索引の有無・撤回。
+  Europe PMC: PMC の本文（XML）
 
 S2 は定番論文ほど DOI の誤り（別論文や SSRN 版の DOI）や ISSN の欠落があるため、
 Zotero に取り込む DOI と SSCI 照合に使う ISSN は OpenAlex 側の値を優先する。
@@ -18,6 +20,7 @@ import os
 import re
 import sys
 import time
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 from urllib.parse import quote, urlencode
@@ -65,10 +68,17 @@ S2_PAPER_FIELDS = (
 S2_BULK_FIELDS = S2_PAPER_FIELDS.replace(",tldr", "")
 S2_LINKED_FIELDS = "paperId,title,authors,year,venue,publicationVenue,journal,citationCount,externalIds,publicationTypes"
 CROSSREF_BASE_URL = "https://api.crossref.org"
+NCBI_BASE_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
+EUROPEPMC_BASE_URL = "https://www.ebi.ac.uk/europepmc/webservices/rest"
+PUBMED_BATCH = 100
+# 研究の論文でない PubMed の出版の種類。検索では落とす（--include-preprints で残す）
+PUBMED_NOT_RESEARCH = {"Editorial", "Letter", "Comment", "News", "Newspaper Article", "Published Erratum",
+                       "Retraction of Publication", "Expression of Concern", "Biography", "Autobiography", "Portrait",
+                       "Interview", "Lecture", "Personal Narrative", "Patient Education Handout", "Congress"}
 CROSSREF_BATCH = 20
 OPENALEX_SELECT = (
     "id,doi,title,display_name,publication_year,type,authorships,primary_location,biblio,"
-    "cited_by_count,referenced_works_count,abstract_inverted_index,open_access,topics"
+    "cited_by_count,referenced_works_count,abstract_inverted_index,open_access,topics,is_retracted"
 )
 
 OPENALEX_BATCH = 50
@@ -113,9 +123,10 @@ KNOWN_SOURCES = {journal_key(name): sid for name, sid in (
 ISSN_RE = re.compile(r"^\d{4}-?\d{3}[\dX]$", re.IGNORECASE)
 
 # プレプリント・WP の DOI（OSF 系・SSRN・arXiv・NBER・Research Square・Preprints.org）
+# bioRxiv・medRxiv は 10.1101/ の後ろが数字（Genome Research など同じ出版社の雑誌は 10.1101/gr.… と文字が続く）
 PREPRINT_DOI_RE = re.compile(
     r"^10\.(?:3121\d|3122\d|3123\d|31124)/|^10\.2139/ssrn|^10\.48550/arxiv|^10\.3386/w\d|"
-    r"^10\.21203/rs\.|^10\.20944/preprints", re.IGNORECASE)
+    r"^10\.21203/rs\.|^10\.20944/preprints|^10\.1101/\d", re.IGNORECASE)
 
 
 def preprint_doi(doi: str) -> bool:
@@ -145,6 +156,30 @@ def openalex_query(query: str) -> str:
         p = re.sub(r"\s*\+\s*", " AND ", p)
         parts[i] = re.sub(r"(^|\s)-(?=[\w(\"])", r"\1NOT ", p)
     return re.sub(r"\s+", " ", "".join(parts)).strip()
+
+
+def pubmed_dates(year: Optional[str]) -> Dict[str, str]:
+    """S2 の年の指定を esearch の mindate / maxdate にする（片方だけは指定できない）。"""
+    m = re.fullmatch(r"\s*(\d{4})?\s*(-)?\s*(\d{4})?\s*", year or "")
+    if not m or not (m.group(1) or m.group(3)):
+        return {}
+    start, dash, end = m.groups()
+    low, high = (start or "1000", end or "3000") if dash else (start or end, start or end)
+    return {"datetype": "pdat", "mindate": low, "maxdate": high}
+
+
+def pubmed_term(query: str, journals: Sequence[str] = ()) -> str:
+    """検索語を PubMed の形にする: bulk の + / | / - を AND / OR / NOT に。[tiab] などのタグや MeSH はそのまま通る。"""
+    term = openalex_query(query)
+    if journals:
+        names = [f"{j.strip()}[is]" if ISSN_RE.match(j.strip()) else f'"{j.strip()}"[ta]' for j in journals]
+        term = f"({term}) AND ({' OR '.join(names)})"
+    return term
+
+
+def plain_query(query: str) -> str:
+    """PubMed のタグ（[tiab] など）を外した検索語（S2 はタグを読めない）。"""
+    return re.sub(r"\s+", " ", re.sub(r"\[[^\]]*\]", " ", query)).strip()
 
 
 def title_query(title: str) -> str:
@@ -219,7 +254,7 @@ def _cache_set(key: str, data: Any):
 def parse_identifier(identifier: str) -> Dict[str, str]:
     """
     DOI / URL / S2 paperId / arXiv ID / OpenAlex ID を判別する。
-    Returns {"type": "doi|s2|arxiv|openalex|raw", "value": ..., "s2_id": ...}
+    Returns {"type": "doi|pmid|s2|arxiv|openalex|raw", "value": ..., "s2_id": ...}
     """
     raw = identifier.strip()
 
@@ -227,6 +262,10 @@ def parse_identifier(identifier: str) -> Dict[str, str]:
     if m or re.match(r"^(doi:)?10\.\d{4,9}/\S+$", raw, re.IGNORECASE):
         doi = m.group(1) if m else re.sub(r"^doi:", "", raw, flags=re.IGNORECASE)
         return {"type": "doi", "value": doi, "s2_id": f"DOI:{doi}"}
+
+    m = re.search(r"pubmed\.ncbi\.nlm\.nih\.gov/(\d+)", raw, re.IGNORECASE) or re.match(r"^pmid:\s*(\d+)$", raw, re.IGNORECASE)
+    if m:
+        return {"type": "pmid", "value": m.group(1), "s2_id": f"PMID:{m.group(1)}"}
 
     m = re.search(r"openalex\.org/(W\d+)", raw, re.IGNORECASE) or re.match(r"^(W\d+)$", raw, re.IGNORECASE)
     if m:
@@ -292,20 +331,155 @@ def _record(**kw) -> Dict[str, Any]:
         "oa_pdf": "",
         "fields": [],
         "openalex_id": "",
+        "pmid": "",
+        "pmcid": "",
+        "mesh": [],
+        "retracted": False,
         "verified": False,   # OpenAlex で DOI 照合済みか
         "warnings": [],
         "notes": [],         # 知らせるだけのこと（DOI を雑誌版に替えた、など）。確かめる必要のあるものは warnings
     }
     rec.update({k: v for k, v in kw.items() if v is not None})
     # 雑誌側の脚注記号（"...Jobs*" など）が Markdown の強調を壊すので落とす
-    rec["title"] = re.sub(r"\s*[*†‡]+$", "", rec["title"])
+    rec["title"] = re.sub(r"\s*[*†‡]+$", "", re.sub(r"\s+", " ", rec["title"]).strip())
     rec["authors"] = [author_name(a) for a in rec["authors"] if author_name(a)]
     rec["warnings"] = list(rec["warnings"])
     rec["notes"] = list(rec["notes"])
     if re.search(r",\s*(?:edited\s+)?by\s+[A-Z]", rec["title"]) or re.fullmatch(r"(\d+)\s*-+\s*\1", rec["pages"]):
         rec["warnings"].append(t("May be a book review or comment (guessed from the title or the page range)"))
+    if rec["retracted"]:
+        mark_retracted(rec)
     rec["ssci"] = classify_paper(rec)
     return rec
+
+
+def mark_retracted(rec: Dict[str, Any]):
+    """撤回された論文の印。警告は `fix --confirm` で消せるので、`check` は retracted も別に見る。"""
+    rec["retracted"] = True
+    warning = t("Retracted: do not rely on this paper (the retraction is recorded in PubMed or OpenAlex)")
+    if warning not in rec["warnings"]:
+        rec["warnings"].append(warning)
+
+
+def not_research(record: Dict[str, Any]) -> bool:
+    return bool(set(record.get("publication_types") or []) & PUBMED_NOT_RESEARCH)
+
+
+def expand_pages(pages: str) -> str:
+    """MEDLINE の略したページ（"1405-14"）を全部書く（"1405-1414"）。"""
+    m = re.fullmatch(r"\s*([A-Za-z]*)(\d+)\s*-\s*([A-Za-z]*)(\d+)\s*", pages or "")
+    if not m:
+        return (pages or "").strip()
+    prefix, first, _, last = m.groups()
+    if len(last) < len(first):
+        last = first[:len(first) - len(last)] + last
+    return f"{prefix}{first}-{prefix}{last}"
+
+
+def _xml_text(element: Optional[ET.Element]) -> str:
+    return re.sub(r"\s+", " ", "".join(element.itertext())).strip() if element is not None else ""
+
+
+def from_pubmed(article: ET.Element) -> Dict[str, Any]:
+    """efetch の <PubmedArticle> 1 件を正規化する。"""
+    citation = article.find("MedlineCitation")
+    art = citation.find("Article")
+    journal = art.find("Journal")
+    issue = journal.find("JournalIssue") if journal is not None else None
+
+    date = issue.find("PubDate") if issue is not None else None
+    year_text = (date.findtext("Year") or date.findtext("MedlineDate") or "") if date is not None else ""
+    m = re.search(r"\d{4}", year_text)
+
+    authors = []
+    for a in art.findall("AuthorList/Author"):
+        name = a.findtext("CollectiveName") or " ".join(x for x in (a.findtext("ForeName"), a.findtext("LastName")) if x)
+        if name:
+            authors.append(name)
+
+    ids = {i.get("IdType"): (i.text or "").strip() for i in article.findall("PubmedData/ArticleIdList/ArticleId")}
+    doi = ids.get("doi") or next((e.text or "" for e in art.findall("ELocationID") if e.get("EIdType") == "doi"), "")
+    doi = _bare_doi(doi.strip())
+    pmid = (citation.findtext("PMID") or "").strip()
+
+    parts = []
+    for text in art.findall("Abstract/AbstractText"):
+        body = _xml_text(text)
+        if body:
+            parts.append(f"{text.get('Label')}: {body}" if text.get("Label") else body)
+
+    types = [(p.text or "").strip() for p in art.findall("PublicationTypeList/PublicationType") if p.text]
+    issns = [i.text.strip() for i in (journal.findall("ISSN") if journal is not None else []) if i.text]
+    linking = citation.findtext("MedlineJournalInfo/ISSNLinking")
+    if linking and linking.strip() not in issns:
+        issns.append(linking.strip())
+    return _record(
+        id=f"PMID:{pmid}",
+        source="PubMed",
+        pmid=pmid,
+        pmcid=ids.get("pmc", ""),
+        title=re.sub(r"\.$", "", _xml_text(art.find("ArticleTitle"))),
+        authors=authors,
+        year=int(m.group()) if m else None,
+        journal_name=journal.findtext("Title") if journal is not None else "",
+        volume=(issue.findtext("Volume") or "") if issue is not None else "",
+        issue=(issue.findtext("Issue") or "") if issue is not None else "",
+        pages=expand_pages(art.findtext("Pagination/MedlinePgn") or ""),
+        issns=issns,
+        source_type="journal",
+        publication_types=types,
+        doi=doi,
+        url=f"https://doi.org/{doi}" if doi else f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/",
+        abstract=" ".join(parts),
+        mesh=[_xml_text(h.find("DescriptorName")) for h in citation.findall("MeshHeadingList/MeshHeading")],
+        medline=citation.get("Status") == "MEDLINE",
+        retracted="Retracted Publication" in types,
+        found_in=["PubMed"],
+    )
+
+
+def pubmed_articles(xml: str) -> List[Dict[str, Any]]:
+    """efetch の XML を正規化する。壊れた記録は飛ばす。"""
+    try:
+        root = ET.fromstring(xml)
+    except ET.ParseError as e:
+        raise ApiError("PubMed", t("could not read the response: {error}", error=e)) from e
+    records = []
+    for article in root.findall("PubmedArticle"):
+        try:
+            records.append(from_pubmed(article))
+        except AttributeError:   # MedlineCitation や Article の無い記録
+            continue
+    return records
+
+
+_JATS_BLOCKS = {"title", "p", "tr", "caption"}
+
+
+def jats_fulltext(xml: str) -> str:
+    """Europe PMC の全文 XML（JATS）の本文を平文にする（表は行ごとに | で区切る。参考文献は入れない）。"""
+    try:
+        root = ET.fromstring(xml)
+    except ET.ParseError:
+        return ""
+    lines: List[str] = []
+
+    def walk(el: ET.Element):
+        tag = el.tag.rsplit("}", 1)[-1]
+        if tag == "tr":
+            lines.append(" | ".join(_xml_text(c) for c in el))
+        elif tag in _JATS_BLOCKS and not any(d.tag in _JATS_BLOCKS for d in el.iter() if d is not el):
+            text = _xml_text(el)
+            if text:
+                lines.append(text)
+        else:
+            for child in el:
+                walk(child)
+
+    for part in [root.find(".//abstract"), root.find(".//body")]:
+        if part is not None:
+            walk(part)
+    return "\n".join(lines)
 
 
 def from_s2(p: Dict[str, Any]) -> Dict[str, Any]:
@@ -375,6 +549,7 @@ def from_openalex(w: Dict[str, Any]) -> Dict[str, Any]:
         abstract=abstract,
         oa_pdf=loc.get("pdf_url") or (w.get("open_access") or {}).get("oa_url") or "",
         fields=[t.get("display_name") for t in (w.get("topics") or [])[:3]],
+        retracted=bool(w.get("is_retracted")),
     )
 
 
@@ -421,23 +596,27 @@ class LiteratureClient:
         self.s2_api_key = os.environ.get("SEMANTIC_SCHOLAR_API_KEY") or os.environ.get("S2_API_KEY")
         self.openalex_api_key = os.environ.get("OPENALEX_API_KEY")
         self.openalex_mailto = os.environ.get("OPENALEX_MAILTO")
+        self.ncbi_api_key = os.environ.get("NCBI_API_KEY")
         self.use_cache = use_cache and os.environ.get("PRIORWORK_NO_CACHE") != "1"
         self.max_retries = int(os.environ.get("PRIORWORK_MAX_RETRIES") or 5)
         self._last_request: Dict[str, float] = {}
         self._source_ids: Dict[str, str] = {}     # journal_key -> OpenAlex source ID（この実行で分かったもの）
+        self.issue_years_failed = False           # 直前の issue_years が Crossref の失敗で打ち切られたか
         self.last_search: Dict[str, Any] = {}     # 直前の search() で OpenAlex をどう使ったか（検索ログ用）
 
     # ---- HTTP ----
 
     def _throttle(self, service: str):
-        interval = {"SemanticScholar": 1.1 if self.s2_api_key else 1.5}.get(service, 0.2)
+        interval = {"SemanticScholar": 1.1 if self.s2_api_key else 1.5,
+                    "PubMed": 0.12 if self.ncbi_api_key else 0.35}.get(service, 0.2)
         elapsed = time.time() - self._last_request.get(service, 0.0)
         if elapsed < interval:
             time.sleep(interval - elapsed)
         self._last_request[service] = time.time()
 
     def _get_json(self, service: str, url: str, params: Dict[str, Any], headers: Dict[str, str],
-                  secret_params: Optional[Dict[str, Any]] = None) -> Any:
+                  secret_params: Optional[Dict[str, Any]] = None, raw: bool = False) -> Any:
+        """raw なら本文をそのまま返す（XML を返す API のため）。"""
         params = {k: v for k, v in params.items() if v is not None}
         cache_key = f"{url}?{urlencode(sorted(params.items()))}"
         if self.use_cache:
@@ -454,7 +633,7 @@ class LiteratureClient:
                 status, detail, retry_after = None, t("network error: {error}", error=e.__class__.__name__), None
             else:
                 if resp.ok:
-                    data = resp.json()
+                    data = resp.text if raw else resp.json()
                     if self.use_cache:
                         _cache_set(cache_key, data)
                     return data
@@ -494,6 +673,13 @@ class LiteratureClient:
         return self._get_json("Crossref", f"{CROSSREF_BASE_URL}{path}", params, {"User-Agent": ua},
                               secret_params={"mailto": self.openalex_mailto})
 
+    def _pubmed(self, path: str, params: Dict[str, Any], raw: bool = False) -> Any:
+        return self._get_json("PubMed", f"{NCBI_BASE_URL}/{path}", {**params, "tool": "priorwork"},
+                              {"User-Agent": "priorwork/0.1"}, secret_params={"api_key": self.ncbi_api_key}, raw=raw)
+
+    def _europepmc(self, path: str) -> str:
+        return self._get_json("EuropePMC", f"{EUROPEPMC_BASE_URL}{path}", {}, {"User-Agent": "priorwork/0.1"}, raw=True)
+
     def complete_abstracts(self, records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """S2 にも OpenAlex にも要旨が無い論文を、Crossref（出版社が登録した要旨）で補う。失敗しても止めない。"""
         missing = [r for r in records if not r.get("abstract") and r.get("doi")]
@@ -518,19 +704,21 @@ class LiteratureClient:
         S2・OpenAlex の年はオンラインで先に公開された年のことが多く（巻・号に載るのは翌年など）、
         参照文献の年と食い違う。失敗しても止めない（空のまま返す）。"""
         years: Dict[str, int] = {}
+        self.issue_years_failed = False
         dois = [d.lower() for d in dois if d]
         try:
             for i in range(0, len(dois), CROSSREF_BATCH):
                 chunk = dois[i:i + CROSSREF_BATCH]
                 data = self._crossref("/works", {"filter": ",".join(f"doi:{d}" for d in chunk),
                                                  "rows": CROSSREF_BATCH,
-                                                 "select": "DOI,published-print,journal-issue"})
+                                                 "select": "DOI,published-print"})   # journal-issue はこの経路で選べない（HTTP 400）
                 for item in (data.get("message") or {}).get("items") or []:
                     year = _date_year((item.get("journal-issue") or {}).get("published-print")) \
                         or _date_year(item.get("published-print"))
                     if year:
                         years[(item.get("DOI") or "").lower()] = year
         except ApiError as e:
+            self.issue_years_failed = True
             print("[Notice] " + t("{error} → the years of the journal issues are not checked", error=e), file=sys.stderr)
         return years
 
@@ -632,6 +820,8 @@ class LiteratureClient:
                 r["abstract"] = oa["abstract"]
             r["verified"] = True
             r["openalex_id"] = oa["openalex_id"]
+            if oa["retracted"]:
+                mark_retracted(r)
             r["ssci"] = ssci.classify_paper(r)
             if r["ssci"]["status"] == ssci.PREPRINT and s2_status != ssci.PREPRINT and s2_journal:
                 added.append(t("S2 gives the journal as \"{journal}\", but the DOI is a working paper / preprint version "
@@ -753,6 +943,178 @@ class LiteratureClient:
         })
         return [dict(from_openalex(w), verified=True) for w in data.get("results") or []]
 
+    # ---- PubMed ----
+
+    def _esearch(self, term: str, retmax: int, year: Optional[str] = None, db: str = "pubmed") -> Dict[str, Any]:
+        data = self._pubmed("esearch.fcgi", {"db": db, "term": term, "retmax": retmax, "retmode": "json",
+                                             "sort": "relevance" if db == "pubmed" else None, **pubmed_dates(year)})
+        result = data.get("esearchresult") or {}
+        if result.get("ERROR"):
+            raise ApiError("PubMed", str(result["ERROR"]))
+        return result
+
+    def _pubmed_fetch(self, pmids: Sequence[str]) -> List[Dict[str, Any]]:
+        """PMID の順に、PubMed の記録を返す。"""
+        found: Dict[str, Dict[str, Any]] = {}
+        for i in range(0, len(pmids), PUBMED_BATCH):
+            xml = self._pubmed("efetch.fcgi", {"db": "pubmed", "id": ",".join(pmids[i:i + PUBMED_BATCH]),
+                                               "retmode": "xml"}, raw=True)
+            found.update((r["pmid"], r) for r in pubmed_articles(xml))
+        return [found[p] for p in pmids if p in found]
+
+    def _search_pubmed(self, query: str, limit: int, year: Optional[str],
+                       journals: Sequence[str]) -> List[Dict[str, Any]]:
+        term = pubmed_term(query, journals)
+        result = self._esearch(term, limit, year)
+        self.last_pubmed = {"pubmed_count": int(result.get("count") or 0),
+                            "pubmed_query": result.get("querytranslation") or term}
+        return self._pubmed_fetch(result.get("idlist") or [])
+
+    def _enrich_pubmed(self, records: List[Dict[str, Any]]):
+        """PubMed の記録に OpenAlex の情報（被引用数・OpenAlex ID・OA の PDF・撤回・誌名）を足す。
+        書誌と DOI は PubMed のまま（出版社が登録した値）。失敗しても止めない。"""
+        with_doi = [r for r in records if r["source"] == "PubMed" and r["doi"]]
+        try:
+            for i in range(0, len(with_doi), OPENALEX_BATCH):
+                chunk = with_doi[i:i + OPENALEX_BATCH]
+                data = self._openalex("/works", {"filter": "doi:" + "|".join(r["doi"].lower() for r in chunk),
+                                                 "per_page": OPENALEX_BATCH, "select": OPENALEX_SELECT})
+                works = {_bare_doi(w.get("doi")).lower(): w for w in data.get("results") or []}
+                for r in chunk:
+                    w = works.get(r["doi"].lower())
+                    if not w:
+                        continue
+                    oa = from_openalex(w)
+                    r.update(citation_count=oa["citation_count"], reference_count=oa["reference_count"],
+                             openalex_id=oa["openalex_id"], verified=True, oa_pdf=r["oa_pdf"] or oa["oa_pdf"])
+                    r["fields"] = oa["fields"]
+                    if oa["journal_name"] and oa["source_type"] == "journal":   # PubMed の誌名は "The Lancet. Oncology" の形
+                        r["journal_name"] = oa["journal_name"]
+                    r["issns"] = list(dict.fromkeys([*r["issns"], *oa["issns"]]))
+                    if oa["retracted"]:
+                        mark_retracted(r)
+                    r["ssci"] = ssci.classify_paper(r)
+        except ApiError as e:
+            print("[Notice] " + t("{error} → the citation counts of the PubMed results are not filled in", error=e),
+                  file=sys.stderr)
+
+    def annotate_pubmed(self, records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """PubMed を通らなかった論文を DOI で PubMed と照合する（PMID・PMC ID・種類・MeSH・MEDLINE・撤回）。
+        見つからなければ medline=False。PubMed が失敗したら未確認（None）のまま。"""
+        pending = [r for r in records if r.get("medline") is None]
+        with_doi = [r for r in pending if r.get("doi")]
+        found: Dict[str, Dict[str, Any]] = {}
+        try:
+            for i in range(0, len(with_doi), PUBMED_BATCH):
+                chunk = with_doi[i:i + PUBMED_BATCH]
+                term = " OR ".join(f'"{r["doi"]}"[doi]' for r in chunk)
+                ids = self._esearch(term, PUBMED_BATCH).get("idlist") or []
+                found.update((p["doi"].lower(), p) for p in self._pubmed_fetch(ids) if p["doi"])
+        except ApiError as e:
+            print("[Notice] " + t("{error} → PubMed's details are not added", error=e), file=sys.stderr)
+            return records
+        for r in pending:
+            p = found.get((r.get("doi") or "").lower())
+            r["medline"] = bool(p and p["medline"])
+            if p:
+                for key in ("pmid", "pmcid", "mesh"):
+                    r[key] = p[key]
+                r["publication_types"] = list(dict.fromkeys([*r["publication_types"], *p["publication_types"]]))
+                r["abstract"] = r.get("abstract") or p["abstract"]
+                if p["retracted"]:
+                    mark_retracted(r)
+            r["ssci"] = ssci.classify_paper(r)
+        return records
+
+    def search_medical(self, query: str, limit: int = 20, year: Optional[str] = None, bulk: bool = False,
+                       journals: Sequence[str] = ()) -> List[Dict[str, Any]]:
+        """医学のサーベイの検索: PubMed（主）に、S2 にだけあった論文を足す。片方が失敗してももう片方を返す。"""
+        pubmed: List[Dict[str, Any]] = []
+        self.last_pubmed = {}
+        failed: Optional[ApiError] = None
+        try:
+            pubmed = self._search_pubmed(query, limit, year, journals)
+            self._enrich_pubmed(pubmed)
+        except ApiError as e:
+            failed = e
+            print("[Notice] " + t("{error} → only the S2 results (PubMed was not searched)", error=e), file=sys.stderr)
+        try:
+            s2 = self.search(plain_query(query), limit=limit, year=year, bulk=bulk, journals=journals)
+        except ApiError as e:
+            if failed:
+                raise
+            print("[Notice] " + t("{error} → only the PubMed results", error=e), file=sys.stderr)
+            s2 = []
+        info = self.last_search
+        self.last_search = {**info, **self.last_pubmed, "pubmed": "failed" if failed else "used"}
+        return self.annotate_pubmed(self._merge_pubmed(pubmed, s2, bulk))
+
+    @staticmethod
+    def _merge_pubmed(pubmed: List[Dict[str, Any]], others: List[Dict[str, Any]], bulk: bool) -> List[Dict[str, Any]]:
+        """PubMed の結果の後ろに、PubMed に無かった論文を足す。同じ論文は PubMed の記録に S2 の要約などを足す。"""
+        out = list(pubmed)
+        for r in others:
+            same = next((p for p in pubmed if (r["doi"] and r["doi"].lower() == p["doi"].lower())
+                         or (ssci.same_title(p["title"], r["title"]) and _close_years(p.get("year"), r.get("year")))),
+                        None)
+            if same is None:
+                out.append(r)
+                continue
+            same["found_in"] = list(dict.fromkeys([*same.get("found_in", []), *r.get("found_in", [])]))
+            same["tldr"] = same["tldr"] or r["tldr"]
+            same["abstract"] = same["abstract"] or r["abstract"]
+            same["citation_count"] = max(same["citation_count"], r["citation_count"])
+            same["oa_pdf"] = same["oa_pdf"] or r["oa_pdf"]
+        if bulk:
+            out.sort(key=lambda p: p.get("citation_count") or 0, reverse=True)
+        return out
+
+    def medline_journal(self, name_or_issn: str) -> Optional[bool]:
+        """誌（名前か ISSN）が今も MEDLINE に索引されているか（NLM Catalog）。"""
+        q = name_or_issn.strip()
+        if ISSN_RE.match(q):
+            return bool(self._esearch(f"{q}[issn] AND currentlyindexed[All]", 1, db="nlmcatalog").get("idlist"))
+        # [Title] は語句を含む誌も拾う（"Lancet" に 18 誌）ので、正式な誌名か略称が同じものだけを見る
+        # NLM の誌名に "The" は付かないことがある（"The Lancet" は "Lancet (London, England)"）
+        name = re.sub(r"^the\s+", "", q, flags=re.IGNORECASE)
+        ids = self._esearch(f'"{name}"[Title] AND currentlyindexed[All]', 50, db="nlmcatalog").get("idlist") or []
+        if not ids:
+            return False
+        result = (self._pubmed("esummary.fcgi", {"db": "nlmcatalog", "id": ",".join(ids), "retmode": "json"})
+                  .get("result") or {})
+        key = journal_key(q)
+        for uid in result.get("uids") or []:
+            item = result.get(uid) or {}
+            names = [item.get("medlineta") or "", *(t.get("title", "") for t in item.get("titlemainlist") or [])]
+            if key in {journal_key(re.sub(r"\.$", "", n)) for n in names}:
+                return True
+        return False
+
+    def get_paper_medical(self, identifier: str) -> Dict[str, Any]:
+        """医学のサーベイの 1 本: DOI ならまず PubMed で引く（書誌が確かで、S2 のレート制限を待たない）。
+        PubMed に無い・PubMed が失敗したら、ふつうの取得（S2 → OpenAlex）にする。"""
+        ident = parse_identifier(identifier)
+        if ident["type"] == "doi":
+            try:
+                ids = self._esearch(f'"{ident["value"]}"[doi]', 1).get("idlist") or []
+                records = self._pubmed_fetch(ids)
+            except ApiError as e:
+                print("[Notice] " + t("{error} → PubMed's details are not added", error=e), file=sys.stderr)
+                records = []
+            if records:
+                self._enrich_pubmed(records)
+                return records[0]
+        return self.get_paper(identifier)
+
+    def pmc_fulltext(self, pmcid: str) -> str:
+        """Europe PMC の全文（OA の論文だけ。ページ区切りは無い）。無ければ空。"""
+        try:
+            return jats_fulltext(self._europepmc(f"/{pmcid}/fullTextXML"))
+        except ApiError as e:
+            if e.status != 404:
+                raise
+            return ""
+
     # ---- Public interface ----
 
     def search(self, query: str, limit: int = 20, year: Optional[str] = None, bulk: bool = False,
@@ -797,6 +1159,12 @@ class LiteratureClient:
     def get_paper(self, identifier: str) -> Dict[str, Any]:
         """S2 で取得して DOI 照合する。S2 に無い（404）DOI / OpenAlex ID は OpenAlex から取得する。"""
         ident = parse_identifier(identifier)
+        if ident["type"] == "pmid":
+            records = self._pubmed_fetch([ident["value"]])
+            if not records:
+                raise ApiError("PubMed", t("PubMed does not know the PMID {id}", id=ident["value"]), 404)
+            self._enrich_pubmed(records)
+            return records[0]
         if ident["s2_id"]:
             try:
                 return self.use_issue_year(

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Priorwork</title>
-<meta name="description" content="Priorwork: hand a literature review for the social sciences to your AI agent — it searches, screens, fills in paper cards and writes; you check and correct from the VS Code sidebar. No terminal needed.">
+<meta name="description" content="Priorwork: hand a literature review for the social sciences or clinical research to your AI agent — it searches, screens, fills in paper cards and writes; you check and correct from the VS Code sidebar. No terminal needed.">
 <link rel="alternate" hreflang="ja" href="ja/">
 <link rel="alternate" hreflang="en" href="">
 <link rel="alternate" hreflang="x-default" href="">
@@ -35,11 +35,12 @@
       Priorwork
     </a>
     <nav>
-      <a href="#install">Install</a>
       <a href="guide/">Guide</a>
-      <a href="reference/">Reference</a>
-      <a href="https://github.com/yoshida-kd/priorwork">GitHub</a>
-      <a href="ja/" hreflang="ja" lang="ja" data-lang="ja">日本語</a>
+      <a href="manuscripts/">From a manuscript</a>
+      <span class="nav-end">
+        <a class="icon" href="https://github.com/yoshida-kd/priorwork" title="GitHub" aria-label="GitHub"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a>
+        <a class="lang" href="ja/" hreflang="ja" lang="ja" data-lang="ja" title="日本語" aria-label="日本語">JA</a>
+      </span>
     </nav>
   </div>
 </header>
@@ -49,7 +50,7 @@
   <div class="wrap">
     <h1>Priorwork</h1>
     <p class="tagline">Hand your review of the prior work to an AI agent — then check it</p>
-    <p class="lead">For the social sciences. Ask in plain words; check and correct in VS Code.</p>
+    <p class="lead">For the social sciences and clinical research. Ask in plain words; check and correct in VS Code.</p>
     <div class="actions">
       <a class="button primary" href="https://marketplace.visualstudio.com/items?itemName=yoshida-kd.priorwork">Get the VS Code extension</a>
       <a class="button secondary" href="quickstart/">Quick guide</a>
@@ -69,7 +70,7 @@
     <h2>What the agent does, without stopping</h2>
     <ol class="chapters">
       <li><b>Scope</b> <span>— research question, period, criteria, depth</span></li>
-      <li><b>Search</b> <span>— Semantic Scholar + OpenAlex</span></li>
+      <li><b>Search</b> <span>— Semantic Scholar + OpenAlex, and PubMed for clinical topics</span></li>
       <li><b>Screen</b> <span>— against your criteria, a reason for each</span></li>
       <li><b>Chase citations</b> <span>— references and citing papers</span></li>
       <li><b>Cards</b> <span>— from the abstracts and full texts</span></li>
@@ -104,6 +105,10 @@
         <p>A page per paper with the abstract, the SSCI status, warnings, your criteria and the agent's reason. <b>I</b> include, <b>M</b> maybe, <b>X</b> exclude; correct a card and save. The agent follows your changes.</p>
       </div>
       <div class="feature">
+        <h3>From your own manuscript</h3>
+        <p>Give it a manuscript, finished or not, and get one report: what to add and where, a check of its citations, the literature it does not mention. <a href="manuscripts/">More</a></p>
+      </div>
+      <div class="feature">
         <h3>Reports, Zotero, servers</h3>
         <p>The report opens inside VS Code, on a server over SSH too. Link a Zotero collection to a survey: the DOIs to add are one copy away, and the PDFs there are read first. The extension never calls an AI service itself.</p>
       </div>
@@ -116,10 +121,23 @@
 
 <footer>
   <div class="wrap">
-    <span>Priorwork · MIT License · by <a href="https://github.com/yoshida-kd">yoshida-kd</a></span>
-    <span><a href="https://github.com/yoshida-kd/priorwork">Source</a> ·
-    <a href="https://pypi.org/project/priorwork/">PyPI</a> ·
-    <a href="https://github.com/yoshida-kd/priorwork/issues">Issues</a></span>
+    <nav class="sitemap" aria-label="Site map">
+      <div><h2>Get started</h2>
+        <a href="quickstart/">Quick guide</a>
+        <a href="install/">Install</a></div>
+      <div><h2>Guides</h2>
+        <a href="guide/">Guide</a>
+        <a href="manuscripts/">From a manuscript</a></div>
+      <div><h2>For AI agents</h2>
+        <a href="reference/">Reference</a></div>
+      <div><h2>Priorwork</h2>
+        <a href="https://marketplace.visualstudio.com/items?itemName=yoshida-kd.priorwork">VS Code extension</a>
+        <a href="https://pypi.org/project/priorwork/">PyPI</a>
+        <a href="https://github.com/yoshida-kd/priorwork">Source</a>
+        <a href="https://github.com/yoshida-kd/priorwork/blob/main/vscode-extension/CHANGELOG.md">Changes</a>
+        <a href="https://github.com/yoshida-kd/priorwork/issues">Issues</a></div>
+    </nav>
+    <p class="colophon">Priorwork · MIT License · by <a href="https://github.com/yoshida-kd">yoshida-kd</a></p>
   </div>
 </footer>
 

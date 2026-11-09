@@ -9,7 +9,7 @@ PDF はページごとのテキストを取り出す。フォルダなら、中�
 組んだ出力（build/）や元データ（data/）は読まない。
 
 作者は、原稿に Priorwork への頼みごとを印で残せる（`find_marks`）: `[cite]`（引用が要る）、`[@?]`（ここに引く論文を）、
-`TODO(priorwork): …`（何を補ってほしいか）。補完（`--purpose complete`）は、この印を優先して埋める。
+`TODO(priorwork): …`（何を補ってほしいか）。補完は、この印を優先して埋める。
 """
 from __future__ import annotations
 

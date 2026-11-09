@@ -84,7 +84,8 @@ my-surveys/
 
 - `--slug` は英語のファイル名（`minimum_wage_employment`）。レポートは `reports/YYYYMMDD_<slug>.md` になる。同じ slug の2つ目は `YYYYMMDD_v2_<slug>` と番号が付く。
 - `--by` は書いたモデルを記録する（監査は同じモデルを断る）。
-- `--search-field social|all`: 社会科学の外の検索結果を除くか（既定は `social`）。
+- `--search-field social|medical|all`: その分野の外の検索結果を除く（既定は `social`。医学のサーベイでは `medical`）。
+- `--discipline medical`（`new` のみ）: 臨床のサーベイ。[2.4](#24-医学のサーベイ) を参照。
 
 ### 2.2 進め方と深さ
 
@@ -111,6 +112,40 @@ my-surveys/
 ./priorwork status --archived
 ```
 
+### 2.4 医学のサーベイ
+
+`./priorwork new "<テーマ>" --slug <slug> --discipline medical` で、臨床研究のサーベイを作る。後からは変えられない。ワークスペースのほかのサーベイはそのまま。
+
+| | 社会科学（既定） | 医学 |
+| :--- | :--- | :--- |
+| 検索 | Semantic Scholar・OpenAlex | PubMed と Semantic Scholar（`--source`）。片方が失敗すれば、もう片方の結果 |
+| 検索語 | `+ \| -`、`"語句"` | 同じものに加え、PubMed のタグ（`[tiab]`、`[MeSH Terms]`、`[pt]`） |
+| 雑誌 | ✅ SSCI、🟡、⚪ | ✅ MEDLINE（論文の PubMed の記録）、✅ SCIE（`settings --import-scie`）、🔍 PubMed 収載、🔍 PubMed に見つからない |
+| 検索から除くもの | WP・プレプリント・書籍 | 同じものに加え、レター・論説・コメント（`--include-preprints` で残す） |
+| カードの欄 | RQ・X・Y・データ・識別戦略 | 臨床上の問い・対象集団・介入または曝露・アウトカム・研究デザイン・効果量 |
+| レポート | 学説・手法 | 研究デザイン別のエビデンス・効果・安全性と有害事象 |
+| 本文 | 5.2 のとおり | 同じものの後に、Europe PMC 経由の PMC の本文（ページの区切りなし） |
+
+- `card --set` のキーは同じ: `rq`、`data`、`x`、`y`、`method`、`findings`、`limits`、`memo`。
+- `add` と `fix --id` は `PMID:<番号>` と PubMed の URL も受け付ける。DOI はまず PubMed で引く。
+- ✅ MEDLINE はその論文の PubMed での状態で、索引される雑誌でもごく新しい論文は 🔍 PubMed 収載になることがある。雑誌については `./priorwork journal "<誌名か ISSN>" --medline` が NLM Catalog に聞く。
+- 撤回（PubMed・OpenAlex）は ⚠️ と `check` の ERROR になり、`fix --confirm` では消えない。`--offline` でない `check` は後からの撤回も見つける。
+- 検索の記録には、各検索語を PubMed がどう解釈したかと全体の件数が残る。
+- レポートには、叙述的レビューであり、システマティックレビューでも診療指針でもないと書かれる。
+
+### 2.5 いくつものサーベイを同時に
+
+```bash
+./priorwork new "<topic>" --slug <slug> --by "<model>" --worktree
+./priorwork worktree                       # worktree の一覧と、未コミット・未 push のもの
+./priorwork worktree --remove <slug>       # ブランチは残る
+```
+
+- `--worktree` は、今のフォルダとブランチに触らずに、main の先頭から `worktrees/<slug>/` を、サーベイの名前の新しいブランチで作る。そのサーベイのコマンドはそのフォルダで実行する。
+- その中の `.env`・`.venv`・`.priorwork/data`・`.priorwork/cache` は本体へのリンクで、キー・雑誌のリスト・エンジン・取得した本文を共有する。更新はすべてに及ぶ。リンクと `worktrees/` は、コミットを増やさず、`git` の `info/exclude` で Git から除く。
+- `status` が一覧し、それらのブランチを「ほかのブランチ」から外す。
+- `--remove` は、未コミットの変更や未 push のコミットがあれば断る。`--force` を付けると、それらは失われる。
+
 ---
 
 ## 3. 文献を探す
@@ -124,7 +159,7 @@ my-surveys/
 ```
 
 - 既定は Semantic Scholar の関連度検索。`--bulk`: `+`（かつ）、`|`（または）、`-`（除く）、`"句"`、被引用の多い順（`AND`・`OR`・`NOT` はこれに直す）。
-- `--sort citations|relevance|recent|cpy`、`--year`、`--journal`（正式名か ISSN。繰り返せる）、`--ssci-only`、`--field social|all`、`--limit N`（full のサーベイに入れるときは既定 25、ほかは 10）、`--include-preprints`（本・ワーキングペーパー・プレプリント・掲載先不明は既定で除く）。
+- `--sort citations|relevance|recent|cpy`、`--year`、`--journal`（正式名か ISSN。繰り返せる）、`--ssci-only`（`--indexed-only` とも書ける。医学のサーベイでは MEDLINE と SCIE）、`--field social|medical|all`、`--source auto|pubmed|s2`、`--limit N`（full のサーベイに入れるときは既定 25、ほかは 10）、`--include-preprints`（本・ワーキングペーパー・プレプリント・掲載先不明は既定で除く）。
 - DOI・掲載誌・ISSN は OpenAlex で照合する。ワーキングペーパーと掲載版が両方見つかれば、掲載版だけを残す。
 - `--journal` を付けると、Semantic Scholar（`venue` で絞る）**と** OpenAlex（誌名か ISSN から引いた誌の source ID で絞る）の両方で探す。Semantic Scholar は誌名（venue）を持たない論文が多く、venue での絞り込みから黙って落ちる。OpenAlex の結果のうち Semantic Scholar に無かったものを足し（DOI で重複を除く。`--bulk` なら被引用数で並べ直し、それ以外は Semantic Scholar の順を保って、足した論文を OpenAlex での順位の位置に差し込む）、足した件数をお知らせに出す。`--journal` のときは SSCI 判定で並べ直さない（誌が同じなので）。どちらで見つかったかは各レコードの `found_in` に（一覧では「見つけた所: S2 / OpenAlex / S2 + OpenAlex」）、検索ログには `openalex`（`used` / `failed`）と `openalex_added` が残る。OpenAlex が失敗したら、お知らせを出して Semantic Scholar の結果だけを返す。`--journal` が無ければ OpenAlex では検索しない（キーワード検索の精度が低い）。
 - 雑誌の論文なのに DOI がプレプリント・WP のもの（OSF・SocArXiv・SSRN・arXiv・NBER など）か OpenAlex の知らないものは、題名で OpenAlex を引く（誌の source ID か ISSN も添える）。雑誌版が一致すれば（`same_title`、年の差 ±2 以内）その DOI と書誌情報に替え、元の DOI を `preprint_doi` に残し、注記（ℹ️、`notes`）を付ける。一致しなければ警告のまま。1 回の検索で 10 件まで引く。
@@ -280,13 +315,15 @@ my-surveys/
 
 ```bash
 ./priorwork read manuscripts/make_or_buy
-./priorwork new "<topic>" --slug <slug> --manuscript manuscripts/make_or_buy --purpose complete
+./priorwork new "<topic>" --slug <slug> --manuscript manuscripts/make_or_buy
 ./priorwork add SURVEY --cited
 ./priorwork export SURVEY --draft
 ```
 
 - `read` は Markdown・Quarto（.qmd とその HTML）・LaTeX・Word・PDF を文章にし、利用者の印（`[cite]`・`[@?]`・`TODO(priorwork): …`）を並べる。
-- `--purpose complete`（既定）: 節ごとに足りないものを、前後の文を引いた「**場所**」と「**理由**」付きの補いとして。`draft`: 序論・先行研究・理論と仮説の下書きと、先行研究の要る主張（ID 付き、食い違う知見も）、下書きに入れない HARKing の節。`advice`: 引用ごとの向きの確認、足りない先行研究、論の組み立て。
+- 1 本の原稿に、サーベイとレポートは 1 本。欠けの地図、文献で支える主張（食い違う知見も）、足すもの（前後の文を引いた「**場所**」と「**理由**」付き。節をまるごとでもよい）、引用の向きの点検、足りない先行研究、仮説と文献、論の組み立て、まず直すところ。頼まれていない節は「対象外」と書く。
+- `export --draft` は足すものを参考文献つきで書き出す。`export --octavo` は残りを「著者へ」の部分として足す。
+- 前の版で `--purpose draft`・`advice` で作ったサーベイは、そのレポートのまま続けられる。
 - カードには「**原稿での役割**」（`role`）が付く。原稿そのものは書き換えない。
 - `add --cited` は、原稿が引いている論文（その `.bib` の DOI）を登録する。
 
@@ -302,6 +339,7 @@ my-surveys/
 ./priorwork zotero SURVEY --dois            # Zotero に無い採用論文の DOI（魔法の杖用）
 ./priorwork zotero SURVEY --add --dry-run   # --add が入れるもの
 ./priorwork zotero SURVEY --add
+./priorwork zotero SURVEY --add --also "論文 / 参考文献"   # 別のコレクションにも（Octavo のプロジェクトのものなど）
 ./priorwork zotero SURVEY --undo
 ```
 
@@ -346,9 +384,16 @@ my-surveys/
 | :--- | :--- |
 | `SEMANTIC_SCHOLAR_API_KEY` | 推奨。無いと検索が HTTP 429 になりやすい |
 | `OPENALEX_API_KEY`、`OPENALEX_MAILTO` | 任意 |
+| `NCBI_API_KEY` | 任意。PubMed はこれがあれば毎秒 10 件、なければ 3 件まで |
 | `ZOTERO_*` | [8](#8-zotero) |
 
 SSCI の表示: ✅ リストで確認、🟡 約 100 誌の組み込みのリストから推定（要確認）、🔍 不明、⚪ リストに無い。📕 本・❌ ワーキングペーパーとプレプリント・❓ 掲載先不明は、既定で検索結果から除く。
+
+### 10.1 再試行・キャッシュ・表示の言語
+
+- 再試行: HTTP 429・5xx・通信エラーは 5・10・20・40・60 秒待って、最大 5 回（`PRIORWORK_MAX_RETRIES`）。
+- キャッシュ: API の応答を `~/.cache/priorwork/` に 7 日保存する（`PRIORWORK_CACHE_TTL_DAYS`。`PRIORWORK_NO_CACHE=1` か `--no-cache` で使わない）。
+- 表示の言語: `PRIORWORK_LANG=ja|en`。無ければロケール。
 
 ---
 
@@ -360,13 +405,14 @@ SSCI の表示: ✅ リストで確認、🟡 約 100 誌の組み込みのリ�
 ./priorwork doctor [--online]
 ./priorwork sync [--force|--diff]
 ./priorwork upgrade [--to X.Y.Z]
+./priorwork worktree [--remove NAME [--force]]
 ./priorwork status [SURVEY] [--archived]
-./priorwork new "<topic>" --slug <slug> --by "<model>" [--mode standard|auto|manual] [--depth quick|full] [--manuscript PATH [--purpose complete|draft|advice]] [--question ... --years ... --fields ... --inclusion ... --exclusion ...]
-./priorwork scope SURVEY [--question ...] [--mode ...] [--go-on] [--depth ...] [--search-field social|all] [--manuscript PATH] [--octavo PATH] [--by "<model>"]
+./priorwork new "<topic>" --slug <slug> --by "<model>" [--mode standard|auto|manual] [--depth quick|full] [--manuscript PATH] [--question ... --years ... --fields ... --inclusion ... --exclusion ...]
+./priorwork scope SURVEY [--question ...] [--mode ...] [--go-on] [--depth ...] [--search-field social|medical|all] [--manuscript PATH] [--octavo PATH] [--by "<model>"]
 ./priorwork archive SURVEY [--undo]
 ./priorwork read PATH [--out FILE]
 ./priorwork requests [ID] [--done --survey SURVEY | --decline --note "..."]
-./priorwork search "<query>" [--into SURVEY] [--bulk] [--sort citations|relevance|recent|cpy] [--year 2010-2024] [--journal "<name>" ...] [--ssci-only] [--field social|all] [--limit N]
+./priorwork search "<query>" [--into SURVEY] [--bulk] [--sort citations|relevance|recent|cpy] [--year 2010-2024] [--journal "<name>" ...] [--ssci-only] [--field social|medical|all] [--limit N]
 ./priorwork snowball SURVEY [--direction both|references|citations] [--limit N] [--min-links N]
 ./priorwork list SURVEY [--status candidate maybe included excluded] [--abstract]
 ./priorwork include|exclude|maybe SURVEY N... --reason "..."
@@ -380,7 +426,7 @@ SSCI の表示: ✅ リストで確認、🟡 約 100 誌の組み込みのリ�
 ./priorwork audit SURVEY [--by "<model>" --note "..."]
 ./priorwork export SURVEY [--format html|docx|md] [--with-abstracts] [--draft] [--derived NAME] [--octavo [PROJECT] [--bib PATH]]
 ./priorwork derive SURVEY [NAME --purpose "..." --length N --structure "a; b; c" [--count-citations]]
-./priorwork zotero [SURVEY] [--collections] [--collection NAME] [--import] [--dois] [--add [--dry-run]] [--undo]
+./priorwork zotero [SURVEY] [--collections] [--collection NAME] [--import] [--dois] [--add [--also COLLECTION] [--dry-run]] [--undo]
 ./priorwork get <DOI>
 ./priorwork citations <DOI> [--sort cited]
 ./priorwork references <DOI> [--sort cited]

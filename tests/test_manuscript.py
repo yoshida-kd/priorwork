@@ -1,5 +1,7 @@
 """原稿から始めるサーベイ（`new --manuscript`）: 原稿での役割の欄・マトリクスの列・下書きの書き出し。"""
 
+import re
+
 import pytest
 
 from priorwork.check import ERROR, WARN, check_survey
@@ -17,7 +19,7 @@ def manuscript(tmp_path):
 
 @pytest.fixture
 def ms(manuscript, s2_record):
-    s = Survey.create("最低賃金と雇用", "mw_paper", {"question": "雇用は減るか"}, manuscript=str(manuscript), purpose="draft")
+    s = Survey.create("最低賃金と雇用", "mw_paper", {"question": "雇用は減るか"}, manuscript=str(manuscript))
     for i, (doi, title, authors, year) in enumerate([
         ("10.1/a", "Minimum wages and employment in New Jersey", ("David Card", "Alan B. Krueger"), 1994),
         ("10.1/b", "The effect of minimum wages on low-wage jobs", ("Doruk Cengiz", "Arindrajit Dube"), 2019),
@@ -30,7 +32,8 @@ def ms(manuscript, s2_record):
 
 def write_draft(s: Survey, text: str):
     md = s.md_path.read_text()
-    md = md.replace("### Literature review\n", "### Literature review\n" + text + "\n", 1)
+    assert re.search(r"(?m)^### K1 ", md)
+    md = re.sub(r"(?m)^(- \*\*(?:理由|Why)\*\*: *)$", lambda m: m.group(1) + "\n\n" + text + "\n", md, count=1)
     s.md_path.write_text(md)
 
 
@@ -72,8 +75,8 @@ def test_the_draft_is_exported_with_the_papers_it_cites(ms):
     out, issues = export_draft(ms)
     text = out.read_text()
     assert out.name.endswith(".draft.md") and not issues
-    assert text.startswith("## Introduction") and "## Literature review\nCard and Krueger (1994)" in text
-    assert "## References" in text and "Card, Alan B. Krueger (1994)" in text and "Cengiz" not in text
+    assert text.startswith("## K1 ") and "Card and Krueger (1994) found no fall" in text
+    assert "## 参考文献" in text and "Card, Alan B. Krueger (1994)" in text and "Cengiz" not in text
     assert "<!--" not in text and "原稿の言語" not in text
 
 
@@ -166,3 +169,35 @@ def test_a_changed_manuscript_is_noticed(ms, manuscript, capsys):
     cli.main(["read", str(manuscript), "--for", s.name])                 # 読み直したと記録する
     assert "TODO(priorwork)" in capsys.readouterr().out
     assert not Survey.load("mw_paper").manuscript_changed()
+
+
+def test_octavo_gets_the_notes_for_the_author(ms):
+    from priorwork.export import octavo_text
+    md = ms.md_path.read_text(encoding="utf-8")
+    assert "著者へ" not in octavo_text(ms, md)      # 空の節は渡さない
+    md = md.replace("| R1 | | | | | |", "| R1 | 2 章 | 雇用は減る | Card and Krueger (1994) | 向きが違う | 弱める |")
+    md = md.replace("1.\n", "1. 2 章の引用を直す\n", 1)
+    md = md.replace("- **研究の流れ A**:\n  - 原稿で触れる場所と理由:", "対象外")
+    text = octavo_text(ms, md)
+    assert "## 著者へ（原稿の本文には入れない）" in text and "### 引用の点検" in text and "向きが違う" in text
+    assert "### まず直すところ" in text and "1. 2 章の引用を直す" in text
+    assert "足りない先行研究" not in text and "<!--" not in text and "| R1 | | |" not in text
+
+
+def test_a_section_marked_not_covered_needs_no_citation(ms):
+    from priorwork import check
+    md = ms.md_path.read_text(encoding="utf-8")
+    written = md.replace("- **研究の流れ A**:\n  - 原稿で触れる場所と理由:", "賃金の研究がある。")
+    ms.md_path.write_text(written, encoding="utf-8")
+    assert any("足りない先行研究" in m for _, m in check.check_survey(ms))
+    ms.md_path.write_text(md.replace("- **研究の流れ A**:\n  - 原稿で触れる場所と理由:", "対象外"), encoding="utf-8")
+    assert not any("足りない先行研究" in m for _, m in check.check_survey(ms))
+
+
+@pytest.mark.parametrize("lang", ["en", "ja"])
+def test_the_report_has_no_check_of_the_order_of_hypotheses_and_results(lang):
+    from priorwork.workspace import assets_dir
+    text = (assets_dir(lang) / "templates" / "manuscript.md").read_text(encoding="utf-8")
+    skill = (assets_dir(lang) / "skills" / "priorwork-manuscript" / "SKILL.md").read_text(encoding="utf-8")
+    for doc in (text, skill):
+        assert not re.search(r"後付け|HARK|after (?:seeing )?the results", doc)

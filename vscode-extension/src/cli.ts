@@ -22,12 +22,20 @@ export interface Counts {
     maybe: number;
 }
 
+export interface WorktreeInfo {
+    name: string;
+    path: string;
+    branch: string;
+}
+
 export interface SurveySummary {
     name: string;
     topic: string;
     created: string;
     /** やり直しの版（0.1.6 から。名前の日付の直後の v2 など。古い CLI には無い） */
     version?: number;
+    /** social / medical（医学のサーベイは次の版から。古い CLI には無い） */
+    discipline?: string;
     depth: string;
     /** 進め方: standard（範囲とカードの前で止まる）/ auto / manual（0.1.9 から） */
     mode?: string;
@@ -52,6 +60,8 @@ export interface GitInfo {
     branch?: string;
     /** 今のブランチに無いサーベイのブランチ（PR を待つもの。0.1.8 から） */
     other_surveys?: string[];
+    /** サーベイごとの worktree（0.2.0 から。古い CLI には無い） */
+    worktrees?: WorktreeInfo[];
 }
 
 export interface WorkspaceStatus {
@@ -325,6 +335,8 @@ export interface SettingsReport {
     exists: boolean;
     items: SettingItem[];
     ssci: SsciListInfo;
+    /** 医学のサーベイ用の SCIE リスト（次の版から。古い CLI には無い） */
+    scie?: SsciListInfo;
 }
 
 export interface SearchReport {

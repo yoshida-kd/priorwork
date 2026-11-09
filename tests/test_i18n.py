@@ -30,7 +30,8 @@ def used_messages():
     found |= {ln for ln in cli.USAGE_LINES if ln}
     found |= {h for _, h in cli.STATUS_COMMANDS + cli.LINK_COMMANDS}
     found |= set(survey.STATUS_NAMES.values()) | set(survey.DEPTHS.values()) | set(survey.SEARCH_FIELDS.values()) | set(survey.EVIDENCE_NAMES.values())
-    found |= {label for _, label in survey.MANUSCRIPT_CARD_FIELDS + survey.SCOPE_ROWS}
+    found |= {label for _, label in survey.MANUSCRIPT_CARD_FIELDS + survey.MEDICAL_CARD_FIELDS + survey.SCOPE_ROWS}
+    found |= set(survey.MEDICAL_MATRIX_HEADS)
     found |= set(survey.MATRIX_HEADS) | set(survey.LOG_HEADS) | {survey.BIBLIO_LABEL}
     found |= set(ssci.BADGE.values())
     return found

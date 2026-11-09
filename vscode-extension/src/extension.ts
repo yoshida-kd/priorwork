@@ -149,7 +149,7 @@ export function activate(context: vscode.ExtensionContext): void {
             snowball: L.t('Chase the citations of the included papers of the survey "{0}" ({1}) with Priorwork and screen the new candidates.', s.topic, s.name),
             fill: L.t('Fill in the paper cards of the survey "{0}" ({1}) with Priorwork: {2}. Write only what the abstract or the full text says, and update the evidence level.', s.topic, s.name, which),
             write: s.purpose === 'complete'
-                ? L.t('Fill in my manuscript ({0}) from the survey "{1}" ({2}): map what each section lacks (the marks I left first: [cite], [@?], TODO(priorwork)), then write what to add and where, quoting the sentence it goes before or after, in the language of the manuscript. Fill in only what the literature backs, not the methods or the results. Cite only papers included in the survey, run ./priorwork check and export it with ./priorwork export {2} --draft. Do not rewrite the manuscript.', s.manuscript ?? '', s.topic, s.name)
+                ? L.t('Write the report on my manuscript ({0}) from the survey "{1}" ({2}), in the section each part belongs to: what each section lacks (the marks I left first: [cite], [@?], TODO(priorwork)); what to add and where, quoting the sentence it goes before or after, in the language of the manuscript; the direction of each citation; the literature it does not mention; comments on the argument; what to do first. Write "Not covered" in sections I did not ask for. Fill in only what the literature backs, not the methods or the results. Cite only papers included in the survey, run ./priorwork check and export it with ./priorwork export {2} --draft. Do not rewrite the manuscript.', s.manuscript ?? '', s.topic, s.name)
                 : s.purpose === 'advice'
                 ? L.t('Write the advice on my manuscript ({0}) from the survey "{1}" ({2}): how it cites the literature (the direction of each citation), the literature it is missing, and comments on the argument, most important first. Cite only papers included in the survey, keep the literature apart from my own claims, and run ./priorwork check at the end. Do not rewrite the manuscript.', s.manuscript ?? '', s.topic, s.name)
                 : s.manuscript
@@ -822,7 +822,7 @@ export function activate(context: vscode.ExtensionContext): void {
                     { label: L.t('Chase citations'), description: L.t('snowball, then screening'), task: 'snowball' },
                     { label: L.t('Fill in the paper cards'), description: L.t('from the abstracts or full texts'), task: 'fill' },
                     s.purpose === 'complete'
-                        ? { label: L.t('Fill in the manuscript'), description: L.t('what it lacks, and where to add it'), task: 'write' }
+                        ? { label: L.t('Write the report on the manuscript'), description: L.t('what to add and where, its citations, the argument'), task: 'write' }
                         : s.purpose === 'advice'
                         ? { label: L.t('Write the advice on the manuscript'), description: L.t('citations, missing literature, the argument'), task: 'write' }
                         : s.manuscript
@@ -907,7 +907,7 @@ export function activate(context: vscode.ExtensionContext): void {
                 return;
             }
             const topic = await vscode.window.showInputBox({
-                title: vscode.l10n.t('New survey (1/4)'),
+                title: vscode.l10n.t('New survey (1/5)'),
                 prompt: vscode.l10n.t('The topic (any language)'),
                 placeHolder: vscode.l10n.t('e.g. Minimum wages and employment'),
                 validateInput: (v) => (v.trim() ? undefined : vscode.l10n.t('Give a topic.')),
@@ -918,7 +918,7 @@ export function activate(context: vscode.ExtensionContext): void {
             const guess = /^[\x20-\x7e]+$/.test(topic)
                 ? topic.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 60) : '';
             const slug = await vscode.window.showInputBox({
-                title: vscode.l10n.t('New survey (2/4)'),
+                title: vscode.l10n.t('New survey (2/5)'),
                 prompt: vscode.l10n.t('An English slug for the file name'),
                 placeHolder: 'minimum_wage_employment',
                 value: guess,
@@ -928,15 +928,24 @@ export function activate(context: vscode.ExtensionContext): void {
             if (!slug) {
                 return;
             }
+            const discipline = await vscode.window.showQuickPick([
+                { label: vscode.l10n.t('Social sciences'), value: 'social',
+                  description: vscode.l10n.t('Semantic Scholar and OpenAlex; journals by SSCI') },
+                { label: vscode.l10n.t('Medicine (clinical research)'), value: 'medical',
+                  description: vscode.l10n.t('PubMed too; journals by MEDLINE and SCIE; PICO cards') },
+            ], { title: vscode.l10n.t('New survey (3/5)'), placeHolder: vscode.l10n.t('Which field?') });
+            if (!discipline) {
+                return;
+            }
             const depth = await vscode.window.showQuickPick([
                 { label: 'full', description: vscode.l10n.t('A broad topic; aim for coverage (chase citations, check full texts)') },
                 { label: 'quick', description: vscode.l10n.t('A narrow topic; an overview from abstracts') },
-            ], { title: vscode.l10n.t('New survey (3/4)'), placeHolder: vscode.l10n.t('How deep?') });
+            ], { title: vscode.l10n.t('New survey (4/5)'), placeHolder: vscode.l10n.t('How deep?') });
             if (!depth) {
                 return;
             }
             const question = await vscode.window.showInputBox({
-                title: vscode.l10n.t('New survey (4/4)'),
+                title: vscode.l10n.t('New survey (5/5)'),
                 prompt: vscode.l10n.t('The research question (optional; you can set it later)'),
             });
             if (question === undefined) {
@@ -944,6 +953,7 @@ export function activate(context: vscode.ExtensionContext): void {
             }
             try {
                 const made = await runJson<SurveySummary>(r, ['new', topic.trim(), '--slug', slug.trim(), '--depth', depth.label,
+                    '--discipline', discipline.value,
                     ...(question.trim() ? ['--question', question.trim()] : [])]);
                 model.refresh();
                 const search = vscode.l10n.t('Search');
@@ -1019,7 +1029,7 @@ export function activate(context: vscode.ExtensionContext): void {
                 { label: vscode.l10n.t('Search'), description: vscode.l10n.t('by relevance, 20 results'), args: ['--limit', '20'] },
                 { label: vscode.l10n.t('Bulk search'), description: vscode.l10n.t('boolean operators, most cited first, 25 results'),
                   args: ['--bulk', '--limit', '25'] },
-                { label: vscode.l10n.t('SSCI journals only'), description: vscode.l10n.t('by relevance, 20 results'),
+                { label: s.discipline === 'medical' ? vscode.l10n.t('MEDLINE and SCIE journals only') : vscode.l10n.t('SSCI journals only'), description: vscode.l10n.t('by relevance, 20 results'),
                   args: ['--ssci-only', '--limit', '20'] },
             ];
             const mode = await vscode.window.showQuickPick(modes, { placeHolder: vscode.l10n.t('How to search') });

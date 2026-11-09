@@ -2,7 +2,7 @@
 
 > このファイルは `priorwork sync` が生成します。直接編集しないでください。このワークスペース固有の指示は `AGENTS.local.md` に書かれています。そちらも読んでください（こちらと食い違うときは `AGENTS.local.md` を優先する）。
 
-このリポジトリは、社会科学のテーマ別文献サーベイを作るための Priorwork のワークスペースです。
+このリポジトリは、社会科学と臨床研究のテーマ別文献サーベイを作るための Priorwork のワークスペースです。
 あなたはリサーチアシスタントとして、`./priorwork` コマンドで文献を探し・選び・記録し、レポートの文章を書きます。
 
 ## 頼まれ方と進め方
@@ -47,7 +47,7 @@
 
 - `reports/YYYYMMDD_<slug>.md` … 作業用のレポート（管理ブロックや記入欄を含む）。エージェントが書く。やり直した版は `YYYYMMDD_v2_<slug>.md`。
 - `manuscripts/<論文名>/` … ユーザーの原稿（形式は問わない: Markdown・Quarto・HTML・Word・PDF など）と結果の表・図（`priorwork-manuscript` で使う）。**読むだけで、書き換えない。** Octavo のプロジェクト（別のリポジトリ。`octavo.config.py` がある）の原稿は、写さずにその場所のまま使う（`../<プロジェクト>/papers/<名前>`。これも読むだけ）。
-- `reports/YYYYMMDD_<slug>.draft.md` … 原稿の 1〜3 章を書く（または欠けを補う）サーベイで `./priorwork export --draft` が作る下書き（補完なら、どこに何を足すかの一覧。参考文献つき）。原稿が Octavo のプロジェクトにあれば、`--octavo` で Octavo のプロジェクトの受け取り場所 `literature/priorwork/<サーベイ>.md`（添え状の `.json` つき） に置く（引用が `[@key]`。原稿への取り込みは Octavo の側でする）。
+- `reports/YYYYMMDD_<slug>.draft.md` … 原稿から始めるサーベイで `./priorwork export --draft` が作る、どこに何を足すかの一覧（参考文献つき）。原稿が Octavo のプロジェクトにあれば、`--octavo` で Octavo のプロジェクトの受け取り場所 `literature/priorwork/<サーベイ>.md`（添え状の `.json` つき） に置く（引用が `[@key]`。原稿への取り込みは Octavo の側でする）。
 - `reports/YYYYMMDD_<slug>.<名前>.md` … サーベイから派生する短い文章（講義資料・読書メモ・要点の整理など）。`./priorwork derive` が作り、用途・字数の目安と参考文献を管理ブロックに書く。エージェントは間の文章を書く（スキル `priorwork-derive`）。ほかの名前（`<名前>.lecture.md` など）で独自に作らない。
 - `reports/YYYYMMDD_<slug>.html` … `./priorwork export` が作る**読むための版。人が読むのはこれ**。
   未記入・未確認・`check` の ERROR が残っていると、冒頭に「下書き」と表示される。
@@ -81,7 +81,7 @@
 | 各論文カードの記入 | `priorwork-extract` | `fulltext`, `card`, `render` |
 | 検査と修正・書き出し | `priorwork-check` | `check`, `export` |
 | 別のモデルとして監査する（頼まれたときだけ） | `priorwork-audit` | `check`, `card`, `audit` |
-| 原稿から始める（1〜3 章の下書き・原稿への助言） | `priorwork-manuscript` | `read`, `new --manuscript --purpose …`, `card --set role=…`, `export --draft` |
+| 原稿から始める（どこに何を足すか・引用の点検・助言） | `priorwork-manuscript` | `read`, `new --manuscript`, `card --set role=…`, `export --draft` |
 | サーベイから短い文章を作る（講義資料・読書メモ・要点の整理） | `priorwork-derive` | `derive`, `check`, `export --derived` |
 
 ユーザーが自分の原稿（書きかけでもよい）を示して、欠けているところの補完や、イントロ・先行研究・理論と仮説の下書きや、それを支える文献、足りない先行研究・引用の向き・論の組み立てへの助言を求めたら、`priorwork-manuscript` の手順で進める。原稿の形式は問わない（`./priorwork read` でテキストにする）。原稿は読むだけで、書き換えない。
@@ -123,6 +123,7 @@
 ワークスペースは GitHub の非公開リポジトリに置く。エージェントは、ユーザーに聞かずに PR を作るところまで Git を操作してよい（`AGENTS.local.md` で別に決めていれば、そちらに従う）。**マージはユーザーがする。**
 
 - **ブランチ名はサーベイ名そのもの**（`./priorwork new` が出した名前。例: `20261015_statutory_text_analysis`、やり直しなら `20261015_v2_<slug>`）。ブランチ名を自分で考えない。サーベイに結び付かない作業（`AGENTS.local.md` の直しなど）は、ブランチ名をユーザーに聞く。
+- **別のサーベイが進行中かもしれないとき。** 今のブランチが別のサーベイのものか、未コミットの変更があるか、別のセッションがこのフォルダで動いているかもしれないとき（変更が無くても、そうでないとは言えない）は、ブランチを切り替えない。新しいサーベイを専用のフォルダで始める: `./priorwork new ... --worktree`。サーベイの名前の新しいブランチで `worktrees/<slug>/` を作り、キー・雑誌のリスト・Python・キャッシュを共有する。そのサーベイのコマンドはすべてそのフォルダで実行し（`cd worktrees/<slug>`）、コミット・push・PR は下のとおり。`./priorwork status` が worktree を一覧する。worktree にあるサーベイはそこで続け、`git switch` しない。消す（`./priorwork worktree --remove <slug>`。ブランチは残る）のは、ユーザーに頼まれたときだけ。
 - **始めるとき**: `git status` を見る。このサーベイのものでない未コミットの変更があれば、ブランチを切り替えずに報告で聞く。
   - 新しいサーベイ: main を最新にし（`git switch main` → リモートがあれば `git pull --ff-only`）、`./priorwork new` のあとに `git switch -c <サーベイ名>`。
   - 続き・監査: `git switch <サーベイ名>`（無ければ main から作る）。リモートにあれば `git pull --ff-only`。
@@ -155,8 +156,21 @@ Zotero に書き込むのは、ユーザーが設定で許したとき（`.env` 
   - `./priorwork zotero <survey> --import` で、コレクションの論文を候補に登録できる。これはユーザーが自分で選んで入れた論文なので、範囲から明らかに外れない限り採用する。
   - 本文（`./priorwork fulltext`）はそのコレクションの PDF を優先して読む。カードの記入も、コレクションに PDF がある論文から始める。
 - **原稿が Octavo のプロジェクトにあるとき**、Octavo はその設定（`zotero_collection`）の Zotero のコレクションから参考文献の `.bib` を取る。サーベイも同じコレクションに結び付ける（`./priorwork new --manuscript` が自動で結び付ける。違っていれば `./priorwork check` が知らせる）。採用論文をそのコレクションに入れれば、Octavo の参考文献にもなる。Octavo はその下のコレクションの文献も取るので、**1 つの Octavo のプロジェクトに複数のサーベイがあるときは、サーベイごとに Octavo のコレクションの下のコレクション**（`"<Octavo のコレクション> / <サーベイ>"`）を使う（同じコレクションに混ぜると、`--import` で互いの論文が候補に入る）。コレクションはユーザーが Zotero で作る。**Octavo のプロジェクトに書くのは `./priorwork export --octavo` が受け取り場所（`literature/priorwork/`）に置くものだけ。** 設定・`.bib`・原稿は書き換えない。原稿への取り込みは、Octavo のプロジェクトのエージェントに頼むようユーザーに伝える。
+- **サーベイのコレクションと、Octavo のプロジェクトが読むコレクションを分けているとき**（`check` が知らせる）は、ユーザーに確かめてから `./priorwork zotero <survey> --add --also "<プロジェクトのコレクション>"` で両方に入れる。同じ名前のコレクションが複数あれば、パスで指定する。
 - **Octavo からの依頼。** Octavo は依頼を `.priorwork/requests/` に置くことがある（`./priorwork status` に件数が出る）。「Octavo からの依頼を進めて」と頼まれたら、`./priorwork requests` で一覧を見て、`./priorwork requests <id>` で中身を読み、依頼の文に従って進める（原稿からなら `priorwork-manuscript`）。済んだら `./priorwork requests <id> --done --survey <survey>` で記録する。進められない（範囲の外・原稿が見つからないなど）なら、`--decline --note "<理由>"` で記録してユーザーに伝える。依頼のファイルは自分で書き換えない。
 - **サーベイと Octavo のプロジェクトは多対多。** テーマのサーベイを論文（Octavo のプロジェクト）で使うと頼まれたら、`./priorwork scope <survey> --octavo <プロジェクトのパス>` で結び付け（いくつでも）、`./priorwork export <survey> --octavo <プロジェクト>` でそのプロジェクトの `.bib` のキーを使って書き出す（そのプロジェクトの `literature/priorwork/<サーベイ>.md`。原稿の下書きのサーベイなら下書き、それ以外は学説・手法・論争・空白の節）。Octavo のプロジェクトの Zotero のコレクション（並びでもよい）にサーベイのコレクションが入っていなければ `./priorwork check` が知らせるので、Octavo 側に足すようユーザーに伝える。
+
+## 医学のサーベイ
+
+臨床研究には `./priorwork new ... --discipline medical` でサーベイを作る。テーマが明らかに臨床（治療・薬・疾患・患者のアウトカム）なら、ユーザーに聞かずにそうする。医療政策や健康の社会的な面は、頼まれない限り既定のままにする。サーベイを作った後では変えられない。
+
+- **変わること。** 検索は Semantic Scholar に加えて PubMed にも行き、PubMed が解釈した検索式が記録に残る。雑誌は論文ごとの PubMed の記録（✅ MEDLINE）と、取り込んであれば SCIE リスト（✅ SCIE）で判定する。レター・論説・コメントは検索から除く。カードは臨床上の問い・対象集団・介入または曝露と対照・アウトカム・研究デザイン・効果量を聞く。`add` は `PMID:<番号>` も受け付ける。
+- **叙述的レビューである。** システマティックレビュー・メタ分析・PRISMA 準拠と呼ばない。エージェント 1 人のスクリーニングはその基準を満たさない。結果を自分で統合しない。
+- **診療の助言をしない。** 論文が見出したことを伝える。患者への治療の推奨を書かない（「本研究の仮説と示唆」でも）。
+- **効果量。** 報告のまま（HR・OR・RR・平均差）、95% 信頼区間・アウトカム・時点・対照を添えて書く。絶対効果と相対効果を分ける。代替アウトカムを臨床アウトカムに、関連を因果に、有意でない結果を「効果なし」に言い換えない。
+- **撤回。** 撤回された論文には ⚠️ が付き、`check` は ERROR を出す。よく引用されていても除外する。撤回そのものを扱うサーベイだけは残してよいが、報告にそう書く。
+- **プレプリント**（medRxiv・bioRxiv）は、ルール 1 のとおり頼まれない限り除く。残すなら、査読を経ていないことを本文に書く。
+- **対象外。** 医中誌 Web の日本語文献や、Embase・CENTRAL などのデータベースは検索しない。問いに必要そうなら報告に書く。
 
 ## ルール
 
@@ -186,10 +200,10 @@ Zotero に書き込むのは、ユーザーが設定で許したとき（`.env` 
 
 ```bash
 ./priorwork status [SURVEY]          # 一覧 / 進捗と次にやること
-./priorwork new "<テーマ>" --slug <slug> --by "<モデル名>" [--mode standard|auto|manual] [--depth quick|full] [--manuscript PATH [--purpose draft|advice]] [--question ... --years ... --fields ... --inclusion ... --exclusion ...]
-./priorwork scope SURVEY [--question ...] [--mode standard|auto|manual] [--go-on] [--depth quick|full] [--search-field social|all] [--manuscript PATH] [--by "<モデル名>"]
+./priorwork new "<テーマ>" --slug <slug> --by "<モデル名>" [--discipline social|medical] [--worktree] [--mode standard|auto|manual] [--depth quick|full] [--manuscript PATH] [--question ... --years ... --fields ... --inclusion ... --exclusion ...]
+./priorwork scope SURVEY [--question ...] [--mode standard|auto|manual] [--go-on] [--depth quick|full] [--search-field social|medical|all] [--manuscript PATH] [--by "<モデル名>"]
 ./priorwork archive SURVEY [--undo]  # 一覧から隠す（ファイルは残る）。アーカイブの一覧は status --archived
-./priorwork search "<English query>" [--into SURVEY] [--bulk] [--sort citations|relevance|recent|cpy] [--year 2010-2024] [--journal "<full journal name>" ...] [--ssci-only] [--field social|all] [--limit N]
+./priorwork search "<English query>" [--into SURVEY] [--bulk] [--sort citations|relevance|recent|cpy] [--year 2010-2024] [--journal "<full journal name>" ...] [--ssci-only] [--field social|medical|all] [--source auto|pubmed|s2] [--limit N]
 ./priorwork list SURVEY [--status candidate maybe included excluded] [--abstract]
 ./priorwork include SURVEY N... --reason "..."   ./priorwork exclude SURVEY N... --reason "..."   ./priorwork maybe SURVEY N... --reason "..."   ./priorwork reset SURVEY N...
 ./priorwork add SURVEY <DOI>... [--candidate]      ./priorwork add SURVEY --cited   # 原稿が引いている論文（.bib の DOI）を登録
@@ -201,7 +215,7 @@ Zotero に書き込むのは、ユーザーが設定で許したとき（`.env` 
 ./priorwork check SURVEY [--offline]
 ./priorwork audit SURVEY [--by "<モデル名>" --note "..."]   # 頼まれた監査を記録（--by なしで記録を見る）
 ./priorwork export SURVEY [--format html|docx|md] [--with-abstracts]   # 読むための版を書き出す
-./priorwork export SURVEY --draft [--format md|docx|html]             # 原稿の 1〜3 章の下書き（--purpose draft のサーベイ）
+./priorwork export SURVEY --draft [--format md|docx|html]             # 原稿に足すものと参考文献（--manuscript のサーベイ）
 ./priorwork derive SURVEY [NAME --purpose "..." --length N --structure "a; b; c" [--count-citations]]   # 派生文書を作る（NAME を省くと一覧）
 ./priorwork export SURVEY --derived NAME [--format html|docx|md]      # 派生文書を読むための版に
 ./priorwork export SURVEY --octavo [PROJECT] [--bib PATH]             # Octavo のプロジェクト用に（引用を [@key] に。下書きか、まとめの節）
@@ -209,7 +223,7 @@ Zotero に書き込むのは、ユーザーが設定で許したとき（`.env` 
 ./priorwork requests [ID] [--done --survey SURVEY | --decline --note "..."]   # Octavo からの依頼
 ./priorwork read PATH [--out FILE]   # 原稿（.md・.qmd・.html・.docx・.pdf など、フォルダも可）をテキストにする
 ./priorwork zotero [SURVEY] [--collections] [--collection NAME] [--import] [--dois]   # --dois は Zotero の連携が無くても使える
-./priorwork zotero SURVEY --add [--dry-run]      # 採用論文を結び付けたコレクションに入れる（ZOTERO_WRITE=1 のときだけ。--undo [番号 …] で戻す）
+./priorwork zotero SURVEY --add [--also COLLECTION] [--dry-run]      # 採用論文を結び付けたコレクションに入れる（ZOTERO_WRITE=1 のときだけ。--undo [番号 …] で戻す）
 ./priorwork get <DOI>      ./priorwork citations <DOI> [--sort cited]      ./priorwork references <DOI> [--sort cited]      ./priorwork journal "<誌名>"
 ./priorwork doctor [--online]        # 設定の診断（動作がおかしいとき）
 ./priorwork sync                     # AGENTS.md・スキルをエンジンの版に更新

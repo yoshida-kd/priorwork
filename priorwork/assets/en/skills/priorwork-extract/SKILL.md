@@ -62,3 +62,14 @@ In a survey made from a manuscript (`priorwork-manuscript`), the papers the draf
    ```
 
 Only in manual mode, report the key points (identification strategy, main findings) every 2–3 papers, naming the papers as Author (year), and check whether to go on.
+
+## In a medical survey
+
+The card has the same structure with clinical fields. `./priorwork card <survey> <number> --set ...` keeps the same keys: `rq` (clinical question), `data` (population and setting), `x` (intervention or exposure, and comparator), `y` (outcomes), `method` (study design), `findings`, `limits`.
+
+- `data`: who, how many in each arm, where, and the follow-up.
+- `y`: the primary outcome first, marked as such; say when an outcome is a surrogate or a composite.
+- `method`: the design as the paper states it (randomised and blinded or not, cohort, case-control, …). Do not call an observational study a trial.
+- `findings`: for each main outcome, the effect size with its 95% CI and the time point, as reported, with the page. Include the harms the paper reports. Copy numbers exactly; do not calculate new ones.
+- `limits`: what the authors state, plus funding by the manufacturer if the paper declares it.
+- A full text from PMC (`europepmc:…`) has no page breaks: write "(page not checked)", as for Zotero's index text.

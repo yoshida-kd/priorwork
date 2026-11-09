@@ -2,26 +2,26 @@
 name: priorwork-manuscript
 description: >-
   Works from the user's own manuscript in any format (Markdown, Quarto, HTML, Word, PDF): reads it with
-  `./priorwork read`, agrees with the user what to make (what to add where a manuscript in progress lacks
-  something, the author's marks first; a draft of its introduction, literature review and theory and
-  hypotheses; advice on missing literature, the direction of its citations and the argument; or several as
-  separate reports) and which parts to cover, then searches, screens, fills in the cards and writes each
-  report (`./priorwork new --manuscript … --purpose complete|draft|advice`). Use when the user points to
-  their manuscript, finished or not, and asks to fill it in, for its sections 1–3, the literature behind it,
-  or advice on it.
+  `./priorwork read`, agrees with the user which parts to cover and what to focus on, then searches, screens,
+  fills in the cards and writes one report (`./priorwork new --manuscript …`): what the manuscript lacks, what to
+  add and where (the author's marks first, whole sections if needed), a check of its citations, literature it does
+  not mention, comments on the argument. Use when the user points to their manuscript, finished or not, and asks to
+  fill it in, for its sections 1–3, the literature behind it, or advice on it.
 ---
 
-# Start from a manuscript (filling it in, a draft of sections 1–3, advice on it)
+# Start from a manuscript
 
-Follow the rules in [AGENTS.md](../../../AGENTS.md). The user has a manuscript of their own and wants the literature behind it. There are three kinds of report, and one manuscript may get several as separate reports.
+Follow the rules in [AGENTS.md](../../../AGENTS.md). The user has a manuscript of their own and wants the literature to support it. **One manuscript gets one survey and one report.** What to write in it depends on the state of the manuscript:
 
-| Purpose (`--purpose`) | Suits | The report |
-| :--- | :--- | :--- |
-| `complete` (filling it in; the default) | a manuscript in progress (sections missing, headings only, thin, claims without citations), maybe with the author's marks (`[cite]`, `[@?]`, `TODO(priorwork): …`) | a map of what it lacks, claims to back with literature, a list of what to add where (the place given by quoting the sentence before or after; `export --draft`), a check of its citations, a check that hypotheses were not fitted after the results, cards |
-| `draft` (a draft of sections 1–3) | a manuscript with the data, methods and results written, but not yet its introduction, literature review or theory and hypotheses | claims to back with literature, cards, a draft to paste into the manuscript (`export --draft`), a check that hypotheses were not fitted after the results |
-| `advice` (advice on the manuscript) | a finished or unfinished paper | a summary of the advice, a check of its citations (direction, overstatement), missing literature, comments on the argument, cards |
+| The manuscript | Put the work in |
+| :--- | :--- |
+| In progress (missing sections, headings only, thin parts, no citations, the author's marks `[cite]`, `[@?]`, `TODO(priorwork): …`) | what it lacks (section 3), what to add (section 5) |
+| The analysis is done, but no introduction, literature review or theory and hypotheses | what to add (section 5): those parts as "write the section" items |
+| Finished | the check of its citations (section 6), missing literature (section 7), the argument (section 9) |
 
-**Only read the manuscript; never rewrite it.** Put what should change in the report and in your report to the user.
+Write "Not covered" in a section nobody asked for. **Only read the manuscript; never rewrite it.** Tell the user what should change in the report and in your report to them.
+
+A survey made by an earlier version has a report of another shape (`purpose` in `./priorwork status <survey> --json` is `draft` or `advice`). Carry on with it as its headings and `<!-- What to write: … -->` notes say. To add the rest, make a new survey and register its included papers with `add`.
 
 ## 1. Read the manuscript
 
@@ -41,46 +41,42 @@ The manuscript goes in `manuscripts/<paper name>/` in the workspace (see `manusc
 
 ## 2. Agree with the user what to make
 
-Once you have read it, propose the following and **wait for the user's answer** (whatever the mode; only when the request already settles the purpose, the parts and the number of reports may you go on without waiting, saying in your report how you decided).
+Once you have read the manuscript, propose the following and **wait for the answer** (whatever the mode; only when the request settles all of it may you go on without waiting, saying in your report how you decided).
 
-- **Purpose**: `complete`, `draft`, `advice`, or several (as separate reports). Recommend one from the state of the manuscript, with your reasons: `complete` for a manuscript in progress whose sections lack different things, or one with the author's marks; `draft` when the analysis is done and only sections 1–3 are missing; `advice` for a finished manuscript.
-- **Parts**: which parts of the manuscript to cover (e.g. "the literature review in section 2 and the hypotheses in section 3", "the whole paper").
-- **Scope of the searches**: the research question (the manuscript's), fields, period, inclusion and exclusion criteria, depth (full by default).
-- **How many reports, in which order**: if both, which first (the papers included in the first survey can be carried into the later one with `add`).
+- **What to focus on**: from the table above, with your reasons from the state of the manuscript.
+- **What to cover**: which parts of the manuscript (e.g. "the literature review in section 2 and the hypotheses in section 3", "the whole paper").
+- **The search**: the research question (the manuscript's), fields, period, inclusion and exclusion criteria, depth (default full).
 
-With the answer, make one survey per report, each with its own slug (e.g. `make_or_buy_draft`, `make_or_buy_advice`).
+Then make the survey. **Do not make a second survey for the same manuscript**; add to the one you have.
 
 ```bash
-./priorwork new "<topic>" --slug <slug> --by "<your model name>" --manuscript manuscripts/<paper name> --purpose complete|draft|advice --mode standard|auto|manual --depth full --question "..." --fields "..." --inclusion "..." --exclusion "..."
+./priorwork new "<topic>" --slug <slug> --by "<your model name>" --manuscript manuscripts/<paper name> --mode standard|auto|manual --depth full --question "..." --fields "..." --inclusion "..." --exclusion "..."
 ```
 
-When the manuscript is in an Octavo project, `new` links the survey to the project's Zotero collection (`./priorwork status <survey>` shows "Octavo project").
+If the manuscript is in an Octavo project, `new` links the project's Zotero collection to the survey (`./priorwork status <survey>` shows "Octavo project").
 
-For the second survey, first register the relevant included papers of the first with `./priorwork add <second> <DOI>...`, then search for what is missing.
-
-This conversation is the first stop of the standard mode (the scope). From here on, follow AGENTS.md, "Modes" (in standard, the next stop is before the cards).
+This agreement is the first stop of the standard mode (the scope). From here follow AGENTS.md, "Modes" (in standard, the next stop is before the cards).
 
 ## 3. Summarise the manuscript
 
-Fill in section 1, "The manuscript in brief", with only what the manuscript says. Copy estimates exactly as in its tables. For `advice`, put the parts agreed in 2 under "What the advice covers".
+Fill in section 1 of the report only from what the manuscript says. Copy estimates exactly from its tables. Give the parts this report covers.
 
 ## 4. Work out where literature is needed
 
-**`draft`**: in the table of section 2, list the claims that need literature, each with an ID (C1, C2, …). Consider at least these kinds:
+- **Section 3**: for each section of the manuscript, its state (written / thin / heading only / missing), the author's marks (at the end of `./priorwork read`) and the plan. The marks are where the author wants literature, so list all of them.
+- **Section 4**: the claims to support, with IDs (C1, C2, …). Think of at least these kinds:
 
-| Kind | Where in the manuscript | Example |
+| Kind | Where it is used | Example |
 | :--- | :--- | :--- |
-| Why the problem matters, the puzzle | Introduction | "The employment effect of minimum wages is contested in policy" |
-| Strands of research it contributes to (2–4) | Literature review | "The line of estimates from cross-border comparisons" |
-| Mechanism, theory | Theory and hypotheses | "Under monopsony, employment need not fall" |
-| Competing theories and findings | Theory and hypotheses, discussion | "In a competitive labour market, employment falls" |
-| Precedents for the method or data | Data and methods (support) | "Studies with the same identification or the same data" |
+| Why the problem matters, the puzzle | introduction | "The employment effect of the minimum wage is contested" |
+| Streams of research it contributes to (2–4) | literature review | "Estimates from comparing regions" |
+| Mechanism, theory | theory and hypotheses | "Under monopsony, employment need not fall" |
+| Competing theories and findings | theory and hypotheses, discussion | "In a competitive labour market, employment falls" |
+| Precedents for the method or data | data and methods (support) | "Studies with the same identification or data" |
 
-**For each main result, also set up the conflicting findings as a claim** ("C3: some report that X does not raise Y"). Do not gather only supporting literature.
-
-**`advice`**: in the table of section 3, list the main places where the manuscript cites the literature, each with an ID (R1, R2, …): where, what the manuscript says, and the papers cited. Also ask, for its question, theory, methods and results, whether a strand of research is missing; these are candidates for section 4.
-
-**`complete`**: in the table of section 2, give each section of the manuscript its state (written / thin / heading only / missing), the author's marks in it (the "Author's marks" at the end of `./priorwork read`) and how to fill it in. The marks are where the author asks for literature, so list every one. Then list in section 3 the claims the additions back with literature, each with an ID (C1, C2, …; the kinds in the `draft` table are a guide, and the conflicting findings for each main result are claims too). List the places where the manuscript already cites the literature in section 5 with R IDs, as for `advice`.
+  **For each main result, also state the conflicting finding as a claim** ("C3: X is reported not to raise Y"). Do not collect only literature in support.
+- **Section 6**: the main places where the manuscript cites the literature, with IDs (R1, R2, …): where, what it says, the paper cited.
+- **Section 7**: for the question, theory, method and results, research streams it does not mention.
 
 ## 5. Search and screen
 
@@ -94,67 +90,54 @@ Standard and manual stop before filling in the cards and show the DOIs to add to
 
 ## 6. Fill in the cards
 
-Fill them in as in `priorwork-extract`. Also fill in **Role in the manuscript** (`role`):
+Fill them in as in `priorwork-extract`. Also write the **Role in the manuscript** (`role`).
 
 ```bash
-./priorwork card <survey> N --set "role=C2 supports; method precedent"       # draft
-./priorwork card <survey> N --set "role=R2 cited; opposite direction"        # advice
-./priorwork card <survey> N --set "role=K2, C1 supports"                     # complete
+./priorwork card <survey> N --set "role=K2, C1 supports"
+./priorwork card <survey> N --set "role=R2 cited by the manuscript; wrong direction"
 ```
 
-- `draft`: the IDs of the claims in section 2 and how the paper bears on them (supports / conflicts / source of theory / method precedent / background). Then fill in the "Supporting" and "Conflicting or qualifying" columns of the table in section 2 from the cards, as Author (year). If a claim is left with no literature, search more for it. If nothing turns up, propose in section 6 to soften or drop the claim.
-- `advice`: the ID in section 3, whether the manuscript cites the paper or it is one to add, and what it means for the manuscript (supports / conflicts / source of theory / method precedent / background).
-- `complete`: the IDs of the item in section 4 (K), the claim in section 3 (C) or the citation in section 5 (R), and the relation. Fill in the literature columns of the table in section 3 from the cards too.
-- Check the papers that carry the manuscript's claims (those cited in the `draft`, and those whose citation you judge in `advice`) against the full text, whatever the depth ("full text checked").
+- `role`: the IDs of the item in section 5, the claim in section 4 or the citation in section 6, and the relation (supports / conflicts / source of the theory / precedent for the method / background, cited by the manuscript or a candidate to add).
+- Fill in the literature columns of section 4 from the cards, as Author (year). If a claim still has no paper, search on that claim. If none turns up, propose weakening or cutting it in section 8 or 9.
+- Papers that bear on the manuscript's claims (those cited in section 5, those whose direction you judge in section 6) are checked in the full text whatever the depth.
 
-## 7a. Write the draft (`draft`)
+## 7. Write the report
 
-In section 5 of the report (after `<!-- priorwork:draft -->`), write text that can go straight into the manuscript, **in the language of the manuscript** (the headings too, if you like; `###` subheadings become `##` when exported).
+Follow the `<!-- What to write: … -->` notes. Cite only papers included in the survey, as in the references. Add nothing that is not on the cards.
 
-- **Introduction**: why the problem matters and the puzzle → what the literature has not settled → this study's question, methods, main results and contribution. Keep the results within the summary in section 1.
-- **Literature review**: for each strand in section 2, sum up the claims and the evidence. Do not list papers; say what each strand has established and what is left, and end with where this study stands.
-- **Theory and hypotheses**: derive the hypotheses from the mechanisms. Give the literature behind each hypothesis. If there is a competing theory, say what it predicts too.
+**Section 5, what to add.** In the manuscript's order, in the **language of the manuscript**:
 
-Keep to these:
+- The heading is `### K1 kind — section`. The kinds are "write the section" (a missing or heading-only section), "insert" (a paragraph in a thin section), "add a citation" (a claim without one, `[cite]`, `[@?]`: the paper to cite and the sentence with the citation in it).
+- Each item has **Where** (the section's heading and the sentence it goes before or after, quoted exactly) and **Why** (the gap, the author's mark, the claim ID), then the text. `./priorwork check` gives a WARN for an item without a place.
+- **Fill in the author's marks first.** Each mark gets an item, or a reason in section 3 why not (no literature supports it, out of scope).
+- Add only what the literature supports. Do not write the content of the methods or results (data, estimates, interpretation); literature supporting the choice of method is fine. If what you add conflicts with what the manuscript says, give that as the reason.
+- When writing whole sections:
+  - **Introduction**: why the problem matters and the puzzle → what the literature does not know → this study's question, method, main results and contribution. Keep the results to the summary in section 1.
+  - **Literature review**: by research stream, the claims and their evidence; not a list of papers, but what each stream has found and left open, ending with where this study stands.
+  - **Theory and hypotheses**: the mechanism and the hypotheses, with the literature behind each. If there are competing theories, what they would predict.
 
-- Cite only papers included in the survey, written as in the references. Add nothing that is not on the cards.
-- **Do not fit hypotheses after the fact.** Only hypotheses that follow naturally from the literature are hypotheses. Do not write unexpected or fragile results as if the literature had predicted them. Propose in section 6 to treat such results as exploratory findings, and leave it to the user.
-- **Do not hide conflicting literature.** Discuss literature that conflicts with the manuscript's results in the literature review or the hypotheses, with the reasons the results may differ (setting, period, identification) as far as the cards say.
+**Do not hide conflicting literature.** Where it conflicts with the manuscript's results, mention it in the text, with the reasons the difference may arise (sample, period, identification) as far as the cards go. **Do not attribute to the literature what it does not say.**
 
-In section 6 (where the hypotheses come from), write the papers behind each hypothesis, what was added or changed after seeing the results, which results to treat as exploratory, and how conflicting literature is handled. This is a record for the user to decide on; it is not exported with the draft.
+**Section 6, citations.** For each R, compare the card of the cited paper (the **direction** of its main findings, sample, method) with what the manuscript says: fits / wrong direction / overstated / weak evidence. For those that do not fit, say what to change (soften it, use another paper, show the conflicting finding too).
 
-## 7b. Write the advice (`advice`)
+**Section 7, missing literature.** By research stream, where in the manuscript and why, citing included papers. Do not hide findings that conflict with its results.
 
-Write in the language of the report, following the `<!-- What to write: … -->` under each heading.
+**Section 8, hypotheses.** For each hypothesis, the literature behind it, the literature that conflicts with it, and how the manuscript deals with that.
 
-- **Section 3, the citations**: for each R, compare the card of the cited paper (the **direction** of its main finding, its setting and method) with what the manuscript says, and give a verdict (fits / opposite direction / overstated / weak support). For those that do not fit, say where and how to change the manuscript (soften the wording, cite another paper, show the conflicting findings too).
-- **Section 4, missing literature**: for each strand, where in the manuscript and why to cite it, citing included papers as Author (year). Do not hide findings that conflict with the manuscript's results.
-- **Section 5, the argument**: comments on how the question, the gap in the literature, the hypotheses, the methods, the results and the contribution hang together. Keep what the literature shows apart from the manuscript's own claims (the authors' hypotheses and interpretations).
-- **Section 2, the summary**: write it last. From sections 3–5, the 3–7 most important things to fix, most important first (where, the problem, the suggested fix, the papers behind it).
+**Section 9, the argument.** Comments on how the question, the gap, the hypotheses, the method, the results and the contribution connect. Do not mix what the literature says with the manuscript's claims.
 
-Cite only papers included in the survey. When you suggest new wording for the manuscript, give it briefly, in the language of the manuscript.
-
-## 7c. Write what to add (`complete`)
-
-Following the map from 4 (section 2), write the items of section 4 (after `<!-- priorwork:draft -->`) **in the manuscript's order**.
-
-- Head each `### K1 Kind — Section`. The kind is "Write the section" (a section missing or with its heading only), "Insert" (paragraphs for a thin section) or "Add citations" (for a claim without citations, `[cite]` or `[@?]`: the papers to cite and the sentence with the citations).
-- Give each **Where** (the section heading and the sentence before or after the place, quoted exactly from the manuscript) and **Why** (the gap in section 2, the author's mark, the claim IDs in section 3), then the text below, **in the language of the manuscript**. `./priorwork check` warns about items without a place.
-- **Fill in the author's marks first.** For each of the "Author's marks" from `./priorwork read`, write an item, or in section 2 why it is not filled in (no literature backs it, out of scope).
-- Fill in only what the literature backs. Never write the content of the methods or the results (data, estimates, interpretations); the literature behind the choice of method is fine.
-- Keep the rules of 7a (cite only included papers, do not fit hypotheses after the fact, do not hide conflicting literature). When an addition conflicts with what the manuscript already says, say so under Why.
-- Write sections 5 (citations) and 6 (where the hypotheses come from) as in 7a and 7b.
+**Section 2, what to do first.** Write it last: the 3–7 most important points, each with where, the problem, what to do and the literature behind it. To suggest a rewritten sentence, show it briefly in the language of the manuscript.
 
 ## 8. Check and export
 
-Fix until there are no ERRORs as in `priorwork-check`, then export.
+Fix until there are no ERRORs, as in `priorwork-check`, then export.
 
 ```bash
-./priorwork export <survey> --draft          # draft, complete: reports/<name>.draft.md (the draft or what to add, and the references it cites)
-./priorwork export <survey>                  # reports/<name>.html (the whole report)
+./priorwork export <survey> --draft          # reports/<name>.draft.md: section 5 and the references of the papers it cites
+./priorwork export <survey>                  # reports/<name>.html: everything
 ```
 
-`--draft --format docx` makes a Word file (needs pandoc). For a manuscript in an Octavo project, export it as in "A manuscript in an Octavo project" below.
+`--draft --format docx` makes a Word file (it needs pandoc). If the manuscript is in an Octavo project, use the form under "A manuscript in an Octavo project".
 
 ## A manuscript in an Octavo project
 
@@ -169,12 +152,15 @@ Fix until there are no ERRORs as in `priorwork-check`, then export.
 - `./priorwork check` warns when the survey and the Octavo project use different Zotero collections, and when the draft cites papers not in the `.bib`. If the collections differ, ask the user which one to use.
 - What you export goes into the Octavo project's inbox (`literature/priorwork/`). Working it into the manuscript happens on Octavo's side: tell the user to ask the agent in the Octavo project to "work the draft from Priorwork into the manuscript". Never change the Octavo project's other files (settings, `.bib`, manuscript).
 
+- `export --octavo` puts section 5 in the inbox, followed by a part for the author with what you wrote in sections 2 and 6–9 (not text for the manuscript).
+
 ## 9. Report
 
-Besides "4. When it is done, report" in the entry skill `priorwork`, say the following, naming papers as Author (year):
+In addition to "4. Report when you are done" in the entry skill `priorwork`, tell the user, naming papers as Author (year):
 
-- for a manuscript in an Octavo project, the file put in the inbox and the DOIs of the papers not in the `.bib` (to add to Zotero, then `octavo bib pull`)
-- `draft`: the claims in section 2 and their literature (claims with only supporting literature, claims with conflicting literature, claims with none found), what the user should decide from the check in section 6, and the draft file (`reports/<name>.draft.md`; the user reads and edits it before moving it into the manuscript)
-- `advice`: the main points of the summary (section 2), and how many citations were judged "opposite direction" or "overstated"
-- `complete`: the main points of the map (section 2), how many items of which kind, which of the author's marks were filled in and which not (and why), and the file exported (the user reads it before working it into the manuscript)
-- when one manuscript got several reports, the name of each, and what is not made yet
+- the main points of section 2
+- what the manuscript lacks, how many items to add and of what kinds, the author's marks you filled in and those you did not, and why
+- how many citations are "wrong direction" or "overstated"
+- which claims have only supporting literature, which have conflicting literature, and which found none
+- the files you exported (the user reads them before moving anything into the manuscript)
+- for a manuscript in an Octavo project, the files placed in the inbox and the DOIs missing from the `.bib` (to add to Zotero, then `octavo bib pull`)

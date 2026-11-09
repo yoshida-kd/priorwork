@@ -48,6 +48,13 @@ When the mode is manual (the user wants to go through it together, or `AGENTS.lo
 2. Record the user's answer (e.g. "include 2, 5, 7; exclude 3") as given. An exclusion needs a reason.
 3. If the user says they screened in the sidebar, reload the list before going on.
 
+## In a medical survey
+
+- Use the study design shown with each result, but check it against the abstract: PubMed's type is not always the design you need.
+- Exclude retracted papers (⚠️), with the reason. Exclude protocols, narrative commentaries and case reports unless the scope wants them.
+- Prefer the original trial and its later meta-analyses over reviews that restate them. Keep the primary report of a trial when you include a secondary analysis, and say which is which in the reason.
+- A paper with no abstract goes to maybe, as elsewhere.
+
 ## Papers with a ⚠️ about the DOI
 
 For papers where "the DOI points to another title", "the DOI is a working paper / preprint version" or "OpenAlex does not know the DOI", find the published version and replace the details with it. The number, status and card stay.

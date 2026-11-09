@@ -23,6 +23,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 
+from .api import ApiError
 from .i18n import t
 
 from .workspace import CACHE_DIR, ROOT
@@ -33,6 +34,9 @@ MAX_PDF_BYTES = 50 * 1024 * 1024
 
 class FulltextError(RuntimeError):
     pass
+
+
+MAX_ATTACHMENTS = 4   # 1 本の論文で調べる Zotero の添付 PDF の数
 
 
 def journal_pages(record: Dict[str, Any]) -> Tuple[Optional[int], Optional[int]]:
@@ -82,6 +86,7 @@ def find_zotero_pdf(doi: str, data_dir: Optional[Path] = None) -> Optional[Path]
         ).fetchall()
     finally:
         conn.close()
+    found = []
     for key, path in rows:
         if not path:
             continue
@@ -90,8 +95,34 @@ def find_zotero_pdf(doi: str, data_dir: Optional[Path] = None) -> Optional[Path]
         else:
             candidate = Path(path)  # リンクされたファイル（絶対パス）
         if candidate.exists():
-            return candidate
-    return None
+            found.append(candidate)
+    if len(found) < 2:
+        return found[0] if found else None
+    # 同じ論文に PDF がいくつもあれば、ワーキングペーパー版でないものを選ぶ
+    return found[best_pdf([p.read_bytes() for p in found])]
+
+
+# 表紙の上のほうだけを見る（掲載版の 1 ページ目の脚注にも "NBER" や "working paper" は出てくる）
+_WP_RE = re.compile(r"\b(?:working\s+paper|discussion\s+paper|preprint|mimeo|author\s+manuscript|"
+                    r"accepted\s+manuscript|draft\s+version|this\s+draft)\b", re.IGNORECASE)
+
+
+def working_paper_text(text: str) -> bool:
+    """本文の 1 ページ目（表紙）が、ワーキングペーパー・原稿の版らしいか。"""
+    first = re.split(r"(?m)^=== page 2 ===", text or "", maxsplit=1)[0]
+    return bool(_WP_RE.search(first[:800]))
+
+
+def best_pdf(pdfs: List[bytes]) -> int:
+    """同じ論文の PDF のうち、読むものの番号: ワーキングペーパー版でなく、読める文字の多いもの。"""
+    def score(pdf: bytes) -> Tuple[bool, int]:
+        try:
+            text, _ = extract_text(pdf)
+        except Exception:   # 壊れた PDF は選ばない
+            return (False, -1)
+        return (not working_paper_text(text), len(text))
+    scores = [score(p) for p in pdfs]
+    return scores.index(max(scores))
 
 
 _PDF_META_RE = re.compile(r"<meta[^>]+name=[\"']citation_pdf_url[\"'][^>]*>", re.IGNORECASE)
@@ -218,12 +249,14 @@ def fetch_fulltext(entry: Dict[str, Any], client: Any, pdf_path: Optional[str] =
                 attempts.append(t("In Zotero, but no PDF is attached"))
             if not item or not attachments:
                 attempts.append(zotero.sync_note())
-            for att in attachments:
+            got = []
+            for att in attachments[:MAX_ATTACHMENTS]:
                 try:
-                    pdf, source = zotero.download_pdf(att), f"zotero:{att['key']} ({att['filename']})"
-                    break
+                    got.append((zotero.download_pdf(att), f"zotero:{att['key']} ({att['filename']})"))
                 except ZoteroError as e:
                     attempts.append(str(e))
+            if got:   # いくつもあれば、ワーキングペーパー版でないものを読む
+                pdf, source = got[best_pdf([g[0] for g in got]) if len(got) > 1 else 0]
             if pdf is None:
                 for att in attachments:
                     ft = zotero.indexed_fulltext(att["key"])
@@ -247,6 +280,17 @@ def fetch_fulltext(entry: Dict[str, Any], client: Any, pdf_path: Optional[str] =
                 break
             except (FulltextError, requests.RequestException) as e:
                 attempts.append(str(e))
+    if pdf is None and text is None and record.get("pmcid"):
+        # PDF が取れなければ PMC の本文（XML）。ページ区切りは無いが、OA の臨床研究の多くはここで読める
+        try:
+            body = client.pmc_fulltext(record["pmcid"])
+        except ApiError as e:
+            attempts.append(str(e))
+        else:
+            if len(body) >= 500:
+                text, source = body, f"europepmc:{record['pmcid']} (no page breaks)"
+            else:
+                attempts.append(t("PMC has no open full text ({id})", id=record["pmcid"]))
     if pdf is None and text is None:
         raise FulltextError(t("No full-text PDF was found:") + "\n  - " + "\n  - ".join(attempts) +
                             "\n  → " + t("Attach the PDF in Zotero, or give it with `--pdf <path>`"))
@@ -268,4 +312,4 @@ def fetch_fulltext(entry: Dict[str, Any], client: Any, pdf_path: Optional[str] =
     out.write_text(text, encoding="utf-8")
     return {"path": str(out.relative_to(ROOT) if out.is_relative_to(ROOT) else out),
             "source": source, "pages": n_pages, "chars": len(text), "page_markers": pdf is not None,
-            "version": version}
+            "version": version, "working_paper": pdf is not None and working_paper_text(text)}

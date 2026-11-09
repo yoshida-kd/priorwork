@@ -21,6 +21,7 @@ from .i18n import language, tl
 from .workspace import DATA_DIR, ROOT
 
 DEFAULT_SSCI_LIST = DATA_DIR / "ssci_journals.csv"
+DEFAULT_SCIE_LIST = DATA_DIR / "scie_journals.csv"
 
 # Status tiers (higher = preferred in ranking)
 SSCI = "ssci"                    # 収録リストで照合済み
@@ -30,8 +31,17 @@ NOT_SSCI = "not_ssci"            # 収録リストに無い学術誌
 BOOK = "book"                    # 書籍・書籍の章
 UNKNOWN = "unknown"              # 掲載誌不明
 PREPRINT = "preprint"            # WP / プレプリント / 学位論文など
+# 医学のサーベイ（PubMed を引いた論文）だけの判定
+SCIE = "scie"                    # SCIE の収録リストで照合済み
+MEDLINE = "medline"              # PubMed の記録が MEDLINE 索引済み（論文ごとの判定）
+PUBMED = "pubmed"                # PubMed にあるが MEDLINE 索引済みではない（索引の待ちや PMC だけなど）
+NOT_PUBMED = "not_pubmed"        # PubMed で見つからない学術誌の論文
 
-TIER = {SSCI: 5, SSCI_LIKELY: 4, JOURNAL: 3, NOT_SSCI: 2, BOOK: 1, UNKNOWN: 1, PREPRINT: 0}
+TIER = {SSCI: 5, SCIE: 5, MEDLINE: 5, SSCI_LIKELY: 4, PUBMED: 4, JOURNAL: 3, NOT_PUBMED: 3, NOT_SSCI: 2, BOOK: 1,
+        UNKNOWN: 1, PREPRINT: 0}
+# 誌を絞る検索（--indexed-only）で残す判定
+SOCIAL_INDEXED = (SSCI, SSCI_LIKELY)
+MEDICAL_INDEXED = (SCIE, MEDLINE, SSCI, SSCI_LIKELY)
 
 # 英語が原文。表示・レポートでは badge() で言語を選ぶ（状態ファイルには英語のまま入る）
 BADGE = {
@@ -42,7 +52,19 @@ BADGE = {
     BOOK: "📕 Book (outside SSCI)",
     UNKNOWN: "❓ Unknown venue",
     PREPRINT: "❌ Working paper / preprint",
+    SCIE: "✅ SCIE (checked against the list)",
+    MEDLINE: "✅ MEDLINE (indexed, per PubMed)",
+    PUBMED: "🔍 In PubMed (not indexed for MEDLINE)",
+    NOT_PUBMED: "🔍 Journal (not found in PubMed)",
 }
+
+
+# スクリーニングの目安として見せる研究デザイン（PubMed の出版の種類。強いものから）
+PUBMED_DESIGNS = ["Meta-Analysis", "Systematic Review", "Practice Guideline", "Guideline", "Randomized Controlled Trial",
+                  "Clinical Trial, Phase IV", "Clinical Trial, Phase III", "Clinical Trial, Phase II",
+                  "Clinical Trial, Phase I", "Pragmatic Clinical Trial", "Controlled Clinical Trial", "Clinical Trial",
+                  "Multicenter Study", "Observational Study", "Comparative Study", "Evaluation Study", "Review",
+                  "Case Reports"]
 
 
 def badge(status: str, lang: Optional[str] = None) -> str:
@@ -185,6 +207,7 @@ class SSCIJournalList:
 
 _KNOWN_TITLES = {normalize_title(t) for t in KNOWN_SSCI_JOURNALS}
 _list_cache: Optional[SSCIJournalList] = None
+_scie_cache: Optional[SSCIJournalList] = None
 
 
 def get_ssci_list() -> SSCIJournalList:
@@ -202,13 +225,32 @@ def get_ssci_list() -> SSCIJournalList:
     return _list_cache
 
 
+def get_scie_list() -> SSCIJournalList:
+    """SCIE（Science Citation Index Expanded）の収録リスト。"""
+    global _scie_cache
+    if _scie_cache is None:
+        env_path = os.environ.get("SCIE_JOURNAL_LIST")
+        path = Path(env_path).expanduser() if env_path else DEFAULT_SCIE_LIST
+        if not env_path and not path.exists():
+            # ダウンロードしたままのファイル名。"Social Sciences … (SSCI).csv" の "scie" を拾わないよう、語として探す
+            candidates = sorted(p for p in DEFAULT_SCIE_LIST.parent.glob("*.csv")
+                                if re.search(r"(?<![a-z])scie(?![a-z])", p.name.lower()))
+            path = candidates[0] if candidates else path
+        if not path.is_absolute():
+            path = ROOT / path
+        _scie_cache = SSCIJournalList(path)
+    return _scie_cache
+
+
 def classify(
     journal_name: str,
     issns: List[str],
     work_types: Iterable[str] = (),
     source_type: str = "",
+    medline: Optional[bool] = None,
+    pmid: str = "",
 ) -> Tuple[str, str]:
-    """Returns (status, badge)."""
+    """Returns (status, badge). medline は PubMed を引いた論文だけ True / False（引いていなければ None）。"""
     types = {t.lower() for t in work_types if t}
     source_type = (source_type or "").lower()
 
@@ -229,7 +271,11 @@ def classify(
     if ssci_list.loaded:
         if ssci_list.contains(journal_name, issns):
             return SSCI, BADGE[SSCI]
-    elif normalize_title(journal_name) in _KNOWN_TITLES:
+    if get_scie_list().contains(journal_name, issns):
+        return SCIE, BADGE[SCIE]
+    if medline:
+        return MEDLINE, BADGE[MEDLINE]
+    if not ssci_list.loaded and normalize_title(journal_name) in _KNOWN_TITLES:
         return SSCI_LIKELY, BADGE[SSCI_LIKELY]
 
     is_journal = (
@@ -239,6 +285,8 @@ def classify(
     )
     if not is_journal:
         return UNKNOWN, BADGE[UNKNOWN]
+    if medline is not None:   # PubMed を引いた論文（医学のサーベイ）に、SSCI の話はしない
+        return (PUBMED, BADGE[PUBMED]) if pmid else (NOT_PUBMED, BADGE[NOT_PUBMED])
     if ssci_list.loaded:
         return NOT_SSCI, BADGE[NOT_SSCI]
     return JOURNAL, BADGE[JOURNAL]
@@ -250,5 +298,7 @@ def classify_paper(paper: Dict[str, Any]) -> Dict[str, Any]:
         issns=paper.get("issns", []),
         work_types=paper.get("publication_types", []),
         source_type=paper.get("source_type", ""),
+        medline=paper.get("medline"),
+        pmid=paper.get("pmid", ""),
     )
     return {"status": status, "badge": badge, "tier": TIER[status]}

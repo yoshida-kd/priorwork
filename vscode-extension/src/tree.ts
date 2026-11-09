@@ -137,6 +137,11 @@ export class SurveyTree implements vscode.TreeDataProvider<Node>, vscode.Disposa
                             label: vscode.l10n.t('{0} more on other branches (waiting to be merged)', ws.git.other_surveys.length),
                             tooltip: ws.git.other_surveys.join('\n') + '\n\n' + vscode.l10n.t('Switch branches') });
             }
+            for (const w of ws.git?.worktrees ?? []) {
+                rows.push({ kind: 'message', icon: 'window', label: vscode.l10n.t('{0} (in its own folder)', w.branch || w.name),
+                            tooltip: vscode.l10n.t('Open {0} in a new window', w.path),
+                            command: { command: 'vscode.openFolder', title: '', arguments: [vscode.Uri.file(w.path), { forceNewWindow: true }] } });
+            }
             if (ws.archived?.length) {
                 rows.push({ kind: 'archive', surveys: ws.archived });
             }

@@ -50,17 +50,19 @@ $endif$
     </a>
     <nav>
 $if(en)$
-      <a href="$home$#install">Install</a>
-      <a href="${root}guide/">Guide</a>
-      <a href="${root}reference/">Reference</a>
-      <a href="https://github.com/yoshida-kd/priorwork">GitHub</a>
-      <a href="${root}ja/${slug}/" hreflang="ja" lang="ja" data-lang="ja">日本語</a>
+      <a href="${root}guide/"$if(nav_guide)$ aria-current="page"$endif$>Guide</a>
+      <a href="${root}manuscripts/"$if(nav_manuscripts)$ aria-current="page"$endif$>From a manuscript</a>
+      <span class="nav-end">
+        <a class="icon" href="https://github.com/yoshida-kd/priorwork" title="GitHub" aria-label="GitHub"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a>
+        <a class="lang" href="${root}ja/${slug}/" hreflang="ja" lang="ja" data-lang="ja" title="日本語" aria-label="日本語">JA</a>
+      </span>
 $else$
-      <a href="$home$#install">インストール</a>
-      <a href="${root}ja/guide/">手引き</a>
-      <a href="${root}ja/reference/">リファレンス</a>
-      <a href="https://github.com/yoshida-kd/priorwork">GitHub</a>
-      <a href="${root}${slug}/" hreflang="en" lang="en" data-lang="en">English</a>
+      <a href="${root}ja/guide/"$if(nav_guide)$ aria-current="page"$endif$>手引き</a>
+      <a href="${root}ja/manuscripts/"$if(nav_manuscripts)$ aria-current="page"$endif$>原稿から始める</a>
+      <span class="nav-end">
+        <a class="icon" href="https://github.com/yoshida-kd/priorwork" title="GitHub" aria-label="GitHub"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a>
+        <a class="lang" href="${root}${slug}/" hreflang="en" lang="en" data-lang="en" title="English" aria-label="English">EN</a>
+      </span>
 $endif$
     </nav>
   </div>
@@ -81,14 +83,51 @@ $body$
   </main>
 </div>
 
+$if(en)$
 <footer>
   <div class="wrap">
-    <span>Priorwork · MIT License · by <a href="https://github.com/yoshida-kd">yoshida-kd</a></span>
-    <span><a href="https://github.com/yoshida-kd/priorwork">Source</a> ·
-    <a href="https://pypi.org/project/priorwork/">PyPI</a> ·
-    <a href="https://github.com/yoshida-kd/priorwork/issues">Issues</a></span>
+    <nav class="sitemap" aria-label="Site map">
+      <div><h2>Get started</h2>
+        <a href="${root}quickstart/">Quick guide</a>
+        <a href="${root}install/">Install</a></div>
+      <div><h2>Guides</h2>
+        <a href="${root}guide/">Guide</a>
+        <a href="${root}manuscripts/">From a manuscript</a></div>
+      <div><h2>For AI agents</h2>
+        <a href="${root}reference/">Reference</a></div>
+      <div><h2>Priorwork</h2>
+        <a href="https://marketplace.visualstudio.com/items?itemName=yoshida-kd.priorwork">VS Code extension</a>
+        <a href="https://pypi.org/project/priorwork/">PyPI</a>
+        <a href="https://github.com/yoshida-kd/priorwork">Source</a>
+        <a href="https://github.com/yoshida-kd/priorwork/blob/main/vscode-extension/CHANGELOG.md">Changes</a>
+        <a href="https://github.com/yoshida-kd/priorwork/issues">Issues</a></div>
+    </nav>
+    <p class="colophon">Priorwork · MIT License · by <a href="https://github.com/yoshida-kd">yoshida-kd</a></p>
   </div>
 </footer>
+$else$
+<footer>
+  <div class="wrap">
+    <nav class="sitemap" aria-label="サイトマップ">
+      <div><h2>はじめる</h2>
+        <a href="${root}ja/quickstart/">クイックガイド</a>
+        <a href="${root}ja/install/">インストール</a></div>
+      <div><h2>手引き</h2>
+        <a href="${root}ja/guide/">手引き</a>
+        <a href="${root}ja/manuscripts/">原稿から始める</a></div>
+      <div><h2>AI エージェント向け</h2>
+        <a href="${root}ja/reference/">リファレンス</a></div>
+      <div><h2>Priorwork</h2>
+        <a href="https://marketplace.visualstudio.com/items?itemName=yoshida-kd.priorwork">VS Code 拡張機能</a>
+        <a href="https://pypi.org/project/priorwork/">PyPI</a>
+        <a href="https://github.com/yoshida-kd/priorwork">ソース</a>
+        <a href="https://github.com/yoshida-kd/priorwork/blob/main/vscode-extension/CHANGELOG.md">変更履歴</a>
+        <a href="https://github.com/yoshida-kd/priorwork/issues">Issue</a></div>
+    </nav>
+    <p class="colophon">Priorwork · MIT ライセンス · <a href="https://github.com/yoshida-kd">yoshida-kd</a></p>
+  </div>
+</footer>
+$endif$
 
 </body>
 </html>

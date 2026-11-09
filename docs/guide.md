@@ -2,7 +2,7 @@
 
 > This is the source of the guide. Read it at **<https://yoshida-kd.github.io/priorwork/guide/>**. <!-- pages:skip -->
 
-**Literature reviews for the social sciences, handed to your AI agent — no terminal needed**
+**Literature reviews for the social sciences and clinical research, handed to your AI agent — no terminal needed**
 
 Priorwork is a toolkit for having an AI agent (Claude Code, Antigravity, …) write topic-based reviews of
 the prior work in economics, sociology, political science, public administration, management, psychology
@@ -11,9 +11,14 @@ fills in a card for each paper, writes the review, checks it and exports a versi
 the result, then check and correct it in the VS Code sidebar.
 
 This guide is for people using VS Code: everything here is a button, a menu or something you say to
-the agent. In a hurry? The [quick guide](https://yoshida-kd.github.io/priorwork/quickstart/). Every
-command — what the agent runs — is in the [reference](https://yoshida-kd.github.io/priorwork/reference/),
-written for the agent.
+the agent.
+
+- Not installed yet: [Installing Priorwork](https://yoshida-kd.github.io/priorwork/install/)
+- In a hurry: the [quick guide](https://yoshida-kd.github.io/priorwork/quickstart/)
+- From your own manuscript, and with Octavo: [Starting from a manuscript](https://yoshida-kd.github.io/priorwork/manuscripts/)
+- Everything else, every command the agent runs, is in the [reference](https://yoshida-kd.github.io/priorwork/reference/), written for AI
+  agents. Ask the agent for anything without a button here.
+
 [日本語の手引き](https://yoshida-kd.github.io/priorwork/ja/guide/)
 
 ---
@@ -25,9 +30,7 @@ written for the agent.
 - **Hand it over.** Ask "review the literature on X" and the agent carries on from the scope to the
   export. You choose where it stops for you to check (standard, full auto, manual). There are no
   commands or skill names to learn.
-- **Start from your manuscript.** Give it a manuscript (Markdown, Quarto, Word, PDF, …) and it drafts
-  its sections 1–3, or advises on the literature it is missing, the direction of its citations and the
-  argument.
+- **Start from your manuscript.** Give it a manuscript in any format, finished or not, and get one report: what to add and where, a check of its citations, the literature it does not mention, comments on the argument ([more](https://yoshida-kd.github.io/priorwork/manuscripts/)).
 - **Find the literature.** English keyword search in Semantic Scholar (by relevance, or a boolean bulk
   search), with DOIs, journals and ISSNs checked against OpenAlex. The references and citing papers of
   the included papers are followed to catch what keyword search misses.
@@ -50,8 +53,8 @@ corrections in the next round.
 
 You choose where it stops for you to check. In the standard mode it stops twice: once the scope is set,
 and before writing the cards (so that you can collect the papers in Zotero). Full auto never stops, and
-manual stops after every step ([4.6](#46-choose-the-mode-ask-for-more)). You can also search and screen from the sidebar
-yourself ([5](#5-doing-it-yourself)).
+manual stops after every step ([3.6](#36-choose-the-mode-ask-for-more)). You can also search and screen from the sidebar
+yourself ([4](#4-doing-it-yourself)).
 
 The extension never calls an AI service itself. AI help comes only through the agent you already use.
 
@@ -59,7 +62,7 @@ The extension never calls an AI service itself. AI help comes only through the a
 
 | What | Needed | |
 | :--- | :--- | :--- |
-| VS Code and the Priorwork extension | yes | Linux, macOS; on Windows, inside WSL ([2.2](#22-windows-and-servers-over-ssh)) |
+| VS Code and the Priorwork extension | yes | Linux, macOS; on Windows, inside WSL ([Install](https://yoshida-kd.github.io/priorwork/install/#2-windows)) |
 | An AI agent | yes | Claude Code, Antigravity or another agent that runs in VS Code and reads `AGENTS.md` |
 | Python 3.10 or later | automatic | if missing, the extension installs uv, which downloads Python |
 | git and a GitHub account | recommended | to keep the workspace in a private GitHub repository |
@@ -69,36 +72,12 @@ The extension never calls an AI service itself. AI help comes only through the a
 
 ---
 
-## 2. Install
-
-### 2.1 With VS Code
-
-1. Install [VS Code](https://code.visualstudio.com/).
-2. Find **Priorwork** in the Extensions view and install it
-   ([Marketplace](https://marketplace.visualstudio.com/items?itemName=yoshida-kd.priorwork)).
-3. The Priorwork icon appears in the activity bar. Go on to
-   [Create a workspace](#3-create-a-workspace).
-
-The extension sets Python up when you create a workspace. It uses Python 3.10 or later if it finds
-one; otherwise it asks whether to install uv. uv (a small tool from Astral) goes into your home
-folder, without administrator rights, and downloads Python for the workspace.
-
-### 2.2 Windows and servers over SSH
-
-- **Windows**: install WSL (Ubuntu), open a folder inside WSL with VS Code's **WSL** extension, and
-  follow the steps above. Using Priorwork on Windows directly has not been tested.
-- **A server**: connect with VS Code's **Remote - SSH** extension and follow the steps above on the
-  server. The extension, Python and the workspace live on the server. Exported reports can be viewed
-  inside Priorwork ([4.4](#44-view-the-report)).
-
----
-
-## 3. Create a workspace
+## 2. Create a workspace
 
 A **workspace** is the folder that holds the reports of your surveys and their state. One workspace
 holds any number of surveys. It is kept in a private GitHub repository.
 
-### 3.1 Create it
+### 2.1 Create it
 
 1. Open an empty folder (or nothing at all) and press **Create a Workspace** in the sidebar.
 2. Choose where, and the language of the reports (English or Japanese). The language cannot be
@@ -107,14 +86,14 @@ holds any number of surveys. It is kept in a private GitHub repository.
 3. The extension creates a `.venv`, installs `priorwork` from PyPI and sets the workspace up
    (including `git init`).
 
-### 3.2 Set it up
+### 2.2 Set it up
 
 Open the gear in the sidebar (**Settings**).
 
 1. Enter a **Semantic Scholar** API key. [Request one for free](https://www.semanticscholar.org/product/api#api-key-form).
-2. If you use Zotero, fill in the **Zotero** fields ([8.2](#82-zotero)).
+2. If you use Zotero, fill in the **Zotero** fields ([7.2](#72-zotero)).
 3. If you have the SSCI journal list, import it with **Import the SSCI List (CSV)…**
-   ([8.3](#83-the-ssci-journal-list)).
+   ([7.3](#73-the-ssci-journal-list)).
 4. **Save and Check the Connections** shows the diagnosis at the bottom of the page.
 5. So that your agent does not ask before every `./priorwork` command, allow `./priorwork` in the agent:
    - **When it is needed**: when you hand work to the agent (ask in the chat). The agent runs
@@ -123,7 +102,7 @@ Open the gear in the sidebar (**Settings**).
      type yourself do not need it (they do not go through the agent).
    - **What it allows**: only commands starting with `./priorwork`. Priorwork touches only the workspace
      (`reports/`, `.priorwork/`) and the literature APIs; it never runs Git, and it writes to Zotero only
-     if you allow it ([8.2](#82-zotero)).
+     if you allow it ([7.2](#72-zotero)).
      Other commands are still checked.
    - **Claude Code**: automatic. Making the workspace (and every `priorwork sync`) adds
      `Bash(./priorwork:*)` to the allowed rules in `.claude/settings.json`, keeping your other settings.
@@ -136,7 +115,7 @@ Open the gear in the sidebar (**Settings**).
 The settings are saved in the workspace's `.env`, which is kept out of Git. The page never shows the
 values of the keys.
 
-### 3.3 Put it on GitHub
+### 2.3 Put it on GitHub
 
 The reports and state files contain abstracts, so keep the workspace in a **private** repository.
 
@@ -146,7 +125,7 @@ The reports and state files contain abstracts, so keep the workspace in a **priv
 
 The agent makes a branch named after the survey (e.g. `20261015_statutory_text_analysis`), commits and pushes at each step, and opens a pull request once the report is exported. **It never merges**: review the pull request and merge it on GitHub. In Claude Code, pushing to main, force-pushing and merging are also denied in `.claude/settings.json`. To keep the agent away from Git, say so in `AGENTS.local.md`.
 
-### 3.4 Continue on another machine
+### 2.4 Continue on another machine
 
 1. Clone the repository in VS Code and open it.
 2. Run **Set Up the Python Environment (.venv)** from the sidebar's menu (…).
@@ -154,9 +133,9 @@ The agent makes a branch named after the survey (e.g. `20261015_statutory_text_a
 
 ---
 
-## 4. Hand it to the agent
+## 3. Hand it to the agent
 
-### 4.1 Ask
+### 3.1 Ask
 
 With the workspace folder open, ask in your agent's chat, in either of two ways:
 
@@ -171,10 +150,10 @@ If you already have a research question, a period or criteria, add them to the r
 agent decides them from the topic; in the standard mode it shows you the scope it decided and waits (in
 full auto it says what it decided in its final report).
 
-### 4.2 What the agent does
+### 3.2 What the agent does
 
 The agent follows the workspace's `AGENTS.md` and skills, in this order. ⏸ marks where the standard mode
-stops for you to check ([4.6](#46-choose-the-mode-ask-for-more)):
+stops for you to check ([3.6](#36-choose-the-mode-ask-for-more)):
 
 ```
 ① scope ⏸ → ② search → ③ screen → ④ chase citations → ⏸ collect in Zotero
@@ -189,7 +168,7 @@ stops for you to check ([4.6](#46-choose-the-mode-ask-for-more)):
    reason for each.
 4. **Chase citations**: picks up papers missed by keyword search from the references and citing papers
    of the included ones, and screens them. In the standard mode it then stops and shows the DOIs to add
-   to Zotero ([4.7](#47-collect-the-papers-in-zotero)). Collect the papers and their PDFs in Zotero and
+   to Zotero ([3.7](#37-collect-the-papers-in-zotero)). Collect the papers and their PDFs in Zotero and
    say "carry on": the cards can then be written from the full texts.
 5. **Cards**: fills in the cards of the included papers from the full text (a PDF in Zotero or an
    open-access version) or the abstract.
@@ -209,7 +188,7 @@ the request), since a model rarely catches its own misreadings. The auditor comp
 full text, checks the direction of each citation, hypotheses passed off as the literature and the
 excluded papers, fixes them and records the audit (the model that wrote the survey cannot audit it). Without an audit, a survey is not left unfinished.
 
-### 4.3 Depth
+### 3.3 Depth
 
 The **depth** is a guide to the size of the survey. If the request says "quick", "an overview", "full"
 or "thorough", the agent follows it; otherwise it decides from how broad the topic is.
@@ -225,7 +204,7 @@ or "thorough", the agent follows it; otherwise it decides from how broad the top
 When a full survey has too few searches, **Search more** appears in the **Next steps** in the sidebar.
 The agent sees it too and adds searches.
 
-### 4.4 View the report
+### 3.4 View the report
 
 Open the version for reading (HTML) inside VS Code. It works the same on a server reached over SSH.
 
@@ -238,7 +217,7 @@ You can select and copy the text, and search the page with **Ctrl+F** (**Cmd+F**
 While cards are unchecked or empty, or the check reports ERRORs, it is marked *Draft* at the top. On a
 local machine you can also open it in the browser and print it to PDF.
 
-### 4.5 Check and correct
+### 3.5 Check and correct
 
 Under each survey in the sidebar are its included, maybe, excluded and unscreened papers. Click a paper
 to open its page.
@@ -254,7 +233,7 @@ to open its page.
 The agent never overturns your decisions or corrections. After correcting, ask it to "carry on" and it
 works from there.
 
-### 4.6 Choose the mode, ask for more
+### 3.6 Choose the mode, ask for more
 
 The **mode** decides where the agent stops and waits for you to check.
 
@@ -286,10 +265,10 @@ your agent to do it** in the sidebar lets you choose it too.
 When you come back to a conversation, "let's continue" is enough: the agent checks the state and takes
 the next step.
 
-### 4.7 Collect the papers in Zotero
+### 3.7 Collect the papers in Zotero
 
 You add the papers, unless you let Priorwork do it (below). Two things make it easier (for setting up
-Zotero, see [8.2](#82-zotero)).
+Zotero, see [7.2](#72-zotero)).
 
 **Add the included papers' DOIs to Zotero at once.**
 
@@ -305,7 +284,7 @@ steps in the sidebar show **Stop here and wait for the user** too; click it to c
 request asking the agent to carry on. The list of DOIs works without the Zotero link too (it then lists
 every included paper).
 
-**Or let Priorwork add them.** If you allow it in the settings ([8.2](#82-zotero)) and link a collection
+**Or let Priorwork add them.** If you allow it in the settings ([7.2](#72-zotero)) and link a collection
 to the survey (below), Priorwork puts the included papers into that collection itself:
 
 - An item already in your library (same DOI, or the same title) is added to the collection; otherwise a
@@ -334,153 +313,7 @@ it. Once linked:
   scope.
 - Full texts come from the PDFs in that collection first.
 
-### 4.8 Start from a manuscript (filling it in, a draft or advice)
-
-You can also start from your own manuscript, finished or not, instead of a topic. There are three
-kinds of report, and one manuscript can have several as separate reports.
-
-| Purpose | Suits | What the report holds |
-| :--- | :--- | :--- |
-| **Filling it in** (the default) | a manuscript in progress: sections missing, thin or without citations | a map of what each section lacks, and a list of what to add where (each item quotes the sentence it goes before or after), cards, a check of its citations |
-| **A draft of sections 1–3** | a manuscript with the analysis (data, methods, results) written | claims to back with literature, paper cards, a draft introduction, literature review and theory and hypotheses, a check against fitting hypotheses after the results |
-| **Advice on the manuscript** | a finished or unfinished paper | a summary of the advice, a check of its citations (the direction of each cited finding, overstatements), missing literature, comments on the argument |
-
-**Where to put the manuscript.** In the workspace's `manuscripts/`, one folder per paper (the same
-explanation is in `manuscripts/README.md`):
-
-```text
-manuscripts/
-  make_or_buy/          ← one folder per paper (an English name)
-    paper.md            ← the manuscript; only the parts that are written
-    tables/             ← tables, figures and logs of the results (any not in the manuscript)
-```
-
-Any format will do. Priorwork turns Markdown, Quarto (.qmd, and the HTML it renders), LaTeX, Word
-(.docx) and PDF into text for the agent. If the results are in separate files
-(regression tables in .tex, …), put them in the same folder. The agent reads everything in it.
-
-**How to ask.** **New Survey → Start from my manuscript** in the sidebar lets you choose the manuscript
-(or its folder) and copies the request. If you choose one outside the workspace, it offers to copy it
-into `manuscripts/` (the original stays where it is). You can also ask in the chat:
-
-> The manuscript in manuscripts/make_or_buy is written up to the analysis. Gather the literature to back
-> it up and write the introduction, literature review and theory and hypotheses.
-
-> What literature is the manuscript in manuscripts/make_or_buy missing, and where does it cite the
-> literature badly?
-
-> The manuscript in manuscripts/make_or_buy is half written. Fill in what it lacks from the literature.
-
-**Leave marks where you want help.** While writing, put `[cite]` where a citation is needed, `[@?]`
-where a paper should be cited, or `TODO(priorwork): <what you need>` on a line of its own (say,
-`TODO(priorwork): the literature on institutions`). The agent lists them, and when filling the
-manuscript in, the agent takes them first and says which it could not fill (and why).
-
-**Agreeing what to make.** The agent reads the manuscript, then proposes the purpose (filling it in, a
-draft, advice, or several), which parts of the manuscript to cover, the scope of the searches and how many reports, and waits
-for your answer. If your request already settles these, it goes ahead. If you want both, the papers
-included in the first report carry over into the second.
-
-For **a draft of sections 1–3**, the agent then:
-
-1. Writes "The manuscript in brief" in the report (research question, variables, data, identification,
-   main results, unexpected results).
-2. Lists, with IDs, the claims that need literature (why it matters, the lines of research it
-   contributes to, mechanisms, rival theories, precedents for the methods). For each main result it also
-   makes a claim for **the findings that conflict with it**.
-3. Searches and screens claim by claim, and fills in each card's **Role in the manuscript** (e.g. "C2
-   supports; method precedent"). The comparison matrix gets a Role column too.
-4. Drafts the introduction, literature review and theory and hypotheses in the language of the
-   manuscript, citing only included papers.
-5. Checks the survey and writes the draft to `reports/<name>.draft.md`, with the references it cites
-   (`--format docx` for Word).
-
-Writing hypotheses after seeing the results easily turns into hypothesizing after the results are known
-(HARKing). So the report records, in a section apart from the draft, the literature behind each
-hypothesis, what was added or changed after seeing the results, which results to treat as exploratory,
-and how conflicting literature is handled. That section is for you to judge; it is not part of the
-exported draft.
-
-For **advice on the manuscript**, the agent registers the papers the manuscript cites, fills in their
-cards, and judges place by place whether the direction, setting and method of each cited paper match
-what the manuscript says (fits / opposite direction / overstated / weak support). It then writes about
-the literature the manuscript is missing (where and why to cite it) and about the argument (how the
-question, the gap in the literature, the hypotheses, the methods, the results and the contribution hang
-together), and sums up what to fix, most important first.
-
-For **filling it in**, the agent maps each section's state (written, thin, heading only, missing) and
-your marks, lists the claims that need literature (with the findings that conflict with your results),
-searches and screens claim by claim, and writes what to add in the manuscript's order: "Write the
-section", "Insert" or "Add citations", each with **Where** (the heading and the sentence it goes before
-or after, quoted) and **Why**, and the text in the language of the manuscript. It fills in only what the
-literature backs, never the content of your methods or results. The agent exports the list with its
-references; for an Octavo manuscript it goes into the project's inbox
-([4.9](#49-working-with-an-octavo-manuscript)).
-
-Either way, the manuscript itself is never rewritten. Read the draft, the additions or the advice and
-edit your manuscript yourself.
-
-### 4.9 Working with an Octavo manuscript
-
-A manuscript you write in [Octavo](https://github.com/yoshida-kd/octavo) (a tool for writing papers in
-Markdown and Quarto) can stay in its Octavo project (another repository). One Priorwork workspace can
-serve the papers of many Octavo projects.
-
-Octavo's collection picker, lists of collections and **Ask Priorwork for the Literature** come with Octavo
-releases after 0.6.4.
-
-**The link between them is a Zotero collection.** Octavo pulls its `.bib` of references from the
-collection named in its settings (`zotero_collection`). Link the Priorwork survey
-to the same collection, and the included papers you put there become the Octavo manuscript's references
-too.
-
-1. In the Octavo project, choose the paper's collection (**Choose the Zotero Collection** in Octavo's
-   sidebar).
-2. Right-click the paper in Octavo's sidebar → **Ask Priorwork for the Literature** (or choose the
-   paper in the Octavo project with Priorwork's **New Survey → Start from my manuscript**) to copy a
-   request, and paste it into the agent's chat in the window of your Priorwork workspace. The two are
-   separate windows, so the request carries it across.
-3. The agent reads the manuscript, the project's results and tables, and the literature it cites (the
-   `.bib`), and registers the papers it cites. The survey is linked to
-   the same Zotero collection as Octavo.
-4. The draft is exported in Octavo's form into the Octavo project's inbox
-   (`literature/priorwork/<survey>.md`, with a `.json`
-   manifest and `<survey>.cards.json`, the cards of the included papers for Octavo to show over each
-   `[@key]`): citations become `[@key]` from the `.bib`, and Octavo makes the references section.
-   Priorwork never changes the manuscript: ask the agent in the Octavo project to "work the draft from
-   Priorwork into the manuscript" (or move it yourself).
-5. Papers not in the `.bib` yet are written as `[@PRIORWORK:<DOI>]`, with a list of their DOIs. Put them
-   in the Zotero collection ([4.7](#47-collect-the-papers-in-zotero); Priorwork can do it for you), pull
-   them into Octavo and press **Replace the Marks with the .bib Keys** in Octavo's sidebar (until then,
-   Octavo's checks report them as missing keys).
-
-**Requests without the clipboard.** An Octavo that knows where your Priorwork workspace is puts its
-requests in the workspace's `.priorwork/requests/` instead of copying them. They show under **Requests
-from Octavo** at the top of the sidebar: click one to ask your agent to carry it out (a short request
-that points to it) or to decline it with a reason Octavo can read. The agent records the outcome, and
-Octavo shows it.
-
-**One survey for several papers.** A survey on a topic (say, the literature on outsourcing) can serve
-several papers. Right-click the survey → **Link to an Octavo Project…** and choose the project's folder
-(as many as you like); **Export for an Octavo Project…** writes the sections on theories, methods,
-debates and gaps with that project's `.bib` keys to its inbox, `literature/priorwork/<survey>.md`. In Octavo,
-add the survey's collection to the project's (**Choose the Zotero Collection** there lets you mark any
-number).
-
-**Several surveys for one Octavo project.** One paper may get several surveys, by angle (theory,
-methods, …), even from different workspaces. Then make a collection for each survey in Zotero under the
-Octavo project's collection (e.g. "Make or buy / Theory" and "Make or buy / Methods" under "Make or
-buy"), and link each survey to its own. Octavo's pull takes the collections under its collection
-too, so every survey's included papers end up in one `.bib`. The sidebar's list of collections shows
-Octavo's collection and the ones under it first, and the survey's status lists the other surveys for
-the same Octavo project.
-
-Priorwork never changes the files of the Octavo project. The check tells you when the survey and Octavo
-use different collections. The manuscript's place is recorded relative to the workspace (e.g.
-`../make_or_buy/papers/main`), so it works on another machine too if the repositories are cloned side by
-side in the same way.
-
-### 4.10 Short texts from a survey
+### 3.8 Short texts from a survey
 
 You can also ask for a short text based on a survey: a lecture handout, reading notes, a summary of
 the main points ("a lecture handout from this survey, in three parts, about 2,000 characters", say).
@@ -498,19 +331,40 @@ The agent records its purpose, length and structure and writes it in
 
 ---
 
-## 5. Doing it yourself
+### 3.9 Medical surveys
+
+For clinical research, say so when you ask ("a review of the clinical evidence on …"), or choose **Medicine (clinical research)** in **New Survey**. The survey then:
+
+- searches PubMed as well as Semantic Scholar, and leaves out letters, editorials and comments;
+- shows each paper's study design, and whether PubMed has indexed it for MEDLINE;
+- has cards for the clinical question, population, intervention or exposure, outcomes, study design and effect sizes;
+- has a report with sections on the evidence by study design, effects, and safety and harms;
+- marks retracted papers, and will not pass the check with one included;
+- reads open full texts from PMC.
+
+It is a **narrative review**. One agent's screening does not meet the standard of a systematic review or PRISMA, and the report says so. It is not clinical guidance. Ichushi-Web (医中誌), Embase and CENTRAL are not searched.
+
+Optional, in **Settings**: a free NCBI key makes PubMed faster, and the SCIE list from the Master Journal List adds ✅ SCIE. The two kinds of survey can live in one workspace.
+
+### 3.10 Several surveys at once
+
+To start a survey while another is in progress, say so: "start this in its own folder, another survey is in progress". The agent makes a folder under `worktrees/` on the survey's own branch, without touching the survey you have open. Your keys, journal lists and fetched full texts are shared.
+
+The sidebar lists such surveys. Click one to open its folder in a new window, and carry on there. When its pull request is merged, ask the agent to remove the folder; it refuses while anything is not committed and pushed.
+
+## 4. Doing it yourself
 
 You can also work from the sidebar yourself instead of handing it to the agent. **Next steps**, under
 each survey in the sidebar, says what to do now; click an item to start it.
 
-### 5.1 Set the scope
+### 4.1 Set the scope
 
 **New Survey** → **Set it up myself** asks for the topic, an English slug (the file name, e.g.
 `minimum_wage_employment`), the depth and the research question. Add the period, the fields and the
 inclusion and exclusion criteria later with **Edit the Scope** (right-click the survey). The criteria
 are shown at the top of each paper's page.
 
-### 5.2 Search
+### 4.2 Search
 
 **Search** asks for an English query and how to search:
 
@@ -528,7 +382,7 @@ journals looks in both Semantic Scholar and OpenAlex: Semantic Scholar often has
 a paper, so a search there alone silently misses it — sometimes the most cited papers of the field.
 OpenAlex picks the journal by its ID, so it finds them, and what it adds is said in the notice.
 
-### 5.3 Screen
+### 4.3 Screen
 
 **Screen Candidates** opens the page of the first unscreened paper.
 
@@ -553,20 +407,20 @@ the title up in OpenAlex and, if the journal version matches (the same title, th
 years), takes its DOI and details. The paper then shows a note (ℹ️) with the old DOI instead of a
 warning.
 
-### 5.4 Chase citations
+### 4.4 Chase citations
 
 **Chase Citations** collects the references and citing papers of the included papers from OpenAlex
 and registers them as candidates, ordered by how many included papers each is linked to. With three
 or more included papers, only those linked to at least two are taken by default. Screen them as in 5.3.
 
-### 5.5 Fill in the paper cards
+### 4.5 Fill in the paper cards
 
 Each included paper gets a card in the section "The papers" of the report. Write it on the paper's page and press
-**Ctrl+S** to save. **Get the Full Text** brings in the full text ([6.3](#63-full-texts)). To hand only
+**Ctrl+S** to save. **Get the Full Text** brings in the full text ([5.3](#53-full-texts)). To hand only
 the cards to the agent, use **Ask Your Agent… → Fill in the paper cards**. Section
-[6](#6-paper-cards) describes the cards.
+[5](#5-paper-cards) describes the cards.
 
-### 5.6 Write the text
+### 4.6 Write the text
 
 The report puts the synthesis first: the background (section 1); the literature's theoretical
 traditions, methods, consensus and debates, and gaps (sections 2–5, each claim citing included papers);
@@ -577,16 +431,16 @@ Mermaid diagrams (```` ```mermaid ````) are drawn in the HTML. Open the report w
 Report (Markdown)** on the survey and write it, or ask the agent with **Ask Your Agent… → Write the
 text of the report**.
 
-### 5.7 Check and export
+### 4.7 Check and export
 
-1. **Check the Survey** lists the problems in VS Code's **Problems** panel ([7](#7-checks)).
-2. **Export and View the Report** opens the version for reading (HTML) ([4.4](#44-view-the-report)).
+1. **Check the Survey** lists the problems in VS Code's **Problems** panel ([6](#6-checks)).
+2. **Export and View the Report** opens the version for reading (HTML) ([3.4](#34-view-the-report)).
 
 ---
 
-## 6. Paper cards
+## 5. Paper cards
 
-### 6.1 The fields
+### 5.1 The fields
 
 ```
 ### #1 Acemoglu et al. (2001): The Colonial Origins of Comparative Development
@@ -611,7 +465,7 @@ text of the report**.
 - On a card checked against the full text, give the page (`(p. 12)`) for the data, the identification
   and the main findings, or "(page not checked)" when the full text has no page breaks.
 
-### 6.2 The evidence level
+### 5.2 The evidence level
 
 | Evidence | Meaning |
 | :--- | :--- |
@@ -623,7 +477,7 @@ Unchecked cards are flagged by the checks, and the export is marked *Draft*. In 
 included paper is checked in the full text; a card may stay "abstract only" only when no full text
 could be found, and the checks list those papers so that you can attach their PDFs in Zotero.
 
-### 6.3 Full texts
+### 5.3 Full texts
 
 Get one with **Get the Full Text** on an included paper's page or from the paper's context menu in the
 sidebar (the agent gets them the same way). PDFs are never stored in the workspace; only the extracted text is kept, in
@@ -638,14 +492,14 @@ sidebar (the agent gets them the same way). PDFs are never stored in the workspa
 Publishers usually refuse automated downloads, so for papers that are not open access, attach the PDF
 in Zotero first.
 
-### 6.4 When a paper is no longer included
+### 5.4 When a paper is no longer included
 
 Its card is kept, with what was written, in the state file, and comes back if the paper is included
 again.
 
 ---
 
-## 7. Checks
+## 6. Checks
 
 **Check the Survey** looks at:
 
@@ -674,26 +528,26 @@ excluded with a comment in the report:
 
 ---
 
-## 8. Settings
+## 7. Settings
 
-### 8.1 API keys
+### 7.1 API keys
 
 | Setting | Purpose |
 | :--- | :--- |
 | Semantic Scholar API key | recommended; without one, searches often fail on the rate limit (HTTP 429) |
 | OpenAlex API key, email address | optional; OpenAlex works without a key, with a daily usage cap |
 
-### 8.2 Zotero
+### 7.2 Zotero
 
 With Zotero set up, Priorwork shows which included papers are in Zotero, links a collection to a
-survey ([4.7](#47-collect-the-papers-in-zotero)) and gets full texts from the PDFs attached there. By
+survey ([3.7](#37-collect-the-papers-in-zotero)) and gets full texts from the PDFs attached there. By
 default it only reads: it never writes to Zotero or WebDAV.
 
 1. Create an API key at <https://www.zotero.org/settings/keys> with **only "Allow library access"**
    (no notes, no write access). "Your user ID for use in API calls" on the same page is the user ID.
 2. Enter the key and the user ID under **Zotero** in the settings. If Zotero runs on this machine,
    enter its data folder too (default `~/Zotero`).
-   - **To let Priorwork add the included papers to the survey's collection** ([4.7](#47-collect-the-papers-in-zotero)),
+   - **To let Priorwork add the included papers to the survey's collection** ([3.7](#37-collect-the-papers-in-zotero)),
      check **Let Priorwork add the included papers to the survey's collection** (`ZOTERO_WRITE=1` in
      `.env`) and also check **Allow write access** for the key on the Zotero page. Both are needed;
      **Save and Check the Connections** tells you whether the key can write.
@@ -706,7 +560,7 @@ default it only reads: it never writes to Zotero or WebDAV.
 If WebDAV reports "folder not found", check the URL. With Nextcloud under a sub-path, include that path
 (e.g. `https://example.com/nextcloud/remote.php/dav/files/<user>/zotero/`).
 
-### 8.3 The SSCI journal list
+### 7.3 The SSCI journal list
 
 Only Clarivate's [Master Journal List](https://mjl.clarivate.com/) settles whether a journal is in the
 SSCI. Download the SSCI list there as CSV (a free account is needed) and import it with **Import the
@@ -721,7 +575,9 @@ major journals.
 | 🔍 Journal (SSCI not verified) / ⚪ Not in SSCI | unknown status / not in the list |
 | 📕 Book / ❌ Working paper / preprint / ❓ Unknown venue | left out of search results by default |
 
-### 8.4 VS Code settings
+For medical surveys, the SCIE list from the same site can be imported the same way (**Import the SCIE List (CSV)…**). It adds ✅ SCIE; without it, journals are judged by PubMed's record of each paper.
+
+### 7.4 VS Code settings
 
 | Setting | Default | |
 | :--- | :--- | :--- |
@@ -731,22 +587,22 @@ major journals.
 
 ---
 
-## 9. Instructions for the agent
+## 8. Instructions for the agent
 
-### 9.1 AGENTS.md and the skills
+### 8.1 AGENTS.md and the skills
 
 The workspace carries instructions for agents (`AGENTS.md`) and a skill for each step (`.agent/skills/`,
 also seen through `.claude/skills/`). The entry point is the `priorwork` skill: it looks at the state and
 goes on to the skill of the next step (`priorwork-new`, `priorwork-screen`, `priorwork-snowball`,
 `priorwork-extract`, `priorwork-check`). To start from a manuscript, it uses
-`priorwork-manuscript` ([4.8](#48-start-from-a-manuscript-filling-it-in-a-draft-or-advice)). The agent
+`priorwork-manuscript` ([Starting from a manuscript](https://yoshida-kd.github.io/priorwork/manuscripts/)). The agent
 picks them from the words of your request, so there are no names to remember.
 
 Instructions for one workspace only (fields to prefer, writing style, journals to leave out, "Mode:
 full auto", …) go in `AGENTS.local.md`. `AGENTS.md` and the skills are rewritten to
 match the engine's version; do not edit them.
 
-### 9.2 What the agent keeps to
+### 8.2 What the agent keeps to
 
 - It leaves a reason for every decision and for the scope, and never overturns your decisions.
 - It stops where the mode says, and decides on its own in between.
@@ -763,7 +619,7 @@ match the engine's version; do not edit them.
 
 ---
 
-## 10. Inside a workspace
+## 9. Inside a workspace
 
 ```text
 my-surveys/
@@ -792,7 +648,7 @@ the searches, the counts, the reasons for exclusion and the decisions that were 
 
 ---
 
-## 11. Updating the engine
+## 10. Updating the engine
 
 A workspace pins the engine's version (the `priorwork` command) in `requirements.txt`, so nothing
 changes behind your back. After the extension is updated, it offers **Update the Engine** when the
@@ -801,7 +657,7 @@ workspace's version is older; that also brings `AGENTS.md` and the skills up to 
 
 ---
 
-## 12. Troubleshooting
+## 11. Troubleshooting
 
 **The agent asks you to type commands or skill names.** Check whether the sidebar says the
 skills are out of date; if so, update AGENTS.md and the skills from that row. If it still asks, name Priorwork in the request: "carry on with the survey in
@@ -817,7 +673,7 @@ request too.
 
 **The HTML report does not open in Live Preview or similar.** On a server reached over SSH, browser
 extensions often cannot open files on the server. View it inside Priorwork as in
-[4.4](#44-view-the-report).
+[3.4](#34-view-the-report).
 
 **Searches stop with "rate limited (HTTP 429)".** Without a Semantic Scholar API key, requests share a
 public pool. Enter a key in the settings. If it still happens, wait a while and try again; Priorwork

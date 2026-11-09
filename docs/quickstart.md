@@ -54,5 +54,7 @@ on its page (**Ctrl+S** saves). The agent follows your corrections when you say 
 ## 7. Where next
 
 - [The guide](https://yoshida-kd.github.io/priorwork/guide/): everything in detail — starting from
+- [Starting from a manuscript](https://yoshida-kd.github.io/priorwork/manuscripts/): from your own manuscript, and with Octavo.
+- [Installing Priorwork](https://yoshida-kd.github.io/priorwork/install/): on Windows or a server.
   your manuscript, Zotero, Octavo, the checks.
 - [The reference](https://yoshida-kd.github.io/priorwork/reference/): every command, for the agent.

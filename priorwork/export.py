@@ -22,12 +22,14 @@ from typing import Any, Dict, List, Optional, Tuple
 from . import i18n
 from .check import ERROR, check_survey, find_citations
 from .i18n import t, tl
-from .survey import (BIBLIO_LABEL, CARD_FIELDS, INCLUDED, Survey, first_surname, now_iso, render_references,
+from .survey import (BIBLIO_LABEL, HYPHENS, CARD_FIELDS, INCLUDED, Survey, first_surname, now_iso, render_references,
                      year_labels)
 
 FORMATS = {"html": ".html", "md": ".clean.md", "docx": ".docx"}
 DRAFT_FORMATS = {"html": ".draft.html", "md": ".draft.md", "docx": ".draft.docx"}
 DRAFT_ANCHOR = "<!-- priorwork:draft -->"
+# 原稿の本文には入らないが、原稿を直す人に渡す節（引用の点検・助言など）。テンプレートの見出しの前に付ける
+NOTE_MARK = "<!-- priorwork:note -->"
 
 # テンプレート（assets/<lang>/templates/*.md）にある、執筆者向けの説明文。両方の言語
 _HINTS = [
@@ -310,7 +312,8 @@ def export(survey: Survey, fmt: str = "html", out: Optional[Path] = None, with_a
 
 # ---------------- Octavo の原稿の書き方（[@key]）----------------
 
-_O_NAME = r"(?:(?:van|von|de|der|den|du|da|di|le|la|del|dos)\s+){0,2}[A-ZÀ-Þ][\w'\-]+"
+# 団体の著者（"RECOVERY Collaborative Group"）は全体を 1 つの名前として読む
+_O_NAME = r"(?:(?:[A-Z][\w\-]*\s+){1,5}(?:Group|Groups|Collaborators|Collaboration|Consortium|Investigators|Committee|Team|Trialists|Network)\b|(?:(?:[Vv]an|[Vv]on|[Dd]e|[Dd]er|[Dd]en|du|da|di|le|[Ll]a|[Dd]el|della|[Dd]os|das|ten|ter)\s+){0,3}[A-ZÀ-Þ][\w'\-]+)"
 _O_AUTHORS = rf"{_O_NAME}(?:\s+et\s+al\.?|(?:\s*,\s*{_O_NAME})*,?\s*(?:and|&)\s*{_O_NAME})?"
 _O_YEARS = r"\d{4}[a-z]?(?:\s*[,;]\s*\d{4}[a-z]?)*"
 # 叙述型: Smith (2010) / Smith ら（2010, p. 5）
@@ -320,13 +323,24 @@ _O_ITEM = re.compile(rf"^(.*?)\b({_O_AUTHORS})\s*,?\s+({_O_YEARS})\s*(?:,\s*(.+)
 _O_PAREN = re.compile(r"[(（]([^()（）]*\d{4}[^()（）]*)[)）]")
 
 
-def _o_key(name_part: str, year: str, labels_index: Dict[Tuple[str, str], dict], bib_keys: Dict[str, str],
+def _o_key(name_part: str, year: str, labels_index: Dict[Tuple[str, str], List[dict]], bib_keys: Dict[str, str],
            missing: Dict[str, dict], cited: Dict[str, dict]) -> Optional[str]:
-    first = re.split(r"\s+et\s+al|\s*,\s*|\s*(?:\band\b|&)\s*", name_part.strip())[0].split()[-1]
-    from .survey import surname
-    entry = labels_index.get((surname(first), year))
-    if entry is None:
+    whole = re.split(r"\s+et\s+al|\s*,\s*|\s*(?:\band\b|&)\s*", name_part.strip())[0]
+    first = whole.split()[-1]
+    from .survey import ascii_fold, author_short, display_surname, surname
+    entries = labels_index.get((surname(first), year))
+    if not entries:
         return None
+    entry = entries[0]
+    if len(entries) > 1:
+        # 同じ語で終わる姓（"RECOVERY Collaborative Group" と "PARADIGM Study Group"）や、筆頭著者と年が同じ論文は、
+        # 書かれた名前で見分ける。見分けられなければ変換しない（別の論文のキーを付けない。残った引用は知らせる）
+        fold = lambda x: re.sub(r"\s+", " ", ascii_fold(x).lower().replace(" and ", " & ")).strip(" .")   # noqa: E731
+        same = [e for e in entries if fold(author_short(e["record"]["authors"])) == fold(name_part)]
+        same = same or [e for e in entries if fold(display_surname(e["record"]["authors"][0])) == fold(whole)]
+        if len(same) != 1:
+            return None
+        entry = same[0]
     cited[entry["key"]] = entry
     key = bib_keys.get(entry["key"])
     if key:
@@ -343,7 +357,10 @@ def octavo_citations(text: str, survey: Survey, bib_entries: List[dict]) -> Tupl
     from .octavo import match_entry
     included = survey.by_status(INCLUDED)
     labels = year_labels(included)
-    index = {(first_surname(e["record"]), labels[e["key"]]): e for e in included}
+    index: Dict[Tuple[str, str], List[dict]] = {}
+    for e in included:
+        index.setdefault((first_surname(e["record"]), labels[e["key"]]), []).append(e)
+    text = text.translate(HYPHENS)   # 姓の U+2010 など（登録の著者名をそのまま写しても変換できるように）
     bib_keys = {e["key"]: (match_entry(e["record"], bib_entries) or {}).get("key", "") for e in included}
     missing: Dict[str, dict] = {}
     cited: Dict[str, dict] = {}
@@ -380,6 +397,11 @@ def octavo_citations(text: str, survey: Survey, bib_entries: List[dict]) -> Tupl
     return text, list(missing.values()), {k: bib_keys.get(k) or "" for k in cited}
 
 
+def unconverted_citations(text: str) -> List[str]:
+    """[@key] にできずに残った「著者 (年)」（`octavo_citations` の後の本文から）。組織名などは除く。"""
+    return [c.text for c in find_citations(text) if not c.is_non_author]
+
+
 def synthesis_sections(md: str) -> str:
     """先行研究のまとめの節（テンプレートで `<!-- priorwork:synthesis -->` を付けた節: 学説・手法・論争・空白など）を
     ひと続きにする。見出しの番号（「2. 」）と、書き方の注・空の記入欄は除く。"""
@@ -398,9 +420,47 @@ def synthesis_sections(md: str) -> str:
     return "\n".join(parts)
 
 
+_EMPTY_ROW = re.compile(r"^\|\s*(?:[A-Z]\d*)?\s*\|(?:\s*\|)+\s*$")
+_TABLE_RULE = re.compile(r"^\|(?:\s*:?-+:?\s*\|)+\s*$")
+_NOT_COVERED = re.compile(r"^\W*(?:対象外|Not covered)\W*$", re.IGNORECASE)
+
+
+def _note_body(md: str, start: int) -> str:
+    """NOTE_MARK の後ろの節（見出しの位置が start）の中身。書き方の注・空の記入欄・空の行の表は除く。"""
+    end = md.find("\n## ", start)
+    body = md[md.index("\n", start):end if end >= 0 else len(md)]
+    body = re.sub(r"<!--.*?-->[ \t]*\n?", "", body, flags=re.S)
+    lines = [ln for ln in _drop_empty_items(body.strip().splitlines())
+             if not _EMPTY_ROW.match(ln.strip()) and not re.fullmatch(r"\s*\d+\.\s*", ln)]
+    rows = [ln for ln in lines if ln.lstrip().startswith("|")]
+    if len(rows) <= 2 and any(_TABLE_RULE.match(r.strip()) for r in rows):   # 見出しの行だけの表
+        lines = [ln for ln in lines if ln not in rows]
+    text = "\n".join(lines).strip()
+    return "" if _NOT_COVERED.match(text) else text
+
+
+def note_sections(md: str, lang: str) -> str:
+    """原稿の本文には入らないが、原稿を直す人に渡す節（NOTE_MARK を付けた節）をひと続きにする。無ければ空。"""
+    parts = []
+    for m in re.finditer(re.escape(NOTE_MARK), md):
+        start = md.find("## ", m.end())
+        if start < 0:
+            continue
+        title = re.sub(r"^\d+\.\s*", "", md[start + 3:md.find("\n", start)].strip())
+        body = _note_body(md, start)
+        if body:
+            parts.append(f"### {title}\n\n{body}\n")
+    if not parts:
+        return ""
+    return "## " + tl(lang, "For the author (not text for the manuscript)") + "\n\n" + "\n".join(parts)
+
+
 def octavo_text(survey: Survey, md: str) -> str:
-    """Octavo の原稿に持っていく文章: 原稿の 1〜3 章を書くサーベイなら下書き、それ以外は先行研究のまとめの節。"""
-    return draft_section(md) if survey.purpose in ("draft", "complete") else synthesis_sections(md)
+    """Octavo に持っていく文章: 原稿のサーベイなら足す本文と、原稿を直す人への指摘。それ以外は先行研究のまとめの節。"""
+    if survey.purpose not in ("draft", "complete"):
+        return synthesis_sections(md)
+    notes = note_sections(md, survey.lang)
+    return draft_section(md) + ("\n" + notes if notes else "")
 
 
 def export_octavo(survey: Survey, bib: Path, out: Optional[Path] = None, project: str = "",

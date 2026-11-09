@@ -69,10 +69,10 @@ MANUSCRIPTS_README = {
     "ja": """# 原稿の置き場
 
 自分の原稿から先行研究を集めるときに、原稿をここに置きます。1 本の論文につき 1 つのフォルダにします。
-作れるものは 2 種類で、両方を別々のレポートにしてもかまいません。
+1 本の原稿に、レポートは 1 本です。原稿の状態に合わせて、次をまとめます。
 
-- 分析まで済んだ原稿の 1〜3 章（イントロ・先行研究・理論と仮説）の下書き
-- 出来上がった（または書きかけの）原稿への助言（足りない先行研究・引用の向き・論の組み立て）
+- どこに何を足すか（書きかけの部分、イントロ・先行研究・理論と仮説をまるごと書くことも）
+- 引用の点検、足りない先行研究、論の組み立てへのコメント
 
 ```
 manuscripts/
@@ -86,16 +86,16 @@ manuscripts/
 - エージェントには「manuscripts/make_or_buy の原稿のイントロ・先行研究・仮説を書いて」「manuscripts/make_or_buy の
   原稿に足りない先行研究を指摘して」などと頼みます。何を作るか・原稿のどこを対象にするかは、エージェントが提案し、
   相談しながら決めます。サイドバーの **新しいサーベイ → 原稿から始める** でも、依頼文を作れます。
-- エージェントは原稿を読むだけで、書き換えません。下書きは `reports/<名前>.draft.md` に出ます。
+- エージェントは原稿を読むだけで、書き換えません。足すものは `reports/<名前>.draft.md` に出ます。
 - このフォルダも Git に載ります（非公開リポジトリにしておくこと）。
 """,
     "en": """# Manuscripts
 
-Put your manuscript here when you want the literature behind it. One folder per paper. There are two kinds of report,
-and you can have both as separate reports:
+Put your manuscript here when you want the literature behind it. One folder per paper. One manuscript gets one report,
+which covers, according to the state of the manuscript:
 
-- a draft of sections 1–3 (introduction, literature review, theory and hypotheses) of a manuscript whose analysis is done
-- advice on a finished (or unfinished) manuscript: missing literature, the direction of its citations, the argument
+- what to add and where (parts in progress; a whole introduction, literature review or theory section if needed)
+- a check of its citations, literature it does not mention, comments on the argument
 
 
 ```
@@ -111,7 +111,7 @@ manuscripts/
   manuscripts/make_or_buy" or "what literature is the manuscript in manuscripts/make_or_buy missing?". The agent
   proposes what to make and which parts to cover, and agrees it with you. **New Survey → Start from my manuscript**
   in the sidebar writes the request too.
-- The agent only reads the manuscript; it never rewrites it. The draft goes to `reports/<name>.draft.md`.
+- The agent only reads the manuscript; it never rewrites it. What to add goes to `reports/<name>.draft.md`.
 - This folder is in Git too (keep the repository private).
 """,
 }

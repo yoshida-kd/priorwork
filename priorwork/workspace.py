@@ -82,11 +82,9 @@ def assets_dir(lang: str) -> Path:
     return ASSETS_DIR / i18n.normalize(lang)
 
 
-def template_path(lang: str, manuscript: bool = False, purpose: Optional[str] = None) -> Path:
-    """レポートのひな形。原稿から始めるサーベイ（`new --manuscript`）は別の形: 書きかけの原稿の補完（complete）、
-    原稿の 1〜3 章の下書き（draft）、原稿への助言（advice）。"""
-    names = {"complete": "manuscript_complete.md", "advice": "manuscript_advice.md"}
-    name = names.get(purpose or "", "manuscript_review.md") if manuscript else "literature_review.md"
+def template_path(lang: str, manuscript: bool = False, medical: bool = False) -> Path:
+    """レポートのひな形。原稿から始めるサーベイ（`new --manuscript`）は 1 種類。医学のサーベイのレビューは別の形。"""
+    name = "manuscript.md" if manuscript else ("medical_review.md" if medical else "literature_review.md")
     return assets_dir(lang) / "templates" / name
 
 

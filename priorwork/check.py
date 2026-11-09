@@ -22,7 +22,7 @@ ERROR, WARN, INFO = "ERROR", "WARN", "INFO"
 # 本文中の著者年引用:
 #   叙述型   "Acemoglu et al. (2001)", "Acemoglu, Johnson and Robinson (2001, 2005)", "Dell (2010a, p. 3)"
 #   括弧型   "(Dell, 2010)", "(e.g., Dell 2010; Acemoglu et al., 2001a, 2005)"
-_NAME = r"(?:(?:van|von|de|der|den|du|da|di|le|la|del|dos)\s+){0,2}[A-Z][A-Za-z'\-]+"
+_NAME = r"(?:(?:[A-Z][A-Za-z\-]*\s+){1,5}(?:Group|Groups|Collaborators|Collaboration|Consortium|Investigators|Committee|Team|Trialists|Network)\b|(?:(?:[Vv]an|[Vv]on|[Dd]e|[Dd]er|[Dd]en|du|da|di|le|[Ll]a|[Dd]el|della|[Dd]os|das|ten|ter)\s+){0,3}[A-Z][A-Za-z'\-]+)"
 _AUTHORS = rf"{_NAME}(?:\s+et\s+al\.?|(?:\s*,\s*{_NAME})*,?\s*(?:and|&)\s*{_NAME})?"
 _YEAR = r"\d{4}[a-z]?"
 _GAP = r"[\s\x00]"   # _fold が日本語などを \x00 にする。「Acemoglu ら (2001)」の「ら」を読み飛ばす
@@ -157,9 +157,16 @@ def check_survey(survey: Survey, client: Optional[Any] = None) -> List[Finding]:
         empty = [k for k in survey.matrix_fields if not fields.get(k)]
         if empty:
             findings.append((WARN, t("{label}: some fields are empty ({fields})", label=label, fields=", ".join(empty))))
-        if r["ssci"]["status"] not in (ssci.SSCI, ssci.SSCI_LIKELY):
+        if survey.medical:
+            if r["ssci"]["status"] not in ssci.MEDICAL_INDEXED:
+                findings.append((INFO, t("{label}: not in MEDLINE or SCIE ({badge})", label=label,
+                                         badge=ssci.badge(r["ssci"]["status"]))))
+        elif r["ssci"]["status"] not in ssci.SOCIAL_INDEXED:
             findings.append((INFO, t("{label}: not an SSCI journal ({badge})", label=label,
                                      badge=ssci.badge(r["ssci"]["status"]))))
+        if r.get("retracted"):
+            findings.append((ERROR, t("{label}: this paper has been retracted. Exclude it (if the survey is about the "
+                                      "retraction itself, say so in your report)", label=label)))
 
     # 2. 本文中の著者年引用が、登録済みの論文に対応しているか
     registered: Dict[Tuple[str, Any], List[dict]] = {}
@@ -222,13 +229,16 @@ def check_survey(survey: Survey, client: Optional[Any] = None) -> List[Finding]:
     if client is not None:
         with_doi = [e for e in included if e["record"].get("doi")]
         works = {}
-        for w in client.openalex_works(dois=[e["record"]["doi"] for e in with_doi], select="doi,title"):
+        for w in client.openalex_works(dois=[e["record"]["doi"] for e in with_doi], select="doi,title,is_retracted"):
             works[(w.get("doi") or "").lower().replace("https://doi.org/", "")] = w
         for e in with_doi:
             if e["record"].get("warnings") or e.get("confirmed"):
                 continue  # 検索時の照合で既に警告済み（上で ERROR として報告している）か、確かめて解除した（fix --confirm）
             w = works.get(e["record"]["doi"].lower())
             label = f"#{e['number']} {e['record']['title'][:50]}"
+            if w and w.get("is_retracted") and not e["record"].get("retracted"):
+                findings.append((ERROR, t("{label}: this paper has been retracted. Exclude it (if the survey is about "
+                                          "the retraction itself, say so in your report)", label=label)))
             if not w:
                 findings.append((ERROR, t("{label}: OpenAlex does not know the DOI {doi}", label=label,
                                           doi=e["record"]["doi"])))
@@ -242,6 +252,10 @@ def check_survey(survey: Survey, client: Optional[Any] = None) -> List[Finding]:
         dated = [e for e in included if e["record"].get("doi") and e["record"].get("volume")
                  and e["record"].get("year") and "year" not in (e.get("fixed") or {})]
         years = client.issue_years([e["record"]["doi"] for e in dated])
+        if dated and getattr(client, "issue_years_failed", False):
+            findings.append((WARN, t("The years of {n|# included paper|# included papers} could not be checked against "
+                                     "the journal issues (Crossref did not answer). Run `priorwork check` again later",
+                                     n=len(dated))))
         for e in dated:
             issue = years.get(e["record"]["doi"].lower())
             if issue and issue != e["record"]["year"]:
@@ -490,6 +504,8 @@ def _check_synthesis(md: str) -> List[Finding]:
         end = md.find("\n## ", m.end())
         body = re.sub(r"<!--.*?-->", "", md[m.end():end if end >= 0 else len(md)], flags=re.S)
         written = [ln for ln in body.splitlines() if ln.strip() and not _LABEL_ONLY.match(ln)]
+        if len(written) == 1 and re.fullmatch(r"\W*(?:対象外|Not covered)\W*", written[0], re.IGNORECASE):
+            continue   # 原稿のレポートで、頼まれていない節
         if written and not find_citations("\n".join(written)):
             findings.append((WARN, t("The section \"{section}\" cites no paper. Base it on the included papers and "
                                      "cite them as Author (year)", section=title)))
@@ -551,7 +567,7 @@ def _check_one_octavo(survey: Survey, md: str, info: dict) -> List[Finding]:
         return findings
     entries = read_bib(Path(info["bib"]))
     absent = [e for e in survey.by_status(INCLUDED) if match_entry(e["record"], entries) is None]
-    from .export import cited_papers, octavo_text
+    from .export import cited_papers, octavo_citations, octavo_text, unconverted_citations
     try:
         cited = {e["key"] for e in cited_papers(survey, octavo_text(survey, md))}
     except RuntimeError:
@@ -561,6 +577,17 @@ def _check_one_octavo(survey: Survey, md: str, info: dict) -> List[Finding]:
         findings.append((WARN, t("The text written for the Octavo project {project} cites {n|# paper|# papers} not in "
                                  "its .bib: {numbers}. Add {n|it|them} to its Zotero collection, then `octavo bib pull`",
                                  project=project, n=len(in_text), numbers=_numbers(in_text))))
+    try:
+        entries = read_bib(Path(info["bib"])) if info.get("bib_exists") else []
+        left = unconverted_citations(octavo_citations(octavo_text(survey, md), survey, entries)[0]) if entries else []
+    except RuntimeError:
+        left = []
+    ignored = ignored_citations(md)
+    left = [c for c in left if (surname(c.split(" (")[0].split()[-1]), int(re.search(r"\d{4}", c).group())) not in ignored]
+    if left:
+        findings.append((WARN, t("{n|# citation|# citations} in the text for the Octavo project {project} cannot become "
+                                 "[@key]: {citations}. Write {n|it|them} as in the report's references",
+                                 n=len(left), project=project, citations="; ".join(left[:10]))))
     rest = [e for e in absent if e["key"] not in cited]
     if rest:
         findings.append((INFO, t("{n|# included paper is|# included papers are} not in the .bib of the Octavo project "

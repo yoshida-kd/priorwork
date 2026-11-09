@@ -39,5 +39,7 @@ Windows では先に WSL の中のフォルダを開き、サーバーでは先�
 
 ## 7. このあとは
 
-- [手引き](https://yoshida-kd.github.io/priorwork/ja/guide/): すべての詳しい説明。原稿から始める、Zotero、Octavo、検査。
+- [手引き](https://yoshida-kd.github.io/priorwork/ja/guide/): すべての詳しい説明。Zotero、検査。
+- [原稿から始める](https://yoshida-kd.github.io/priorwork/ja/manuscripts/): 自分の原稿から、Octavo と一緒に。
+- [インストール](https://yoshida-kd.github.io/priorwork/ja/install/): Windows やサーバーで使うとき。
 - [リファレンス](https://yoshida-kd.github.io/priorwork/ja/reference/): エージェント向けの、すべてのコマンド。

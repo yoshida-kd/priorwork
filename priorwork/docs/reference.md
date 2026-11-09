@@ -92,7 +92,8 @@ Most commands print JSON with `--json`.
 - `--slug` is an English file name (`minimum_wage_employment`); the report is
   `reports/YYYYMMDD_<slug>.md`. A second survey with the same slug is numbered `YYYYMMDD_v2_<slug>`.
 - `--by` records the model that wrote it (the audit refuses the same model).
-- `--search-field social|all`: drop results outside the social sciences (default `social`).
+- `--search-field social|medical|all`: drop results outside that field (default `social`; `medical` in a medical survey).
+- `--discipline medical` (only on `new`): a clinical survey. See [2.4](#24-medical-surveys).
 
 ### 2.2 Modes and depth
 
@@ -120,6 +121,40 @@ surveys.
 ./priorwork status --archived
 ```
 
+### 2.4 Medical surveys
+
+`./priorwork new "<topic>" --slug <slug> --discipline medical` makes a survey for clinical research. It cannot be changed later. Other surveys in the workspace stay as they are.
+
+| | Social (default) | Medical |
+| :--- | :--- | :--- |
+| Search | Semantic Scholar, OpenAlex | PubMed and Semantic Scholar (`--source`); if one fails, the other's results |
+| Query | `+ \| -`, `"phrases"` | the same, plus PubMed's tags (`[tiab]`, `[MeSH Terms]`, `[pt]`) |
+| Journals | ✅ SSCI, 🟡, ⚪ | ✅ MEDLINE (PubMed's record of the paper), ✅ SCIE (`settings --import-scie`), 🔍 In PubMed, 🔍 not found in PubMed |
+| Left out of searches | working papers, preprints, books | the same, plus letters, editorials and comments (`--include-preprints` keeps them) |
+| Card fields | RQ, X, Y, data, identification | clinical question, population, intervention or exposure, outcomes, study design, effect sizes |
+| Report | theories, methods | evidence by study design, effects, safety and harms |
+| Full text | as in 5.2 | the same, then PMC's text through Europe PMC (no page breaks) |
+
+- The keys for `card --set` are the same: `rq`, `data`, `x`, `y`, `method`, `findings`, `limits`, `memo`.
+- `add` and `fix --id` also take `PMID:<number>` or a PubMed URL. A DOI is looked up in PubMed first.
+- ✅ MEDLINE is PubMed's status of that paper; a very recent paper in an indexed journal may show 🔍 In PubMed. `./priorwork journal "<name or ISSN>" --medline` asks the NLM Catalog about the journal.
+- Retractions (PubMed, OpenAlex) give a ⚠️ and an ERROR in `check`, which `fix --confirm` does not clear. `check` without `--offline` also finds later retractions.
+- The search log keeps PubMed's reading of each query and its total count.
+- The report says it is a narrative review, neither a systematic review nor clinical guidance.
+
+### 2.5 Several surveys at once
+
+```bash
+./priorwork new "<topic>" --slug <slug> --by "<model>" --worktree
+./priorwork worktree                       # the worktrees, with what is not committed or pushed
+./priorwork worktree --remove <slug>       # the branch stays
+```
+
+- `--worktree` makes `worktrees/<slug>/` from the top of main, on a new branch named after the survey, without touching the current folder or branch. Run that survey's commands from that folder.
+- `.env`, `.venv`, `.priorwork/data` and `.priorwork/cache` there are links to the workspace's, so keys, journal lists, the engine and fetched full texts are shared. An upgrade reaches all of them. `git`'s `info/exclude` keeps the links and `worktrees/` out of Git, with no commit.
+- `status` lists them, and leaves their branches out of "On other branches".
+- `--remove` refuses while there are uncommitted changes or commits not pushed. `--force` throws them away.
+
 ---
 
 ## 3. Finding the literature
@@ -135,7 +170,7 @@ surveys.
 - Default: Semantic Scholar's relevance search. `--bulk`: `+` (and), `|` (or), `-` (not),
   `"phrases"`, most cited first (`AND`, `OR`, `NOT` are turned into these).
 - `--sort citations|relevance|recent|cpy`, `--year`, `--journal` (full name or ISSN, repeatable),
-  `--ssci-only`, `--field social|all`, `--limit N` (default 25 into a full survey, else 10),
+  `--ssci-only` (or `--indexed-only`; in a medical survey, MEDLINE and SCIE), `--field social|medical|all`, `--source auto|pubmed|s2`, `--limit N` (default 25 into a full survey, else 10),
   `--include-preprints` (books, working papers, preprints and unknown venues are left out by
   default).
 - DOIs, journals and ISSNs are checked against OpenAlex; when a working paper and its published
@@ -325,18 +360,16 @@ checked in the full text, and the length leaves out citations in parentheses unl
 
 ```bash
 ./priorwork read manuscripts/make_or_buy
-./priorwork new "<topic>" --slug <slug> --manuscript manuscripts/make_or_buy --purpose complete
+./priorwork new "<topic>" --slug <slug> --manuscript manuscripts/make_or_buy
 ./priorwork add SURVEY --cited
 ./priorwork export SURVEY --draft
 ```
 
 - `read` turns Markdown, Quarto (.qmd and its HTML), LaTeX, Word and PDF into text, and lists the
   user's marks: `[cite]`, `[@?]`, `TODO(priorwork): …`.
-- `--purpose complete` (default): what each section lacks, as additions that quote the sentence
-  they go before or after (**Where**), with **Why**. `draft`: the introduction, literature review
-  and theory and hypotheses, with the claims that need literature (IDs, with conflicting findings),
-  and a HARKing section kept out of the draft. `advice`: a check of each cited paper's direction,
-  missing literature, the argument.
+- One manuscript gets one survey and one report: what it lacks, the claims that need literature (with conflicting findings), what to add (**Where** quotes the sentence it goes before or after, with **Why**; whole sections if needed), a check of each cited paper's direction, missing literature, the hypotheses and their literature, the argument, and what to do first. Sections nobody asked for say "Not covered".
+- `export --draft` writes what to add, with its references. `export --octavo` adds a part for the author with the rest.
+- Surveys made by earlier versions with `--purpose draft` or `advice` keep their own report and carry on as they are.
 - Cards get a **Role in the manuscript** (`role`). The manuscript is never rewritten.
 - `add --cited` registers the papers the manuscript cites (the DOIs in its `.bib`).
 
@@ -352,6 +385,7 @@ checked in the full text, and the length leaves out citations in parentheses unl
 ./priorwork zotero SURVEY --dois            # DOIs of included papers not in Zotero (for the magic wand)
 ./priorwork zotero SURVEY --add --dry-run   # what --add would put into the collection
 ./priorwork zotero SURVEY --add
+./priorwork zotero SURVEY --add --also "Paper / References"   # and into another collection, such as an Octavo project's
 ./priorwork zotero SURVEY --undo
 ```
 
@@ -410,11 +444,18 @@ checked in the full text, and the length leaves out citations in parentheses unl
 | :--- | :--- |
 | `SEMANTIC_SCHOLAR_API_KEY` | recommended; without it, searches often hit HTTP 429 |
 | `OPENALEX_API_KEY`, `OPENALEX_MAILTO` | optional |
+| `NCBI_API_KEY` | optional; PubMed allows 10 requests a second with it, 3 without |
 | `ZOTERO_*` | [8](#8-zotero) |
 
 The SSCI status: ✅ checked against the list, 🟡 guessed from a built-in list of about 100 journals
 (verify), 🔍 unknown, ⚪ not in the list; 📕 books, ❌ working papers and preprints, ❓ unknown venues
 are left out of searches by default.
+
+### 10.1 Retries, cache and language
+
+- Retries: HTTP 429, 5xx and network errors wait 5, 10, 20, 40 and 60 s, up to 5 times (`PRIORWORK_MAX_RETRIES`).
+- Cache: API responses stay in `~/.cache/priorwork/` for 7 days (`PRIORWORK_CACHE_TTL_DAYS`; `PRIORWORK_NO_CACHE=1` or `--no-cache` turns it off).
+- Messages: `PRIORWORK_LANG=ja|en`, otherwise the locale.
 
 ---
 
@@ -426,13 +467,14 @@ are left out of searches by default.
 ./priorwork doctor [--online]
 ./priorwork sync [--force|--diff]
 ./priorwork upgrade [--to X.Y.Z]
+./priorwork worktree [--remove NAME [--force]]
 ./priorwork status [SURVEY] [--archived]
-./priorwork new "<topic>" --slug <slug> --by "<model>" [--mode standard|auto|manual] [--depth quick|full] [--manuscript PATH [--purpose complete|draft|advice]] [--question ... --years ... --fields ... --inclusion ... --exclusion ...]
-./priorwork scope SURVEY [--question ...] [--mode ...] [--go-on] [--depth ...] [--search-field social|all] [--manuscript PATH] [--octavo PATH] [--by "<model>"]
+./priorwork new "<topic>" --slug <slug> --by "<model>" [--mode standard|auto|manual] [--depth quick|full] [--manuscript PATH] [--question ... --years ... --fields ... --inclusion ... --exclusion ...]
+./priorwork scope SURVEY [--question ...] [--mode ...] [--go-on] [--depth ...] [--search-field social|medical|all] [--manuscript PATH] [--octavo PATH] [--by "<model>"]
 ./priorwork archive SURVEY [--undo]
 ./priorwork read PATH [--out FILE]
 ./priorwork requests [ID] [--done --survey SURVEY | --decline --note "..."]
-./priorwork search "<query>" [--into SURVEY] [--bulk] [--sort citations|relevance|recent|cpy] [--year 2010-2024] [--journal "<name>" ...] [--ssci-only] [--field social|all] [--limit N]
+./priorwork search "<query>" [--into SURVEY] [--bulk] [--sort citations|relevance|recent|cpy] [--year 2010-2024] [--journal "<name>" ...] [--ssci-only] [--field social|medical|all] [--limit N]
 ./priorwork snowball SURVEY [--direction both|references|citations] [--limit N] [--min-links N]
 ./priorwork list SURVEY [--status candidate maybe included excluded] [--abstract]
 ./priorwork include|exclude|maybe SURVEY N... --reason "..."
@@ -446,7 +488,7 @@ are left out of searches by default.
 ./priorwork audit SURVEY [--by "<model>" --note "..."]
 ./priorwork export SURVEY [--format html|docx|md] [--with-abstracts] [--draft] [--derived NAME] [--octavo [PROJECT] [--bib PATH]]
 ./priorwork derive SURVEY [NAME --purpose "..." --length N --structure "a; b; c" [--count-citations]]
-./priorwork zotero [SURVEY] [--collections] [--collection NAME] [--import] [--dois] [--add [--dry-run]] [--undo]
+./priorwork zotero [SURVEY] [--collections] [--collection NAME] [--import] [--dois] [--add [--also COLLECTION] [--dry-run]] [--undo]
 ./priorwork get <DOI>
 ./priorwork citations <DOI> [--sort cited]
 ./priorwork references <DOI> [--sort cited]

@@ -20,6 +20,7 @@ ITEMS = [
     ("SEMANTIC_SCHOLAR_API_KEY", True),
     ("OPENALEX_API_KEY", True),
     ("OPENALEX_MAILTO", False),
+    ("NCBI_API_KEY", True),
     ("ZOTERO_API_KEY", True),
     ("ZOTERO_USER_ID", False),
     ("ZOTERO_WRITE", False),
@@ -30,6 +31,7 @@ ITEMS = [
 ]
 SECRETS = {k for k, secret in ITEMS if secret}
 SSCI_FILE = "ssci_journals.csv"   # 取り込んだリストの置き場所（ssci.DEFAULT_SSCI_LIST と同じ名前）
+SCIE_FILE = "scie_journals.csv"   # 同じく ssci.DEFAULT_SCIE_LIST
 
 _LINE = re.compile(r"^\s*(#\s*)?([A-Za-z_][A-Za-z0-9_]*)\s*=(.*)$")
 
@@ -76,8 +78,10 @@ def status(root: Path) -> Dict[str, Any]:
     items = [{"key": k, "secret": secret, "set": bool(env.get(k)), "value": "" if secret else env.get(k, "")}
              for k, secret in ITEMS]
     lst = ssci.get_ssci_list()
+    scie = ssci.get_scie_list()
     return {"env": str(env_path(root)), "exists": env_path(root).is_file(), "items": items,
-            "ssci": {"file": lst.path.name if lst.loaded and lst.path else None, "journals": len(lst.titles)}}
+            "ssci": {"file": lst.path.name if lst.loaded and lst.path else None, "journals": len(lst.titles)},
+            "scie": {"file": scie.path.name if scie.loaded and scie.path else None, "journals": len(scie.titles)}}
 
 
 def update(root: Path, values: Dict[str, Optional[str]]) -> List[str]:
@@ -123,6 +127,15 @@ def update(root: Path, values: Dict[str, Optional[str]]) -> List[str]:
 
 def import_ssci(root: Path, src: Path) -> Dict[str, Any]:
     """Master Journal List からダウンロードした SSCI の CSV を、ワークスペースに取り込む。"""
+    return _import_list(root, src, SSCI_FILE)
+
+
+def import_scie(root: Path, src: Path) -> Dict[str, Any]:
+    """Master Journal List からダウンロードした SCIE の CSV を、ワークスペースに取り込む。"""
+    return _import_list(root, src, SCIE_FILE)
+
+
+def _import_list(root: Path, src: Path, name: str) -> Dict[str, Any]:
     src = src.expanduser()
     if not src.is_file():
         raise SettingsError(t("File not found: {path}", path=src))
@@ -131,11 +144,11 @@ def import_ssci(root: Path, src: Path) -> Dict[str, Any]:
     except (OSError, UnicodeDecodeError, ValueError) as e:
         raise SettingsError(t("Could not read {file}: {error}", file=src.name, error=e)) from e
     if not lst.loaded:
-        raise SettingsError(t("{file} has no journal title or ISSN column. Download the SSCI list as CSV from "
+        raise SettingsError(t("{file} has no journal title or ISSN column. Download the list as CSV from "
                               "the Master Journal List", file=src.name))
-    dest = data_dir(root) / SSCI_FILE
+    dest = data_dir(root) / name
     dest.parent.mkdir(parents=True, exist_ok=True)
     if src.resolve() != dest.resolve():
         shutil.copyfile(src, dest)
-    ssci._list_cache = None   # このプロセスでも新しいリストを使う
+    ssci._list_cache = ssci._scie_cache = None   # このプロセスでも新しいリストを使う
     return {"file": dest.name, "journals": len(lst.titles)}

@@ -3,6 +3,53 @@
 Priorwork's command-line tool (`priorwork` on PyPI) and this extension are
 released together, under one version number.
 
+## 0.2.0
+
+- **Medical surveys.** `new --discipline medical`, or **Medicine (clinical research)** in **New
+  Survey**, makes a survey for clinical research. It searches PubMed as well as Semantic Scholar and
+  records how PubMed read each query; judges journals by each paper's MEDLINE status and an optional
+  SCIE list (`settings --import-scie`); leaves letters, editorials and comments out of searches; has
+  cards for the clinical question, population, intervention or exposure, outcomes, study design and
+  effect sizes; has its own report; and reads open full texts from PMC through Europe PMC. `add` and
+  `fix --id` take `PMID:<number>`. `journal --medline` asks the NLM Catalog. It is a narrative review,
+  not a systematic review, and the report says so. Surveys in the social sciences work as before.
+- **One report from a manuscript.** A manuscript now gets one survey and one report, instead of a
+  choice of `--purpose complete`, `draft` or `advice` (the same manuscript had been surveyed from
+  scratch for each). The report holds what the manuscript lacks, what to add and where (whole sections
+  if needed), the check of its citations, the literature it does not mention, its hypotheses and
+  their literature, comments on the argument, and what to do first. `export --octavo` also passes the
+  check and the comments to the Octavo project, as a part for the author. `--purpose` is still
+  accepted and ignored for a new survey, and surveys made for one purpose carry on as they are.
+- **The check of whether hypotheses came after the results is gone**, from the report, the agent's
+  instructions and the guide. The literature behind each hypothesis, and the literature against it,
+  are still set out.
+- **Retractions.** Retracted papers (from OpenAlex, and from PubMed in medical surveys) get a ⚠️, in
+  every survey. `check` gives an ERROR for an included one, which `fix --confirm` does not clear, and
+  without `--offline` also finds papers retracted since they were added.
+- **Several surveys at once.** `new --worktree` makes a survey in its own folder and branch under
+  `worktrees/`, without touching the survey you have open, and shares the keys, journal lists, engine and
+  cache. `worktree` lists them and `worktree --remove` removes one, refusing while anything is not
+  committed and pushed. `status` and the sidebar show them; click one to open it in a new window.
+- **Names.** Surnames keep their particles: "Drazin & Van de Ven (1985)" and "van Witteloostuijn et al.
+  (2018)", where the report used to write "Ven" and "Witteloostuijn". The text may say either. A group
+  author ("RECOVERY Collaborative Group") is shown whole. `fix --authors` also takes "Van de Ven,
+  Andrew H.".
+- **`export --octavo`** converts names with non-ASCII hyphens ("Fernández‐i‐Marín"), and it and `check`
+  now name any citation left unconverted.
+- **`check` says when Crossref did not answer**, so the years were not compared.
+- **Titles with line breaks** no longer pile up in the card on each `render`, and are cleaned when a paper
+  is registered.
+- **Several PDFs for one paper.** `fulltext` reads the one that is not a working paper, and says so when
+  the text it read looks like a working paper or a manuscript.
+- **`zotero --add`** does not add again a paper whose duplicate item is already in the collection, does
+  not record the same write twice, and says if a paper still is not in the collection afterwards.
+  `--also "<collection>"` adds the papers to another collection too, such as the one an Octavo project
+  pulls from.
+- **Fixed: the year of the journal issue was never looked up.** Crossref rejects the request's
+  `journal-issue` field on this route (HTTP 400), so `add` kept the online-first year and `check`
+  could not compare the years. It now asks for `published-print`.
+- **Fixed: bioRxiv and medRxiv DOIs** are recognised as preprint DOIs when a journal is named.
+
 ## 0.1.13
 
 - **Zotero: PDFs attached while the Zotero app was syncing are no longer lost.** The library was

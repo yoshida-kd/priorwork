@@ -3,6 +3,7 @@
 VS Code の拡張機能も `priorwork doctor --json` でこの結果を読む（項目のキーは CHECK_KEYS）。
 """
 
+import json
 import os
 import re
 import shutil
@@ -59,6 +60,16 @@ def git_checks(root: Path) -> List[Check]:
     return out
 
 
+def _only_medical_surveys(root: Path) -> bool:
+    surveys = []
+    for path in state_dir(root).glob("*.json"):
+        try:
+            surveys.append(json.loads(path.read_text(encoding="utf-8")).get("discipline"))
+        except (OSError, ValueError):
+            return False
+    return bool(surveys) and all(d == "medical" for d in surveys)
+
+
 def run_checks(root: Path, client: Optional[Any] = None) -> List[Check]:
     """client を渡すと、Semantic Scholar・OpenAlex・Zotero にも接続して確認する。"""
     out: List[Check] = []
@@ -104,9 +115,18 @@ def run_checks(root: Path, client: Optional[Any] = None) -> List[Check]:
     ssci_list = ssci.get_ssci_list()
     if ssci_list.loaded:
         out.append((OK, ssci_name, t("{file} ({n|# ISSN|# ISSNs})", file=ssci_list.path.name, n=len(ssci_list.issns))))
+    elif _only_medical_surveys(root):
+        out.append((OK, ssci_name, t("Not set (not needed: all the surveys are medical)")))
     else:
         out.append((WARN, ssci_name, t("Not set, so the SSCI status is guessed from the journal name (🟡). "
                                        "Import Clarivate's CSV in the settings (`priorwork settings --import-ssci CSV`)")))
+
+    scie_name = t("SCIE journal list")
+    scie_list = ssci.get_scie_list()
+    out.append((OK, scie_name, t("{file} ({n|# ISSN|# ISSNs})", file=scie_list.path.name, n=len(scie_list.issns))
+                if scie_list.loaded else t("Not set (optional, for medical surveys: `priorwork settings --import-scie CSV`)")))
+    out.append((OK, "PubMed", t("Set") if os.environ.get("NCBI_API_KEY")
+                else t("No key (optional: it works, at 3 requests a second)")))
 
     zotero = ZoteroClient.from_env()
     out.append((OK, "Zotero", t("Set") + (" | " + t("may add the included papers to the survey's collection "

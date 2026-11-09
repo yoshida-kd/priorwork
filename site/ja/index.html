@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Priorwork</title>
-<meta name="description" content="Priorwork: 社会科学の先行研究サーベイを AI エージェントに任せる。検索・選別・論文カード・文章はエージェントが行い、あなたは VS Code のサイドバーで確かめて直す。ターミナルは不要。">
+<meta name="description" content="Priorwork: 社会科学と臨床研究の先行研究サーベイを AI エージェントに任せる。検索・選別・論文カード・文章はエージェントが行い、あなたは VS Code のサイドバーで確かめて直す。ターミナルは不要。">
 <link rel="alternate" hreflang="ja" href="../ja/">
 <link rel="alternate" hreflang="en" href="../">
 <link rel="alternate" hreflang="x-default" href="../">
@@ -29,11 +29,12 @@ document.addEventListener('click', function (e) {
       Priorwork
     </a>
     <nav>
-      <a href="#install">インストール</a>
       <a href="guide/">手引き</a>
-      <a href="reference/">リファレンス</a>
-      <a href="https://github.com/yoshida-kd/priorwork">GitHub</a>
-      <a href="../" hreflang="en" lang="en" data-lang="en">English</a>
+      <a href="manuscripts/">原稿から始める</a>
+      <span class="nav-end">
+        <a class="icon" href="https://github.com/yoshida-kd/priorwork" title="GitHub" aria-label="GitHub"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a>
+        <a class="lang" href="../" hreflang="en" lang="en" data-lang="en" title="English" aria-label="English">EN</a>
+      </span>
     </nav>
   </div>
 </header>
@@ -43,7 +44,7 @@ document.addEventListener('click', function (e) {
   <div class="wrap">
     <h1>Priorwork</h1>
     <p class="tagline">先行研究サーベイを AI エージェントに任せて、確かめる</p>
-    <p class="lead">社会科学のために。ふつうの言葉で頼み、VS Code で確かめて直します。</p>
+    <p class="lead">社会科学と臨床研究のために。ふつうの言葉で頼み、VS Code で確かめて直します。</p>
     <div class="actions">
       <a class="button primary" href="https://marketplace.visualstudio.com/items?itemName=yoshida-kd.priorwork">VS Code の拡張機能を入れる</a>
       <a class="button secondary" href="quickstart/">クイックガイド</a>
@@ -98,6 +99,10 @@ document.addEventListener('click', function (e) {
         <p>論文ごとのページに、要旨・SSCI の判定・警告・採否の基準と、エージェントが残した理由。<b>I</b> 採用、<b>M</b> 保留、<b>X</b> 除外。カードも直して保存。エージェントはあなたの変更に従います。</p>
       </div>
       <div class="feature">
+        <h3>自分の原稿から</h3>
+        <p>書きかけでも出来上がりでも、原稿を渡すと 1 本のレポートに。どこに何を足すか、引用の点検、足りない先行研究をまとめます。<a href="manuscripts/">詳しく</a></p>
+      </div>
+      <div class="feature">
         <h3>レポート・Zotero・サーバー</h3>
         <p>レポートは VS Code の中で開けます（SSH でつないだサーバーでも）。Zotero のコレクションをサーベイに結び付ければ、足す DOI はコピー 1 回、本文はそこの PDF から先に読みます。拡張機能が自分で AI のサービスを呼ぶことはありません。</p>
       </div>
@@ -110,10 +115,23 @@ document.addEventListener('click', function (e) {
 
 <footer>
   <div class="wrap">
-    <span>Priorwork · MIT License · by <a href="https://github.com/yoshida-kd">yoshida-kd</a></span>
-    <span><a href="https://github.com/yoshida-kd/priorwork">Source</a> ·
-    <a href="https://pypi.org/project/priorwork/">PyPI</a> ·
-    <a href="https://github.com/yoshida-kd/priorwork/issues">Issues</a></span>
+    <nav class="sitemap" aria-label="サイトマップ">
+      <div><h2>はじめる</h2>
+        <a href="quickstart/">クイックガイド</a>
+        <a href="install/">インストール</a></div>
+      <div><h2>手引き</h2>
+        <a href="guide/">手引き</a>
+        <a href="manuscripts/">原稿から始める</a></div>
+      <div><h2>AI エージェント向け</h2>
+        <a href="reference/">リファレンス</a></div>
+      <div><h2>Priorwork</h2>
+        <a href="https://marketplace.visualstudio.com/items?itemName=yoshida-kd.priorwork">VS Code 拡張機能</a>
+        <a href="https://pypi.org/project/priorwork/">PyPI</a>
+        <a href="https://github.com/yoshida-kd/priorwork">ソース</a>
+        <a href="https://github.com/yoshida-kd/priorwork/blob/main/vscode-extension/CHANGELOG.md">変更履歴</a>
+        <a href="https://github.com/yoshida-kd/priorwork/issues">Issue</a></div>
+    </nav>
+    <p class="colophon">Priorwork · MIT ライセンス · <a href="https://github.com/yoshida-kd">yoshida-kd</a></p>
   </div>
 </footer>
 

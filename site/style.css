@@ -86,7 +86,12 @@ img { max-width: 100%; height: auto; display: block; }
   font-size: 18px;
 }
 .brand svg { width: 28px; height: 28px; flex: none; }
-.top nav { display: flex; gap: 18px; flex-wrap: wrap; font-size: 15px; }
+.top nav { display: flex; gap: 22px; flex-wrap: wrap; align-items: center; font-size: 15px; margin-left: auto; }
+.top nav .nav-end { display: flex; align-items: center; gap: 12px; padding-left: 18px; border-left: 1px solid var(--line); }
+.top nav .icon { display: flex; }
+.top nav .icon svg { width: 18px; height: 18px; }
+.top nav .lang { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
+.top nav a[aria-current="page"] { color: var(--text); font-weight: 600; }
 .top nav a { color: var(--muted); text-decoration: none; }
 .top nav a:hover { color: var(--text); }
 
@@ -120,6 +125,8 @@ img { max-width: 100%; height: auto; display: block; }
 
 /* 節 */
 section { padding: 40px 0; }
+section.install { padding: 32px 0 28px; }
+section.install p { margin: 0; font-size: 18px; }
 section.alt { background: var(--bg-alt); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 h2 { margin: 0 0 16px; font-size: 26px; line-height: 1.3; }
 h3 { margin: 0 0 6px; font-size: 17px; }
@@ -135,7 +142,7 @@ p { margin: 0 0 14px; }
 
 .features {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
   gap: 16px;
   margin-top: 8px;
 }
@@ -184,14 +191,22 @@ footer {
   color: var(--muted);
   font-size: 14px;
 }
-footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 20px; justify-content: space-between; }
-footer a { color: var(--muted); }
+footer .sitemap { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 20px 32px; }
+footer .sitemap div { display: flex; flex-direction: column; gap: 6px; }
+footer .sitemap h2 { margin: 0 0 4px; font-size: 13px; font-weight: 600; color: var(--text); letter-spacing: 0.02em; }
+footer a { color: var(--muted); text-decoration: none; }
+footer a:hover { color: var(--text); text-decoration: underline; }
+footer .colophon { margin: 28px 0 0; }
 
 @media (max-width: 600px) {
   body { font-size: 16px; }
   .hero { padding: 40px 0 28px; }
   section { padding: 32px 0; }
-  .top nav { gap: 12px; }
+  .top .wrap { flex-wrap: wrap; gap: 4px 16px; padding-top: 10px; padding-bottom: 10px; }
+  .top .wrap { position: relative; }
+  .top nav { gap: 16px; margin-left: 0; flex-basis: 100%; }
+  /* 狭い画面では、GitHub と言語をロゴの行の右端に */
+  .top nav .nav-end { position: absolute; top: 12px; right: 16px; border-left: none; padding-left: 0; }
 }
 
 /* ---- 手引きのページ（site/guide.html） ---------------------------------- */
@@ -237,6 +252,10 @@ footer a { color: var(--muted); }
 .guide .content details.fold > summary { cursor: pointer; }
 .guide .content details.fold > summary h4 { display: inline; margin: 0; }
 .guide .content details.fold[open] > summary { margin-bottom: 8px; }
+/* 見出しを持たない折りたたみ（クイックガイドの「ターミナルでは」） */
+.guide .content details:not(.fold) { margin: 0 0 14px; }
+.guide .content details:not(.fold) > summary { cursor: pointer; }
+.guide .content details:not(.fold)[open] > summary { margin-bottom: 8px; }
 .guide .content hr { display: none; }                /* 章の区切りは h2 の罫で足りる */
 .guide .content ul, .guide .content ol { padding-left: 1.4em; margin: 0 0 14px; }
 .guide .content li { margin: 0 0 4px; }

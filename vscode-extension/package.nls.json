@@ -1,5 +1,5 @@
 {
-  "extension.description": "Build literature reviews for the social sciences by handing them to your AI agent: it searches Semantic Scholar and OpenAlex, screens, fills in the paper cards and writes; you review and correct from the sidebar. No terminal needed.",
+  "extension.description": "Build literature reviews for the social sciences and clinical research by handing them to your AI agent: it searches Semantic Scholar and OpenAlex, screens, fills in the paper cards and writes; you review and correct from the sidebar. No terminal needed.",
   "view.surveys.name": "Surveys",
   "welcome.noWorkspace": "Priorwork keeps each literature review in a workspace: a folder (and a private Git repository) with the reports and their state.\n[Create a Workspace](command:priorwork.initWorkspace)\nAlready have one? Open its folder.\n[Open Folder](command:vscode.openFolder)\n[Diagnose the Setup](command:priorwork.doctor)",
   "welcome.noSurveys": "No surveys yet. The easiest way: give the topic and let your agent (Claude Code, Antigravity, …) do the survey.\n[Start a Survey](command:priorwork.newSurvey)\nSet your API keys first for faster searches.\n[Open the Settings](command:priorwork.openSettings)",

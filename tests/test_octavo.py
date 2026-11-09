@@ -1,3 +1,4 @@
+import re
 """Octavo のプロジェクトとのつなぎ: 設定と .bib を読む、原稿の引用を登録する、下書きを [@key] で書き出す。"""
 
 import hashlib
@@ -91,19 +92,21 @@ def fake_get(monkeypatch):
 
 def test_add_cited_and_export_for_octavo(ws, tmp_path, fake_get, capsys):  # noqa: F811
     paper = make_project(tmp_path / "proj")
-    made = ws("new", "mw", "--slug", "mw", "--manuscript", str(paper.parent), "--purpose", "draft", "--json")
+    made = ws("new", "mw", "--slug", "mw", "--manuscript", str(paper.parent), "--json")
     added = ws("add", "mw", "--cited", "--json")
     assert len(added["added"]) == 2 and added["no_doi"] == []
     ws("add", "mw", "10.1/neum", "--json")                       # .bib にまだ無い論文
     detail = ws("status", "mw", "--json")
     assert detail["octavo"]["zotero_collections"] == ["Minimum wages"]
-    assert "--octavo" in next(s for s in detail["next"] if s["id"] == "draft")["args"]
+    assert "--octavo" in next(s for s in detail["next"] if s["id"] == "complete")["args"]
 
     s = Survey.load("mw")
-    md = s.md_path.read_text(encoding="utf-8").replace(
-        "### Introduction",
-        "### Introduction\n\nCard and Krueger (1994) found no fall, unlike Neumark and Wascher (2007, p. 5) "
-        "(e.g., Dube et al., 2010; Card and Krueger 1994). See also Smith (2001) and (2010年代).")
+    md = re.sub(r"(?m)^- \*\*(?:場所|Where)\*\*: *$", "- **Where**: Before \"Results\".", s.md_path.read_text(encoding="utf-8"), count=1)
+    md = md.replace(
+        "<!-- priorwork:note -->\n## 6.",
+        "Card and Krueger (1994) found no fall, unlike Neumark and Wascher (2007, p. 5) "
+        "(e.g., Dube et al., 2010; Card and Krueger 1994). See also Smith (2001) and (2010年代).\n\n"
+        "<!-- priorwork:note -->\n## 6.")
     s.md_path.write_text(md, encoding="utf-8")
     capsys.readouterr()
     cli.main(["export", "mw", "--draft", "--octavo"])
@@ -113,7 +116,7 @@ def test_add_cited_and_export_for_octavo(ws, tmp_path, fake_get, capsys):  # noq
     text = (inbox / f"{made['name']}.md").read_text(encoding="utf-8")
     assert "@card1994 found no fall, unlike @PRIORWORK:10.1/neum [p. 5]" in text   # Octavo が DOI でキーに置き換える
     manifest = json.loads((inbox / f"{made['name']}.json").read_text(encoding="utf-8"))
-    assert manifest["kind"] == "draft" and manifest["text"] == f"{made['name']}.md"
+    assert manifest["kind"] == "complete" and manifest["text"] == f"{made['name']}.md"
     assert {(c["key"], c["in_bib"]) for c in manifest["citations"]} == {
         ("card1994", True), ("dube2010", True), ("PRIORWORK:10.1/neum", False)}
     assert manifest["sha256"] == hashlib.sha256(text.encode("utf-8")).hexdigest()

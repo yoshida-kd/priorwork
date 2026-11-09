@@ -1,7 +1,7 @@
 ---
 name: priorwork-new
 description: >-
-  Starts a new social-science literature survey: settles the scope (research question, period, criteria,
+  Starts a new literature survey (social sciences or clinical research): settles the scope (research question, period, criteria,
   depth), creates reports/YYYYMMDD_<slug>.md with `./priorwork new`, and runs enough searches for the depth.
   Use when a survey on a new topic is needed, or when an existing survey needs more searches.
 ---
@@ -21,11 +21,14 @@ Settle these from the request. For anything the request does not say, decide som
 - Exclusion criteria (e.g. theory only, working papers)
 - An English slug (e.g. `minimum_wage_employment`). For a redo, use the old slug (the engine numbers the version as `20261012_v2_<slug>`; do not add `_v2` yourself)
 - The depth (`quick` / `full`): decide with the table in AGENTS.md, "Depth".
+- The discipline: for clinical research, add `--discipline medical` (AGENTS.md, "Medical surveys"); then write the question as population, intervention or exposure, comparator and outcomes.
 - The mode (`standard` / `auto` / `manual`): decide as in AGENTS.md, "Modes". If nothing says otherwise, `standard`.
 
 ```bash
 ./priorwork new "<topic (any language)>" --slug <slug> --by "<your model name>" --mode standard|auto|manual --depth quick|full --question "..." --years "..." --fields "..." --inclusion "..." --exclusion "..."
 ```
+
+If another survey may be in progress in this folder, add `--worktree` and work in the folder it makes (AGENTS.md, "Git").
 
 Give your own model name with `--by` (e.g. `"Gemini 3.1 Pro"`, `"Claude Opus 5.5"`).
 
@@ -48,6 +51,7 @@ For each subtopic, write 2–4 English queries and use both plain and `--bulk` s
 - Rerun a query that found nothing or almost nothing with fewer terms, synonyms, or without `--bulk`.
 - Ideas for terms: the concept in English and its synonyms, the names of the main theories (`"transaction cost"`, …), identification strategies (`"difference-in-differences"`), countries and regions.
 - Searches into a new survey leave out papers outside the social sciences (medicine or computer science only, say), judged by the S2 fields; papers with no field are kept. If the topic reaches into the natural sciences or engineering, set `./priorwork scope <survey> --search-field all`.
+- **In a medical survey**, each query goes to PubMed and S2. PubMed's tags work (`"heart failure"[MeSH Terms]`, `aspirin[tiab]`, `Randomized Controlled Trial[pt]`); they are removed for S2. Plain words let PubMed map them to MeSH; a phrase in quotes is searched as written, so use both. Search the drug class and the drug names, and search separately for trials and for meta-analyses. Results show the study design from PubMed.
 - To stay within particular journals ("the major journals of the field"), add `--journal "<full name>"` for each, as the journal writes its name (e.g. `--journal "American Political Science Review" --journal "American Journal of Political Science"`). Papers in other journals are left out and the count is shown.
 - Abstracts missing from the databases are filled in from Crossref. Do not exclude a paper still without one on its title and journal alone: set it to maybe and check the full text.
 - If you know a well-known paper, you may register it directly with `./priorwork add <survey> <DOI>` (after checking it with `get`).

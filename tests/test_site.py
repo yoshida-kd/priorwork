@@ -18,6 +18,8 @@ def headings(path: Path):
 PAIRS = [
     (REPO / "docs" / "guide.md", REPO / "docs" / "guide.ja.md"),
     (REPO / "docs" / "quickstart.md", REPO / "docs" / "quickstart.ja.md"),
+    (REPO / "docs" / "install.md", REPO / "docs" / "install.ja.md"),
+    (REPO / "docs" / "manuscripts.md", REPO / "docs" / "manuscripts.ja.md"),
     (REPO / "priorwork" / "docs" / "reference.md", REPO / "priorwork" / "docs" / "reference.ja.md"),
 ]
 
@@ -29,7 +31,7 @@ def test_the_two_guides_have_the_same_sections():
 
 def test_the_guide_is_for_people_in_vs_code():
     """手引きにはコマンドを書かない（エージェント向けのリファレンスにある）。"""
-    for path in (REPO / "docs" / "guide.md", REPO / "docs" / "guide.ja.md"):
+    for path in [REPO / "docs" / f"{n}{s}.md" for n in ("guide", "install", "manuscripts") for s in ("", ".ja")]:
         text = path.read_text(encoding="utf-8")
         assert not re.search(r"^```bash", text, re.M), path.name
         assert not re.search(r"\./priorwork [a-z]", text), path.name
@@ -57,10 +59,37 @@ def test_the_site_builds_and_its_links_resolve(tmp_path):
     subprocess.run(["sh", str(REPO / "site" / "build.sh"), str(tmp_path)], check=True)
     for idx, guide in (("index.html", "guide/index.html"), ("ja/index.html", "ja/guide/index.html"),
                        ("index.html", "quickstart/index.html"), ("ja/index.html", "ja/quickstart/index.html"),
-                       ("index.html", "reference/index.html"), ("ja/index.html", "ja/reference/index.html")):
+                       ("index.html", "reference/index.html"), ("ja/index.html", "ja/reference/index.html"),
+                       ("index.html", "install/index.html"), ("ja/index.html", "ja/install/index.html"),
+                       ("index.html", "manuscripts/index.html"), ("ja/index.html", "ja/manuscripts/index.html")):
         page = (tmp_path / guide).read_text(encoding="utf-8")
         assert "pages:skip" not in page and "<nav class=\"toc" in page
         ids = set(re.findall(r'id="([^"]+)"', page)) | {"install"}
         for html in (tmp_path / idx, tmp_path / guide):
             for anchor in re.findall(r'href="(?:guide/)?#([^"]+)"', html.read_text(encoding="utf-8")):
                 assert anchor in ids, (html.name, anchor)
+
+
+@pytest.mark.skipif(not shutil.which("pandoc"), reason="pandoc is not installed")
+def test_every_link_between_the_pages_resolves(tmp_path):
+    """ページどうしのリンク（パスと #見出し）が、組んだサイトの中にある。"""
+    shutil.copytree(REPO / "site", tmp_path, dirs_exist_ok=True)
+    subprocess.run(["sh", str(REPO / "site" / "build.sh"), str(tmp_path)], check=True)
+    base = "https://yoshida-kd.github.io/priorwork/"
+    for page in tmp_path.rglob("index.html"):
+        for href in re.findall(r'href="([^"]+)"', page.read_text(encoding="utf-8")):
+            if href.startswith(base):
+                target, anchor = (tmp_path / href[len(base):].split("#")[0]), href.partition("#")[2]
+            elif href.startswith(("http", "mailto:")) or href.startswith("#"):
+                continue
+            else:
+                target, anchor = (page.parent / href.split("#")[0]), href.partition("#")[2]
+            if target.is_dir():
+                target = target / "index.html"
+            if target.suffix not in (".html",):
+                assert target.exists(), (page, href)
+                continue
+            assert target.exists(), (page, href)
+            if anchor:
+                from urllib.parse import unquote
+                assert f'id="{unquote(anchor)}"' in target.read_text(encoding="utf-8"), (page, href)

@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from priorwork.survey import Survey
 from priorwork import cli, scaffold, survey
 from priorwork.api import from_openalex
 
@@ -46,7 +47,7 @@ def ws(tmp_path, monkeypatch, capsys):
 
 def test_status_list_and_decisions(ws):
     top = ws("status", "--json")
-    assert top["workspace"] and top["git"] == {"repo": True, "remote": False, "branch": top["git"]["branch"], "other_surveys": []} and top["surveys"] == [] and top["lang"] == "ja"
+    assert top["workspace"] and top["git"] == {"repo": True, "remote": False, "worktrees": [], "branch": top["git"]["branch"], "other_surveys": []} and top["surveys"] == [] and top["lang"] == "ja"
 
     made = ws("new", "最低賃金", "--slug", "mw", "--json")
     assert made["name"].endswith("_mw") and made["report"].endswith(".md") and made["lang"] == "ja"
@@ -110,8 +111,9 @@ def test_the_extension_reads_only_keys_the_cli_writes():
         declared[name] = set(re.findall(r"^\s+(\w+)\??:", body, re.M))
     expected = {
         "WorkspaceStatus": {"version", "root", "workspace", "lang", "git", "sync", "zotero", "zotero_write", "requests", "surveys", "archived"},
-        "GitInfo": {"repo", "remote", "branch", "other_surveys"},
-        "SurveySummary": {"name", "topic", "created", "version", "depth", "mode", "lang", "report", "manuscript", "purpose",
+        "GitInfo": {"repo", "remote", "branch", "other_surveys", "worktrees"},
+        "WorktreeInfo": {"name", "path", "branch"},
+        "SurveySummary": {"name", "topic", "created", "version", "discipline", "depth", "mode", "lang", "report", "manuscript", "purpose",
                           "zotero_collection", "archived", "counts", "searches"},
         "SurveyDetail": {"scope", "unfilled", "zotero_missing", "zotero_write", "zotero_written", "written_by", "audits", "octavo", "octavo_projects",
                          "sync", "next"},
@@ -144,7 +146,7 @@ def test_the_extension_reads_only_keys_the_cli_writes():
         "CardReport": {"number", "evidence", "evidence_options", "fields"},
         "CardField": {"key", "label", "value"},
         "EvidenceOption": {"key", "label"},
-        "SettingsReport": {"env", "exists", "items", "ssci"},
+        "SettingsReport": {"env", "exists", "items", "ssci", "scie"},
         "SettingItem": {"key", "secret", "set", "value"},
         "SsciListInfo": {"file", "journals"},
     }
@@ -155,12 +157,12 @@ def test_the_extension_reads_only_keys_the_cli_writes():
 
 def test_a_survey_from_a_manuscript(ws, tmp_path):
     (tmp_path / "paper.md").write_text("# 5. Results\n")
-    made = ws("new", "t", "--slug", "mp", "--manuscript", str(tmp_path / "paper.md"), "--purpose", "draft", "--json")
+    made = ws("new", "t", "--slug", "mp", "--manuscript", str(tmp_path / "paper.md"), "--json")
     assert made["manuscript"] == "paper.md"
     ws("search", "minimum wage", "--into", "mp", "--limit", "1", "--json")
     ws("include", "mp", "1", "--json")
     detail = ws("status", "mp", "--json")
-    assert detail["manuscript"] == "paper.md" and "draft" in [s["id"] for s in detail["next"]]
+    assert detail["manuscript"] == "paper.md" and "complete" in [s["id"] for s in detail["next"]]
     card = ws("card", "mp", "1", "--set", "role=C1 supports", "--json")
     assert next(f["value"] for f in card["fields"] if f["key"] == "role") == "C1 supports"
     with pytest.raises(SystemExit) as e:   # まだ下書きが無い
@@ -243,23 +245,34 @@ def test_standard_mode_stops_before_the_cards_until_the_user_says_go_on(ws):
     assert ws("scope", "au", "--mode", "manual", "--json")["mode"] == "manual"
 
 
-def test_a_survey_that_advises_on_a_manuscript(ws, tmp_path):
+def test_one_report_from_a_manuscript(ws, tmp_path, capsys):
     (tmp_path / "paper.md").write_text("# Paper\n")
-    made = ws("new", "t", "--slug", "adv", "--manuscript", str(tmp_path / "paper.md"), "--purpose", "advice", "--json")
-    assert made["purpose"] == "advice"
+    made = ws("new", "t", "--slug", "one", "--manuscript", str(tmp_path / "paper.md"), "--json")
+    assert made["purpose"] == "complete"
     report = Path(made["report"]).read_text(encoding="utf-8")
-    assert "原稿への助言" in report and "priorwork:draft" not in report
-    ws("search", "minimum wage", "--into", "adv", "--limit", "1", "--json")
-    ws("include", "adv", "1", "--json")
-    ids = [s["id"] for s in ws("status", "adv", "--json")["next"]]
-    assert "advice" in ids and "draft" not in ids
-    # 同じ原稿から、補完のサーベイ（目的を省いたときの既定）も別に作れる
-    filled = ws("new", "t", "--slug", "fill", "--manuscript", str(tmp_path / "paper.md"), "--json")
-    assert filled["purpose"] == "complete" and filled["manuscript"] == made["manuscript"]
-    report = Path(filled["report"]).read_text(encoding="utf-8")
-    assert "原稿の補完" in report and "priorwork:draft" in report and "原稿の欠けの地図" in report
+    for part in ("priorwork:draft", "原稿の欠けの地図", "補完の一覧", "引用の点検", "足りない先行研究", "論の組み立て", "まず直すところ"):
+        assert part in report
+    assert "後付け" not in report
+    # 前の版のコマンドの --purpose は受け付けて、同じ 1 種類にする
+    old = ws("new", "t", "--slug", "old", "--manuscript", str(tmp_path / "paper.md"), "--purpose", "advice", "--json")
+    assert old["purpose"] == "complete"
     with pytest.raises(SystemExit):
         cli.main(["new", "t", "--slug", "x", "--purpose", "advice"])          # 原稿が無い
+
+
+def test_surveys_made_for_a_single_purpose_still_work(ws, tmp_path):
+    """前の版の draft・advice のサーベイは、そのまま続けられる。"""
+    (tmp_path / "paper.md").write_text("# Paper\n")
+    ws("new", "t", "--slug", "adv", "--manuscript", str(tmp_path / "paper.md"), "--json")
+    s = Survey.load("adv")
+    ws("search", "minimum wage", "--into", "adv", "--limit", "1", "--json")
+    ws("include", "adv", "1", "--json")
+    for purpose in ("advice", "draft"):
+        s = Survey.load("adv")
+        s.data["purpose"] = purpose
+        s.save()
+        ids = [step["id"] for step in ws("status", "adv", "--json")["next"]]
+        assert purpose in ids and "complete" not in ids
 
 
 def test_zotero_dois_without_zotero_lists_every_included_paper(ws, capsys):
@@ -291,3 +304,12 @@ def test_requests_from_octavo(ws, tmp_path):
     assert {k: on_disk[k] for k in ("format", "project", "text", "created_at")} == \
         {k: sample[k] for k in ("format", "project", "text", "created_at")}
     assert ws("status", "--json")["requests"] == [] and len(ws("requests", "--all", "--json")["requests"]) == 1
+
+
+def test_a_medical_survey_through_the_cli(ws):
+    assert ws("new", "SGLT2 inhibitors", "--slug", "sglt2", "--discipline", "medical", "--json")["discipline"] == "medical"
+    assert ws("new", "Minimum wage", "--slug", "mw", "--json")["discipline"] == "social"
+    assert ws("status", "sglt2", "--json")["discipline"] == "medical"
+    settings = ws("settings", "--json")
+    assert settings["scie"] == {"file": None, "journals": 0}
+    assert "NCBI_API_KEY" in {i["key"] for i in settings["items"]}
