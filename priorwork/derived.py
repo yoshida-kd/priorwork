@@ -140,7 +140,8 @@ def measure(md: str, lang: str, count_citations: bool) -> int:
 
 # ---------------- 検査 ----------------
 
-_SENTENCE = re.compile(r"[^。！？.!?\n]+[。！？.!?]?")
+# 文。数字に挟まれた点（0.27）は文の終わりではない
+_SENTENCE = re.compile(r"(?:[^。！？.!?\n]|(?<=\d)\.(?=\d))+[。！？.!?]?")
 
 
 def check(survey: Survey) -> List[Tuple[str, str]]:

@@ -3,6 +3,24 @@
 Priorwork's command-line tool (`priorwork` on PyPI) and this extension are
 released together, under one version number.
 
+## 0.2.1
+
+- **Notes under a card no longer pile up.** Each `render` (and each `card --set`) added the note
+  "Replaced the preprint / working-paper DOI …" again, so `check` always said the Markdown did not
+  match the state file. Notes repeated before are cleaned up on the next `render`.
+- **Working paper and published version as one record in OpenAlex.** When OpenAlex gives the
+  working paper's DOI (SSRN) for a published paper, Priorwork now takes the journal's DOI. `fix --id
+  <published DOI>` no longer falls back to the SSRN DOI, a journal DOI from Semantic Scholar is no
+  longer shown as "SSRN Electronic Journal", and `fix --id` says when the databases give another DOI.
+- **`fix --journal` and `fix --pages`**, for a working-paper series given as the journal or a single
+  page given as the range (`145-145`).
+- **`check`:** pages with a letter (`p. F117`, `S117`, `E244`) count as pages; a decimal point no
+  longer ends a sentence in derived documents (`0.27` was read as `27`); numbers written `10 943`, or
+  run into words (`by35,000federal`), are found in the full text.
+- **Surnames:** `Dal Bó` and `Di Tella` keep their particle.
+- **Zotero:** the papers in the collection but not in the survey are listed, and `--import` says when
+  a paper in Zotero is a paper of the survey under another DOI.
+
 ## 0.2.0
 
 - **Medical surveys.** `new --discipline medical`, or **Medicine (clinical research)** in **New

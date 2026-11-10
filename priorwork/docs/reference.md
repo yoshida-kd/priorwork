@@ -211,11 +211,15 @@ at least two are taken by default.
 ./priorwork references 10.1257/aer.91.5.1369
 ./priorwork journal "Journal of Public Administration Research and Theory"
 ./priorwork fix SURVEY 12 --id 10.1093/jopart/xyz --authors "A; B" --year 2019
+./priorwork fix SURVEY 12 --journal "Labour Economics" --pages 101-122
 ./priorwork fix SURVEY 12 --confirm "checked the publisher's page"
 ```
 
-`fix` replaces a working-paper DOI with the published one, corrects authors, year or title, or
-clears a warning you have checked (with what you checked).
+`fix` replaces a working-paper DOI with the published one, corrects authors, year, title, journal
+or pages, or clears a warning you have checked (with what you checked). Correct the journal when the
+databases give a working-paper series (SSRN) for a published paper, and the pages when they give a
+single page (`145-145`). If `--id` comes back with another DOI, the databases hold the two versions as
+one paper; `fix` says so.
 
 ---
 
@@ -480,7 +484,7 @@ are left out of searches by default.
 ./priorwork include|exclude|maybe SURVEY N... --reason "..."
 ./priorwork reset SURVEY N...
 ./priorwork add SURVEY <DOI>... [--candidate] | --cited
-./priorwork fix SURVEY N [--id <DOI>] [--authors "A; B"] [--year Y] [--confirm "..."]
+./priorwork fix SURVEY N [--id <DOI>] [--authors "A; B"] [--year Y] [--title T] [--journal J] [--pages P] [--confirm "..."]
 ./priorwork card SURVEY N [--set KEY=VALUE ...]
 ./priorwork fulltext SURVEY N [--pdf PATH]
 ./priorwork render SURVEY

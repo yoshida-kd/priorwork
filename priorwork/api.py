@@ -527,8 +527,13 @@ def from_openalex(w: Dict[str, Any]) -> Dict[str, Any]:
         abstract = " ".join(word for _, word in positions)
 
     doi = _bare_doi(w.get("doi"))
+    # OpenAlex は WP 版と掲載版を 1 つの work にまとめ、DOI に WP 版を、所在の先頭に掲載誌を置くことがある
+    # （Hospido & Moral-Benito 2016: 10.2139/ssrn.2480321 と Labour Economics）。誌名に合わせて掲載版の DOI を使う
+    published, preprint = location_doi(loc), ""
+    if published and published.lower() != doi.lower() and preprint_doi(doi) and not preprint_doi(published):
+        doi, preprint = published, doi
     work_id = (w.get("id") or "").replace("https://openalex.org/", "")
-    return _record(
+    rec = _record(
         id=work_id,
         openalex_id=work_id,
         source="OpenAlex",
@@ -551,6 +556,15 @@ def from_openalex(w: Dict[str, Any]) -> Dict[str, Any]:
         fields=[t.get("display_name") for t in (w.get("topics") or [])[:3]],
         retracted=bool(w.get("is_retracted")),
     )
+    if preprint:
+        rec["preprint_doi"] = preprint
+    return rec
+
+
+def location_doi(loc: Dict[str, Any]) -> str:
+    """OpenAlex の所在の DOI（landing_page_url が doi.org のとき）。"""
+    url = (loc or {}).get("landing_page_url") or ""
+    return _bare_doi(url) if re.match(r"^https?://(dx\.)?doi\.org/10\.", url, re.IGNORECASE) else ""
 
 
 def _date_year(part: Any) -> Optional[int]:
@@ -572,6 +586,7 @@ def merge_found(s2: List[Dict[str, Any]], oa: List[Dict[str, Any]], bulk: bool) 
     rank = {id(p): n for n, p in enumerate(s2)}
     for n, r in enumerate(oa):
         same = next((p for p in out if (r["doi"] and r["doi"].lower() in {p["doi"].lower(), (p.get("preprint_doi") or "").lower()})
+                     or (r.get("preprint_doi") and p["doi"] and r["preprint_doi"].lower() == p["doi"].lower())
                      or (r["openalex_id"] and r["openalex_id"] == p.get("openalex_id"))
                      or (ssci.same_title(p["title"], r["title"]) and _close_years(p.get("year"), r.get("year")))), None)
         if same is None:
@@ -786,6 +801,8 @@ class LiteratureClient:
                 })
                 for w in data.get("results") or []:
                     works[_bare_doi(w.get("doi")).lower()] = w
+                    # 掲載版の DOI でも引ける（work の DOI が WP 版のとき）
+                    works.setdefault(location_doi(w.get("primary_location") or {}).lower() or "-", w)
         except ApiError as e:
             print("[Notice] " + t("{error} → the DOIs are not checked with OpenAlex (the details from S2 are kept)",
                                   error=e), file=sys.stderr)
@@ -806,6 +823,12 @@ class LiteratureClient:
                     versions.append((r, s2_journal, s2_issns, [warning]))
                 continue
             oa = from_openalex(w)
+            if oa.get("preprint_doi", "").lower() == r["doi"].lower() and ssci.same_title(oa["title"], r["title"]):
+                # S2 の DOI は WP 版で、OpenAlex の同じ work に掲載版がある
+                self._take_journal_version(r, oa)
+                if oa["retracted"]:
+                    mark_retracted(r)
+                continue
             added = []
             if not ssci.same_title(oa["title"], r["title"]):
                 added.append(t("The DOI points to another title: \"{title}\" (verify the DOI)", title=oa["title"]))

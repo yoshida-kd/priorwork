@@ -40,8 +40,8 @@ MAX_ATTACHMENTS = 4   # 1 本の論文で調べる Zotero の添付 PDF の数
 
 
 def journal_pages(record: Dict[str, Any]) -> Tuple[Optional[int], Optional[int]]:
-    """掲載誌のページ範囲（"330-345" → (330, 345)）。最後のページが無い・最初より前なら (最初, None)。"""
-    m = re.match(r"^\s*(\d+)\s*(?:[-–]+\s*(\d+))?", record.get("pages") or "")
+    """掲載誌のページ範囲（"330-345" → (330, 345)。"F107-F130" も）。最後のページが無い・最初より前なら (最初, None)。"""
+    m = re.match(r"^\s*[A-Za-z]?(\d+)\s*(?:[-–]+\s*[A-Za-z]?(\d+))?", record.get("pages") or "")
     if not m:
         return None, None
     first, last = int(m.group(1)), int(m.group(2)) if m.group(2) else None

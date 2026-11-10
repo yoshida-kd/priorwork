@@ -44,7 +44,9 @@ SYNTHESIS_MARK = "<!-- priorwork:synthesis -->"
 _LABEL_ONLY = re.compile(r"^\s*(?:[-*]|\d+\.)\s+\S.*[:：]\s*$")
 # カードの根拠: ページ（p. 12 / pp. 12-13）、または本文にページ区切りが無いときの「（ページ未確認）」
 # 「p. 177, 184-190」のように続くページも一つの参照として読む（後ろのページを数値と取り違えない）
-_PAGE_RE = re.compile(r"\bpp?\.\s*\d+(?:\s*[-–]\s*\d+)?(?:\s*[,，]\s*\d+(?:\s*[-–]\s*\d+)?)*", re.IGNORECASE)
+# ページ。英字の付いたもの（The Economic Journal の F107、特集号の S117、e244）も
+_PAGE_RE = re.compile(r"\bpp?\.\s*[A-Z]?\d+(?:\s*[-–]\s*[A-Z]?\d+)?(?:\s*[,，]\s*[A-Z]?\d+(?:\s*[-–]\s*[A-Z]?\d+)?)*",
+                      re.IGNORECASE)
 _PAGE_UNCHECKED_RE = re.compile(r"ページ未確認|page not checked", re.IGNORECASE)
 _NUMBER_RE = re.compile(r"(?<![0-9A-Za-z_.])\d[\d,]*(?:\.\d+)?")
 _CJK_RE = re.compile(r"[\u3040-\u30ff\u4e00-\u9fff]")
@@ -466,10 +468,13 @@ def _card_numbers(text: str) -> Set[str]:
 
 
 def _text_numbers(text: str) -> Set[str]:
-    """本文に現れる数値（カンマを外した形。.35 は 0.35 としても引ける）。"""
+    """本文に現れる数値（桁区切りを外した形。.35 は 0.35 としても引ける）。"""
     text = unicodedata.normalize("NFKC", text)
-    text = re.sub(r"(?<=\d),\s?(?=\d{3}\b)", "", text)            # 1,234 / 1, 234（抽出の空白）→ 1234
-    found = set(re.findall(r"\d+(?:\.\d+)?|\.\d+", text))
+    # 1,234 / 1, 234（抽出の空白）/ by35,000federal（空白の詰まった本文）→ 1234
+    text = re.sub(r"(?<=\d),\s?(?=\d{3}(?!\d))", "", text)
+    # 10 943（空白の桁区切り）。「2015 100 社」のような別の数かもしれないので、つなげる前の数も残す
+    joined = re.sub(r"(?<=\d) (?=\d{3}(?!\d))", "", text)
+    found = set(re.findall(r"\d+(?:\.\d+)?|\.\d+", text)) | set(re.findall(r"\d+(?:\.\d+)?|\.\d+", joined))
     return found | {"0" + m for m in found if m.startswith(".")}
 
 

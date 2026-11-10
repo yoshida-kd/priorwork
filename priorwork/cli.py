@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional
 from . import __version__, derived, i18n, scaffold, settings, ssci
 import requests
 
-from .api import RETRY_STATUSES, ApiError, LiteratureClient, in_journals, not_research
+from .api import RETRY_STATUSES, ApiError, LiteratureClient, in_journals, not_research, parse_identifier
 from .check import ERROR, INFO, WARN, check_survey
 from .doctor import NG, OK, run_checks
 from .export import FORMATS, export, export_draft
@@ -886,12 +886,18 @@ def cmd_fix(args, client):
     e = s.get(args.number)
     if args.id:
         rec = paper_for(s, client, args.id)
+        asked = parse_identifier(args.id)
+        if asked["type"] == "doi" and (rec.get("doi") or "").lower() != asked["value"].lower():
+            print("[Notice] " + t("The databases give {got} for {asked} (the same paper under another DOI). Check it; "
+                                  "the paper keeps the DOI they give", got=rec.get("doi") or "-", asked=asked["value"]),
+                  file=sys.stderr)
         old_key = e["key"]
         s.replace_record(e, rec)
         if not args.json:
             print(t("#{number}: replaced {old} with {new}", number=e["number"], old=old_key, new=e["key"]))
     authors = [a.strip() for a in args.authors.split(";")] if args.authors else None
-    s.fix_record(args.number, confirm=args.confirm or "", authors=authors, year=args.year, title=args.title)
+    s.fix_record(args.number, confirm=args.confirm or "", authors=authors, year=args.year, title=args.title,
+                 journal_name=args.journal, pages=args.pages)
     render_and_report(s)
     if args.json:
         return dump_json({"number": e["number"], "key": e["key"], "record": e["record"],
@@ -1150,7 +1156,7 @@ def zotero_to_import(s: Survey, z: ZoteroClient) -> List[Dict[str, Any]]:
     coll = s.zotero_collection.get("key")
     if not coll:
         return []
-    known_dois = {(e["record"].get("doi") or "").lower() for e in s.papers} - {""}
+    known_dois = {(e["record"].get(k) or "").lower() for e in s.papers for k in ("doi", "preprint_doi")} - {""}
     known_titles = {ssci.normalize_title(e["record"]["title"]) for e in s.papers}
     return [i for i in z.collection_items(coll)
             if i["doi"] not in known_dois and ssci.normalize_title(i["title"]) not in known_titles]
@@ -1313,7 +1319,13 @@ def cmd_zotero(args, client):
                 print(f"[Notice] {item['doi']}: {e}", file=sys.stderr)
                 no_doi.append(item)
                 continue
-            imported.append(s.upsert(rec, "zotero"))
+            entry, is_new = s.upsert(rec, "zotero")
+            imported.append((entry, is_new))
+            if not is_new and (entry["record"].get("doi") or "").lower() != item["doi"].lower():
+                print("[Notice] " + t("{doi} in Zotero is the same paper as #{number} ({other}). Correct the DOI of "
+                                      "one of them (`priorwork fix {survey} {number} --id {doi}`)", doi=item["doi"],
+                                      number=entry["number"], other=entry["record"].get("doi") or "-", survey=s.name),
+                      file=sys.stderr)
         if imported:
             s.log_search("zotero", coll["name"], {}, len(imported), sum(1 for _, n in imported if n))
         render_and_report(s)
@@ -1382,6 +1394,10 @@ def cmd_zotero(args, client):
     if pending:
         print(t("{n|# paper is|# papers are} in the collection but not in the survey yet: "
                 "`priorwork zotero {name} --import` registers them as candidates", n=len(pending), name=s.name))
+        for item in pending[:10]:
+            print(f"  {item['title']}" + (f" (doi:{item['doi']})" if item["doi"] else ""))
+        if len(pending) > 10:
+            print("  " + t("… and {n} more", n=len(pending) - 10))
 
 
 # ---------------- Discovery commands ----------------
@@ -1715,7 +1731,7 @@ def build_parser() -> argparse.ArgumentParser:
                    help=t("register the papers the survey's manuscript cites (the DOIs in its .bib)"))
 
     p = sub.add_parser("fix", parents=[common, as_json],
-                       help=t("correct the details of a registered paper (published-version DOI, authors, year, title) "
+                       help=t("correct the details of a registered paper (published-version DOI, authors, year, title, journal, pages) "
                               "or clear a warning you have checked"))
     p.add_argument("survey")
     p.add_argument("number", type=int, help=t("the paper number"))
@@ -1724,6 +1740,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--authors", help=t("the authors, separated by \";\" (e.g. \"Yuen Yuen Ang\")"))
     p.add_argument("--year", type=int, help=t("the year"))
     p.add_argument("--title", help=t("the title"))
+    p.add_argument("--journal", help=t("the journal (when the database gives the working-paper series instead)"))
+    p.add_argument("--pages", help=t("the pages (e.g. 145-159)"))
     p.add_argument("--confirm", metavar="REASON",
                    help=t("clear the warnings after checking that the details are right, recording why"))
 

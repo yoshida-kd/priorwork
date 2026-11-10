@@ -182,10 +182,11 @@ my-surveys/
 ./priorwork references 10.1257/aer.91.5.1369
 ./priorwork journal "Journal of Public Administration Research and Theory"
 ./priorwork fix SURVEY 12 --id 10.1093/jopart/xyz --authors "A; B" --year 2019
+./priorwork fix SURVEY 12 --journal "Labour Economics" --pages 101-122
 ./priorwork fix SURVEY 12 --confirm "checked the publisher's page"
 ```
 
-`fix` は、ワーキングペーパーの DOI を掲載版のものに替え、著者・年・題を直し、確かめた警告を（何を確かめたかとともに）解除する。
+`fix` は、ワーキングペーパーの DOI を掲載版のものに替え、著者・年・題・誌名・ページを直し、確かめた警告を（何を確かめたかとともに）解除する。掲載された論文にデータベースが WP のシリーズ（SSRN）を誌名として返したときは誌名を、1 ページだけの範囲（`145-145`）を返したときはページを直す。`--id` で別の DOI が返ってきたら、データベースが 2 つの版を 1 本として持っている。`fix` はそれを知らせる。
 
 ---
 
@@ -418,7 +419,7 @@ SSCI の表示: ✅ リストで確認、🟡 約 100 誌の組み込みのリ�
 ./priorwork include|exclude|maybe SURVEY N... --reason "..."
 ./priorwork reset SURVEY N...
 ./priorwork add SURVEY <DOI>... [--candidate] | --cited
-./priorwork fix SURVEY N [--id <DOI>] [--authors "A; B"] [--year Y] [--confirm "..."]
+./priorwork fix SURVEY N [--id <DOI>] [--authors "A; B"] [--year Y] [--title T] [--journal J] [--pages P] [--confirm "..."]
 ./priorwork card SURVEY N [--set KEY=VALUE ...]
 ./priorwork fulltext SURVEY N [--pdf PATH]
 ./priorwork render SURVEY

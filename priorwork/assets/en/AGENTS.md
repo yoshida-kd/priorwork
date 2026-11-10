@@ -207,7 +207,7 @@ For clinical research, create the survey with `./priorwork new ... --discipline 
 ./priorwork list SURVEY [--status candidate maybe included excluded] [--abstract]
 ./priorwork include SURVEY N... --reason "..."   ./priorwork exclude SURVEY N... --reason "..."   ./priorwork maybe SURVEY N... --reason "..."   ./priorwork reset SURVEY N...
 ./priorwork add SURVEY <DOI>... [--candidate]      ./priorwork add SURVEY --cited   # register the papers the manuscript cites (the DOIs in its .bib)
-./priorwork fix SURVEY N [--id <published DOI>] [--authors "A; B"] [--year Y] [--confirm "<what you checked>"]
+./priorwork fix SURVEY N [--id <published DOI>] [--authors "A; B"] [--year Y] [--journal J] [--pages P] [--confirm "<what you checked>"]
 ./priorwork snowball SURVEY [--direction both|references|citations] [--limit N] [--min-links N]
 ./priorwork fulltext SURVEY N [--pdf PATH]
 ./priorwork card SURVEY N [--set KEY=VALUE ...]

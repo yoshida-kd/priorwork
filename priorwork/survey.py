@@ -176,8 +176,9 @@ _NAME_SUFFIXES = {"jr", "sr", "ii", "iii", "iv"}
 
 
 # 姓の前置詞。小文字なら何でも。大文字で始まるものは、名前と紛れにくいものだけ（"Le"・"Da" は東アジアの名前にもある）
-_PARTICLES = {"van", "von", "de", "der", "den", "del", "della", "du", "da", "di", "le", "la", "dos", "das", "ten", "ter"}
-_CAPITAL_PARTICLES = {"Van", "Von", "De", "Del", "Der", "Den", "La", "Dos"}
+_PARTICLES = {"van", "von", "de", "der", "den", "del", "della", "dalla", "dal", "du", "da", "di", "le", "la", "dos",
+              "das", "des", "ten", "ter"}
+_CAPITAL_PARTICLES = {"Van", "Von", "De", "Del", "Della", "Dalla", "Dal", "Di", "Der", "Den", "La", "Dos", "Des"}
 # 団体の著者（"RECOVERY Collaborative Group"）。最後の語は姓ではないので、全体を示す
 _GROUP_WORDS = {"group", "groups", "collaborators", "collaboration", "collaborative", "consortium", "investigators",
                 "committee", "team", "trialists", "network", "working", "study"}
@@ -511,16 +512,25 @@ class Survey:
             self.data["papers"][entry["key"]] = entry
 
     def fix_record(self, number: int, confirm: str = "", **fields: Any) -> Dict[str, Any]:
-        """書誌情報を手で直す（authors・year・title）。confirm に理由を渡すと、今の警告を確かめたものとして解除する。"""
+        """書誌情報を手で直す（authors・year・title・journal_name・pages）。confirm に理由を渡すと、今の警告を
+        確かめたものとして解除する。"""
         e = self.get(number)
         fields = {k: v for k, v in fields.items() if v not in (None, "", [])}
         if fields.get("authors"):   # "Van de Ven, Andrew H." の形でも受け取る
             fields["authors"] = [" ".join(x for x in split_name(a) if x) for a in fields["authors"]]
-        if fields.get("title"):
-            fields["title"] = one_line(fields["title"])
+        for key in ("title", "journal_name", "pages"):
+            if fields.get(key):
+                fields[key] = one_line(fields[key])
+        if fields.get("pages"):
+            fields["pages"] = re.sub(r"\s*[-–—]+\s*", "-", fields["pages"])
+        if fields.get("journal_name") and fields["journal_name"] != e["record"].get("journal_name"):
+            # 前の誌（SSRN など）の ISSN・種類では収録の判定を誤る。誌名で判定し直す
+            fields.update(issns=[], source_type="journal")
         if fields:
             e.setdefault("fixed", {}).update(fields)
             e["record"].update(fields)
+            if "journal_name" in fields and not self.medical:
+                e["record"]["ssci"] = ssci.classify_paper(e["record"])
         if confirm:
             old = (e.get("confirmed") or {}).get("warnings", [])
             e["confirmed"] = {"at": now_iso(), "reason": confirm,
@@ -939,10 +949,10 @@ def _biblio_prefixes() -> Tuple[str, ...]:
 
 
 def parse_cards(papers_block: str) -> Dict[str, str]:
-    """カードごとに、再生成する行（見出し・書誌・⚠️）を除いた本文を返す。"""
+    """カードごとに、再生成する行（見出し・書誌・⚠️・ℹ️）を除いた本文を返す。"""
     cards: Dict[str, List[str]] = {}
     current = None
-    regenerated = ("### ", "- ⚠️", *_biblio_prefixes())
+    regenerated = ("### ", "- ⚠️", "- ℹ️", *_biblio_prefixes())
     for line in papers_block.splitlines():
         m = _CARD_MARKER.match(line)
         if m:

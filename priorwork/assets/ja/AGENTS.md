@@ -207,7 +207,7 @@ Zotero に書き込むのは、ユーザーが設定で許したとき（`.env` 
 ./priorwork list SURVEY [--status candidate maybe included excluded] [--abstract]
 ./priorwork include SURVEY N... --reason "..."   ./priorwork exclude SURVEY N... --reason "..."   ./priorwork maybe SURVEY N... --reason "..."   ./priorwork reset SURVEY N...
 ./priorwork add SURVEY <DOI>... [--candidate]      ./priorwork add SURVEY --cited   # 原稿が引いている論文（.bib の DOI）を登録
-./priorwork fix SURVEY N [--id <掲載版の DOI>] [--authors "A; B"] [--year Y] [--confirm "<確かめたこと>"]
+./priorwork fix SURVEY N [--id <掲載版の DOI>] [--authors "A; B"] [--year Y] [--journal J] [--pages P] [--confirm "<確かめたこと>"]
 ./priorwork snowball SURVEY [--direction both|references|citations] [--limit N] [--min-links N]
 ./priorwork fulltext SURVEY N [--pdf PATH]
 ./priorwork card SURVEY N [--set KEY=VALUE ...]

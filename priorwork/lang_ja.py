@@ -569,14 +569,25 @@ MESSAGES = {
     "publisher's preview: get the whole PDF (attach it in Zotero, or give it with `--pdf`)":
         "※ PDF は {pages} ページしかありませんが、掲載誌では {expected} ページあります。出版社のプレビューだけかもしれません。"
         "PDF の全体を用意してください（Zotero に添付するか、`--pdf` で渡す）",
-    "correct the details of a registered paper (published-version DOI, authors, year, title) "
+    "correct the details of a registered paper (published-version DOI, authors, year, title, journal, pages) "
     "or clear a warning you have checked":
-        "登録した論文の書誌を直す（掲載版の DOI・著者・年・タイトル）、または確かめた警告を解除する",
+        "登録した論文の書誌を直す（掲載版の DOI・著者・年・タイトル・誌名・ページ）、または確かめた警告を解除する",
     "replace the details with those of this DOI / ID (e.g. the published version of a working paper)":
         "この DOI / ID の書誌に置き換える（WP 版を掲載版にするときなど）",
     "the authors, separated by \";\" (e.g. \"Yuen Yuen Ang\")": "著者（「;」で区切る。例: \"Yuen Yuen Ang\"）",
     "the year": "年",
     "the title": "タイトル",
+    "the journal (when the database gives the working-paper series instead)":
+        "誌名（データベースが WP のシリーズ名を返したとき）",
+    "the pages (e.g. 145-159)": "ページ（例: 145-159）",
+    "… and {n} more": "…ほか {n} 本",
+    "{doi} in Zotero is the same paper as #{number} ({other}). Correct the DOI of "
+    "one of them (`priorwork fix {survey} {number} --id {doi}`)":
+        "Zotero の {doi} は #{number}（{other}）と同じ論文です。どちらかの DOI を直してください"
+        "（`priorwork fix {survey} {number} --id {doi}`）",
+    "The databases give {got} for {asked} (the same paper under another DOI). Check it; "
+    "the paper keeps the DOI they give":
+        "データベースは {asked} に {got} を返しました（同じ論文の別の DOI）。確かめてください。論文の DOI は返された方になります",
     "clear the warnings after checking that the details are right, recording why":
         "書誌が正しいことを確かめたうえで、理由を記録して警告を解除する",
     "updated": "更新しました",
