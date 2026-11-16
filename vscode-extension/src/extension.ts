@@ -13,7 +13,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import {
     CheckReport, CliError, DoctorReport, Entry, ExportReport, OctavoRequest, runJson, runText, SearchReport, Status,
-    SurveySummary, ZoteroCollections, ZoteroReport,
+    NewSurveyReport, SurveySummary, ZoteroCollections, ZoteroReport,
 } from './cli';
 import { browseCollections } from './collections';
 import { Model } from './model';
@@ -952,10 +952,21 @@ export function activate(context: vscode.ExtensionContext): void {
                 return;
             }
             try {
-                const made = await runJson<SurveySummary>(r, ['new', topic.trim(), '--slug', slug.trim(), '--depth', depth.label,
+                const made = await runJson<NewSurveyReport>(r, ['new', topic.trim(), '--slug', slug.trim(), '--depth', depth.label,
                     '--discipline', discipline.value,
                     ...(question.trim() ? ['--question', question.trim()] : [])]);
                 model.refresh();
+                if (made.worktree) {
+                    // 既定では worktree（worktrees/<slug>/）に作る。このウィンドウのフォルダは main のまま
+                    const open = vscode.l10n.t('Open in a New Window');
+                    const chosen = await vscode.window.showInformationMessage(
+                        vscode.l10n.t('Priorwork: created {0} in its own folder {1} (branch {2}). Work on it there; this folder stays as it is.',
+                            path.basename(made.report), made.worktree, made.branch ?? made.name), open);
+                    if (chosen === open) {
+                        await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(made.worktree), { forceNewWindow: true });
+                    }
+                    return;
+                }
                 const search = vscode.l10n.t('Search');
                 const picked = await vscode.window.showInformationMessage(
                     vscode.l10n.t('Priorwork: created {0}.', path.basename(made.report)), search);

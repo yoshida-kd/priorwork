@@ -55,4 +55,4 @@ Fix the ERRORs before exporting. For a WARN about a number, check the card again
 
 ## 4. Report
 
-Say which file you wrote and what it is (purpose, length, structure), what you decided yourself, how many papers it cites, the WARNs left, and how to read it (AGENTS.md, "Showing the report"; the HTML is `reports/<survey>.<name>.html`). With Git, the file goes in with `git add reports/<survey>.*`.
+Say which file you wrote and what it is (purpose, length, structure), what you decided yourself, how many papers it cites, the WARNs left, and how to read it (AGENTS.md, "Showing the report"; the HTML is `reports/<survey>.<name>.html`). With Git, the file goes in with `git add 'reports/<survey>.*'`.

@@ -1,4 +1,4 @@
-"""同じワークスペースで、いくつものサーベイを同時に進める: サーベイごとの git worktree（`new --worktree`）。
+"""同じワークスペースで、いくつものサーベイを同時に進める: サーベイごとの git worktree（`new` の既定。`--here` で使わない）。
 
 サーベイはそれぞれのブランチで進むので、同じフォルダで切り替えると、別のセッションの作業を巻き込む。worktree は
 ワークスペースの `worktrees/<slug>/` に置き、Git に入らないもの（`.env`・`.venv`・リストの CSV・本文のキャッシュ）は
@@ -94,6 +94,9 @@ def create(root: Path, slug: str) -> Path:
         raise WorktreeError(t("{path} already exists. Continue there, or choose another slug", path=tree))
     _exclude(common_dir(root))
     base = base_branch(main)
+    # リモートがあれば、その最新から始める（このフォルダの main が古くても。このフォルダには触れない）
+    if _out(main, "remote") and _git(main, "fetch", "--quiet", "origin", base).returncode == 0:
+        base = f"origin/{base}"
     done = _git(main, "worktree", "add", "--detach", str(tree), base)
     if done.returncode != 0:
         raise WorktreeError(t("Could not create the worktree: {error}", error=done.stderr.strip()))
@@ -115,8 +118,12 @@ def discard(tree: Path):
 def _unsaved(tree: Path, main: Path) -> Dict[str, Any]:
     """消すと失われるもの: 未コミットの変更と、どこにも push していないコミット。"""
     changes = _out(tree, "status", "--porcelain")
-    upstream = _out(tree, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
-    ahead = _out(tree, "rev-list", "--count", f"{upstream or base_branch(main)}..HEAD")
+    if _out(tree, "remote"):
+        # どのリモートのブランチにも無いコミット。PR のマージ後にリモートのブランチが消えても、
+        # コミットはリモートの main にあるので失われない
+        ahead = _out(tree, "rev-list", "--count", "HEAD", "--not", "--remotes")
+    else:
+        ahead = _out(tree, "rev-list", "--count", f"{base_branch(main)}..HEAD")
     return {"changes": len(changes.splitlines()), "unpushed": int(ahead or 0)}
 
 

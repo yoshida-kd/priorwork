@@ -377,5 +377,7 @@
   "Write the report on the manuscript": "原稿のレポートを書く",
   "what to add and where, its citations, the argument": "どこに何を足すか・引用・論の組み立て",
   "{0} (in its own folder)": "{0}（専用のフォルダ）",
-  "Open {0} in a new window": "{0} を新しいウィンドウで開く"
+  "Open {0} in a new window": "{0} を新しいウィンドウで開く",
+  "Open in a New Window": "新しいウィンドウで開く",
+  "Priorwork: created {0} in its own folder {1} (branch {2}). Work on it there; this folder stays as it is.": "Priorwork: {0} を専用のフォルダ {1}（ブランチ {2}）に作りました。作業はそちらで行います。このフォルダはそのままです。"
 }

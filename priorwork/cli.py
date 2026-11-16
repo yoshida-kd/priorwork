@@ -12,7 +12,7 @@ import subprocess
 import sys
 from datetime import date
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from . import __version__, derived, i18n, scaffold, settings, ssci
 import requests
@@ -21,12 +21,13 @@ from .api import RETRY_STATUSES, ApiError, LiteratureClient, in_journals, not_re
 from .check import ERROR, INFO, WARN, check_survey
 from .doctor import NG, OK, run_checks
 from .export import FORMATS, export, export_draft
+from . import fulltext as ftmod
 from .fulltext import FulltextError, fetch_fulltext, incomplete_fulltext
 from .i18n import language, t, tl
 from .snowball import snowball
 from .survey import (
     CANDIDATE, DEFAULT_DEPTH, DEPTHS, DISCIPLINES, EVIDENCE_KEYS, EXCLUDED, INCLUDED, MAYBE, MODES, PURPOSES,
-    SEARCH_FIELDS, STATUSES, Survey,
+    SCOPE_KEYS, SEARCH_FIELDS, STATUSES, Survey,
     SurveyError, author_short, off_field, sanitize_slug, evidence_key, evidence_label, now_iso, status_label, status_trail,
     study_design,
 )
@@ -432,6 +433,11 @@ def cmd_status(args, client):
         if not shown:
             print(t("No archived surveys.") if args.archived
                   else t("No surveys yet. Create one with `priorwork new \"<topic>\" --slug <english_slug>`."))
+        if not everything and not args.archived and not git["other_surveys"]:
+            projects = octavo.projects_in(ROOT)
+            if projects:
+                from .doctor import octavo_only_note
+                print("⚠️ " + octavo_only_note(ROOT, projects))
         for s in shown:
             c = s.counts()
             print(f"{s.name}: {s.data['topic']} | " + t("included {included} / maybe {maybe} / candidates {candidate} / "
@@ -527,7 +533,7 @@ def zotero_unregistered(s: Survey) -> List[Dict[str, Any]]:
 def new_in_worktree(args) -> None:
     """`new --worktree`: worktree を作り、その中でふつうの `new` を動かし、サーベイの名前のブランチを作る。"""
     tree = worktree.create(ROOT, sanitize_slug(args.slug) or "survey")
-    argv = [a for a in args.argv if a != "--worktree"]
+    argv = [a for a in args.argv if a != "--worktree"] + ["--here"]
     if args.manuscript:                 # 原稿がまだコミットされていなければ、worktree の中には無い
         path = Path(args.manuscript).expanduser()
         if not path.is_absolute() and not (tree / path).exists() and (Path.cwd() / path).exists():
@@ -570,10 +576,26 @@ def cmd_worktree(args, client):
                   changes=w["changes"], unpushed=w["unpushed"]))
 
 
+def worktree_unavailable(root: Path) -> str:
+    """新しいサーベイを worktree で作れない理由（作れるなら空）。Git の外か、元にするブランチがまだ無いとき。"""
+    try:
+        worktree.base_branch(worktree.main_root(root))
+    except worktree.WorktreeError as e:
+        return str(e)
+    return ""
+
+
 def cmd_new(args, client):
-    if args.worktree:
-        return new_in_worktree(args)
-    scope = {k: getattr(args, k) or "" for k in ("question", "years", "fields", "inclusion", "exclusion")}
+    # 既定では worktree（worktrees/<slug>/ とサーベイの名前のブランチ）に作り、このフォルダのブランチは動かさない。
+    # 別のセッションがこのフォルダで動いていても巻き込まない。--here か、Git で作れないときだけ、このフォルダに作る
+    if not args.here:
+        why = worktree_unavailable(ROOT)
+        if not why:
+            return new_in_worktree(args)
+        if args.worktree:
+            raise worktree.WorktreeError(why)
+        print("[Notice] " + t("Made in this folder, not in a worktree: {reason}", reason=why), file=sys.stderr)
+    scope = {k: getattr(args, k) or "" for k in SCOPE_KEYS}
     if args.purpose and args.manuscript:
         print("[Notice] " + t("--purpose is no longer needed: one report from a manuscript covers what to add, the "
                               "check of its citations and advice"), file=sys.stderr)
@@ -640,7 +662,7 @@ def link_octavo_collection(s: Survey):
 
 def cmd_scope(args, client):
     s = Survey.load(args.survey)
-    s.update_scope(**{k: getattr(args, k) for k in ("question", "years", "fields", "inclusion", "exclusion")})
+    s.update_scope(**{k: getattr(args, k) for k in SCOPE_KEYS})
     if args.depth:
         s.set_depth(args.depth)
     if args.search_field:
@@ -789,18 +811,40 @@ def cmd_list(args, client):
                     extra=extra)
 
 
+def issue_years_for(client, entries: List[Dict[str, Any]]) -> List[Tuple[Dict[str, Any], int]]:
+    """掲載号の年が登録の年と違う論文と、その号の年（Crossref）。巻の無い論文と、年を手で直した論文は見ない。"""
+    dated = [e for e in entries if e["record"].get("doi") and e["record"].get("volume")
+             and e["record"].get("year") and "year" not in (e.get("fixed") or {})]
+    if not dated or client is None or not hasattr(client, "issue_years"):
+        return []
+    years = client.issue_years([e["record"]["doi"] for e in dated])
+    return [(e, years[e["record"]["doi"].lower()]) for e in dated
+            if years.get(e["record"]["doi"].lower()) not in (None, e["record"]["year"])]
+
+
 def cmd_set_status(args, client):
     status = {"include": INCLUDED, "exclude": EXCLUDED, "maybe": MAYBE, "reset": CANDIDATE}[args.command]
     if status == EXCLUDED and not args.reason:
         sys.exit(t("Error: {message}", message=t("An exclusion needs a reason (--reason \"...\")")))
     s = Survey.load(args.survey)
     entries = s.set_status(args.numbers, status, args.reason or "")
+    # 検索・snowball から入った論文の年は、オンラインで先に公開された年のことが多い。採用するときに掲載号の年に直す
+    # （`add` と同じく、号の年が後のときだけ。元の年は online_year に残す）
+    online: Dict[int, int] = {}
+    if status == INCLUDED:
+        for e, issue in issue_years_for(client, entries):
+            if issue > e["record"]["year"]:
+                online[e["number"]] = e["record"]["year"]
+                e["record"]["online_year"], e["record"]["year"] = e["record"]["year"], issue
     render_and_report(s)
     if args.json:
         return dump_json({"changed": [{"number": e["number"], "status": status, "title": e["record"]["title"]}
                                       for e in entries]})
     for e in entries:
         print(f"#{e['number']} → {status_label(status)}: {e['record']['title']}")
+        if e["number"] in online:
+            print("    " + t("the year is now {new}, the year of the journal issue (it came out online in {old})",
+                             new=e["record"]["year"], old=online[e["number"]]))
         for w in e["record"].get("warnings", []):
             print(f"    ⚠️ {w}")
 
@@ -883,6 +927,10 @@ def cmd_add(args, client):
 
 def cmd_fix(args, client):
     s = Survey.load(args.survey)
+    if args.issue_years:
+        return fix_issue_years(s, client, args)
+    if args.number is None:
+        raise SurveyError(t("Give the paper number (or --issue-years for all included papers)"))
     e = s.get(args.number)
     if args.id:
         rec = paper_for(s, client, args.id)
@@ -895,16 +943,57 @@ def cmd_fix(args, client):
         s.replace_record(e, rec)
         if not args.json:
             print(t("#{number}: replaced {old} with {new}", number=e["number"], old=old_key, new=e["key"]))
+    if args.confirm_warning is not None:
+        if args.reason is None:
+            raise SurveyError(t("Say what you checked with --reason \"...\" (an empty reason removes the record)"))
+        s.confirm_warning(args.number, args.confirm_warning, args.reason)
     authors = [a.strip() for a in args.authors.split(";")] if args.authors else None
     s.fix_record(args.number, confirm=args.confirm or "", authors=authors, year=args.year, title=args.title,
                  journal_name=args.journal, pages=args.pages)
     render_and_report(s)
     if args.json:
         return dump_json({"number": e["number"], "key": e["key"], "record": e["record"],
-                          "fixed": e.get("fixed", {}), "confirmed": e.get("confirmed")})
+                          "fixed": e.get("fixed", {}), "confirmed": e.get("confirmed"),
+                          "checked_warnings": e.get("checked_warnings", [])})
     print_paper(e["record"], f"#{e['number']}")
     if e.get("confirmed"):
         print(t("Checked by hand: {reason}", reason=e["confirmed"]["reason"]))
+    for c in e.get("checked_warnings", []):
+        print(t("Warning checked by hand (\"{match}\"): {reason}", match=c["match"], reason=c["reason"]))
+
+
+def fix_issue_years(s: Survey, client, args):
+    """`check` が知らせる「掲載号の年と違う採用論文」を、まとめて号の年に直す（1本ずつの `fix --year` と同じ）。"""
+    numbers = {args.number} if args.number is not None else None
+    included = [e for e in s.by_status(INCLUDED) if numbers is None or e["number"] in numbers]
+    found = issue_years_for(client, included)
+    failed = bool(getattr(client, "issue_years_failed", False))
+    changed = []
+    for e, issue in found:
+        old = e["record"]["year"]
+        if args.dry_run:
+            changed.append((e, old, issue))
+            continue
+        if issue > old:
+            e["record"]["online_year"] = old
+        s.fix_record(e["number"], year=issue)
+        changed.append((e, old, issue))
+    if changed and not args.dry_run:
+        render_and_report(s)
+    if args.json:
+        dump_json({"years": [{"number": e["number"], "title": e["record"]["title"], "from": old, "to": new}
+                             for e, old, new in changed], "dry_run": bool(args.dry_run), "failed": failed})
+    else:
+        for e, old, new in changed:
+            print(f"#{e['number']} {old} → {new}: {e['record']['title'][:60]}")
+        if failed:
+            print(t("Crossref did not answer, so some years were not checked. Run it again later"))
+        elif not changed:
+            print(t("Every included paper already has the year of its journal issue"))
+        elif args.dry_run:
+            print(t("(--dry-run: nothing was changed)"))
+    if failed:
+        sys.exit(1)
 
 
 def card_json(s: Survey, number: int) -> Dict[str, Any]:
@@ -1101,11 +1190,85 @@ def export_for_octavo(s: Survey, args, output: Optional[Path]):
                   + (f"https://doi.org/{r['doi']}" if r.get("doi") else r["title"]))
 
 
+def fulltext_file(entry: Dict[str, Any]) -> Optional[Path]:
+    """保存した本文のファイル（無ければ None）。"""
+    path = (entry.get("fulltext") or {}).get("path")
+    if not path:
+        return None
+    p = Path(path)
+    p = p if p.is_absolute() else ROOT / p
+    return p if p.exists() else None
+
+
+def reusable_fulltext(s: Survey, entry: Dict[str, Any]) -> Optional[Tuple[str, Dict[str, Any]]]:
+    """同じワークスペースのほかのサーベイが取得した、同じ論文の本文（(サーベイ名, 情報)）。取り直さずに使う。"""
+    for other in Survey.list_all():
+        if other.name == s.name:
+            continue
+        found = other.data["papers"].get(entry["key"])
+        if found and fulltext_file(found) and not (found["fulltext"].get("working_paper")
+                                                    or incomplete_fulltext(found)):
+            return other.name, dict(found["fulltext"])
+    return None
+
+
+def read_fulltext(s: Survey, entry: Dict[str, Any], args):
+    """保存した本文を部分ごとに読む（--outline / --pages / --grep / --references）。取り直さない。"""
+    path = fulltext_file(entry)
+    if path is None:
+        raise SurveyError(t("No full text for #{number} yet. Get it first: `priorwork fulltext {name} {number}`",
+                            number=entry["number"], name=s.name))
+    text = path.read_text(encoding="utf-8")
+    if ftmod.REFS_NOTE not in text and not ftmod.references_path(path).exists():
+        ftmod.save_text(text, path)     # 参照文献を分ける前に取得した本文も、ここで分ける
+        text = path.read_text(encoding="utf-8")
+    if args.references:
+        refs = ftmod.references_path(path)
+        body = refs.read_text(encoding="utf-8") if refs.exists() else ""
+        if args.json:
+            return dump_json({"number": entry["number"], "references": body})
+        print(body or t("No references section was found in the full text"))
+        return
+    if args.outline:
+        items = ftmod.outline(text)
+        if args.json:
+            return dump_json({"number": entry["number"], "path": str(path), "pages": entry["fulltext"].get("pages"),
+                              "chars": len(text), "outline": items})
+        print(t("#{number}: {pages} pages, {chars} characters ({path})", number=entry["number"],
+                pages=entry["fulltext"].get("pages") or "?", chars=f"{len(text):,}", path=path))
+        for it in items:
+            print(f"  p.{it['page']:<4} {'▸' if it['kind'] == 'caption' else ' '} {it['text']}")
+        if not items:
+            print("  " + t("(no headings found; read it by pages with --pages)"))
+        return
+    if args.pages:
+        body = ftmod.read_pages(text, args.pages)
+        if args.json:
+            return dump_json({"number": entry["number"], "pages": args.pages, "text": body})
+        print(body or t("No such pages (the full text has {pages})", pages=entry["fulltext"].get("pages") or "?"))
+        return
+    hits = ftmod.grep(text, args.grep, context=args.context)
+    if args.json:
+        return dump_json({"number": entry["number"], "pattern": args.grep, "hits": hits})
+    for h in hits:
+        print(f"--- p.{h['page']}\n{h['text']}")
+    if not hits:
+        print(t("Not found: {pattern}", pattern=args.grep))
+
+
 def cmd_fulltext(args, client):
     s = Survey.load(args.survey)
     entry = s.get(args.number)
+    if args.outline or args.pages or args.grep or args.references:
+        return read_fulltext(s, entry, args)
+    reused = None if (args.pdf or args.refresh or fulltext_file(entry)) else reusable_fulltext(s, entry)
     try:
-        info = fetch_fulltext(entry, client, pdf_path=args.pdf, zotero=ZoteroClient.from_env())
+        if reused:
+            info = reused[1]
+            print("[Notice] " + t("Using the full text that {survey} already fetched (`--refresh` fetches it again)",
+                                  survey=reused[0]), file=sys.stderr)
+        else:
+            info = fetch_fulltext(entry, client, pdf_path=args.pdf, zotero=ZoteroClient.from_env())
     except FulltextError as e:
         # 「試して取れなかった」を残す（check が「試していない」と区別する）
         entry["fulltext_failed"] = {"at": now_iso(), "reason": str(e).splitlines()[0]}
@@ -1136,7 +1299,15 @@ def cmd_fulltext(args, client):
         print(t("* This is PMC's full text, which has no page breaks. Check the PDF before giving page numbers.")
               if info["source"].startswith("europepmc:") else
               t("* This is Zotero's index text, which has no page breaks. Check the PDF before giving page numbers."))
-    print(t("* Extracted text can garble columns, tables and formulas. Check numbers against the page in the PDF too."))
+    if info.get("references_chars"):
+        print(t("* The references ({chars} characters) are kept apart: `--references` shows them",
+                chars=f"{info['references_chars']:,}"))
+    if info.get("extractor") == "docling":
+        print(t("* Read with Docling: headings and tables are kept as Markdown"))
+    else:
+        print(t("* Extracted text can garble columns, tables and formulas. Check numbers against the page in the PDF too."))
+    print(t("To read only what you need: `priorwork fulltext {name} {number} --outline`, then `--pages 5-9` or "
+            "`--grep \"<words>\"`", name=s.name, number=entry["number"]))
 
 
 def zotero_pending(s: Survey) -> int:
@@ -1667,6 +1838,9 @@ def build_parser() -> argparse.ArgumentParser:
     scope_args.add_argument("--fields", help=t("the fields (e.g. labour economics, sociology)"))
     scope_args.add_argument("--inclusion", help=t("inclusion criteria"))
     scope_args.add_argument("--exclusion", help=t("exclusion criteria"))
+    scope_args.add_argument("--languages",
+                            help=t("the languages of the literature, when you limit them (e.g. \"English only; "
+                                   "Japanese-language studies left out\"); the report states it"))
     scope_args.add_argument("--depth", choices=list(DEPTHS),
                             help=t("the depth of the survey (quick or full; default full)"))
     scope_args.add_argument("--search-field", choices=list(SEARCH_FIELDS),
@@ -1694,8 +1868,10 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("new", parents=[common, scope_args, as_json], help=t("create a survey"))
     p.add_argument("topic", help=t("the topic (any language)"))
     p.add_argument("--worktree", action="store_true",
-                   help=t("make it in its own folder and branch (worktrees/<slug>), so that it runs alongside other "
-                          "surveys without switching branches"))
+                   help=t("make it in its own folder and branch (worktrees/<slug>); the default in a Git repository. "
+                          "With this, fail rather than make it here"))
+    p.add_argument("--here", action="store_true",
+                   help=t("make it in this folder, on the current branch, instead of in a worktree"))
     p.add_argument("--discipline", choices=list(DISCIPLINES), default="social",
                    help=t("social (the default) or medical: a clinical survey searches PubMed too, judges journals by "
                           "MEDLINE and SCIE, and has PICO cards and its own report"))
@@ -1734,7 +1910,7 @@ def build_parser() -> argparse.ArgumentParser:
                        help=t("correct the details of a registered paper (published-version DOI, authors, year, title, journal, pages) "
                               "or clear a warning you have checked"))
     p.add_argument("survey")
-    p.add_argument("number", type=int, help=t("the paper number"))
+    p.add_argument("number", type=int, nargs="?", help=t("the paper number"))
     p.add_argument("--id", metavar="DOI",
                    help=t("replace the details with those of this DOI / ID (e.g. the published version of a working paper)"))
     p.add_argument("--authors", help=t("the authors, separated by \";\" (e.g. \"Yuen Yuen Ang\")"))
@@ -1744,6 +1920,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--pages", help=t("the pages (e.g. 145-159)"))
     p.add_argument("--confirm", metavar="REASON",
                    help=t("clear the warnings after checking that the details are right, recording why"))
+    p.add_argument("--confirm-warning", metavar="TEXT",
+                   help=t("record that you checked the `check` WARN about this paper that contains TEXT (e.g. the number "
+                          "it names), with --reason; `check` no longer shows it"))
+    p.add_argument("--reason", help=t("with --confirm-warning: what you checked (empty removes the record)"))
+    p.add_argument("--issue-years", action="store_true",
+                   help=t("set the year of every included paper (or of the one numbered) to the year of its journal "
+                          "issue, as `check` suggests"))
+    p.add_argument("--dry-run", action="store_true", help=t("with --issue-years: only show what would change"))
 
     p = sub.add_parser("card", parents=[common, as_json], help=t("show or fill in the card of an included paper"))
     p.add_argument("survey")
@@ -1796,6 +1980,16 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("survey")
     p.add_argument("number", type=int, help=t("the paper number"))
     p.add_argument("--pdf", help=t("the path of the PDF"))
+    p.add_argument("--refresh", action="store_true",
+                   help=t("fetch it again, even when another survey in the workspace already has it"))
+    reading = p.add_mutually_exclusive_group()
+    reading.add_argument("--outline", action="store_true",
+                         help=t("show the headings and the table and figure captions of the saved full text, with their pages"))
+    reading.add_argument("--pages", metavar="N-M", help=t("show these pages of the saved full text (e.g. 5-9 or 3,7-8)"))
+    reading.add_argument("--grep", metavar="WORDS",
+                         help=t("show the lines of the saved full text with these words (a regular expression), with their pages"))
+    reading.add_argument("--references", action="store_true", help=t("show the references section, kept apart"))
+    p.add_argument("--context", type=int, default=1, help=t("with --grep: lines to show before and after (default 1)"))
 
     p = sub.add_parser("zotero", parents=[common, as_json],
                        help=t("check the Zotero link / which included papers are in Zotero"))

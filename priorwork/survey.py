@@ -101,6 +101,7 @@ EVIDENCE_KEYS = tuple(EVIDENCE_NAMES)
 # レポートの表の見出し（英語が原文。サーベイの言語で書く）
 SCOPE_ROWS = [("question", "Research question"), ("years", "Period"), ("fields", "Fields"),
               ("inclusion", "Inclusion criteria"), ("exclusion", "Exclusion criteria")]
+SCOPE_KEYS = [k for k, _ in SCOPE_ROWS] + ["languages"]   # languages: 文献の言語の制限。決めたときだけレポートに出す
 MATRIX_HEADS = ["Paper", "Journal", "RQ", "X", "Y", "Data / sample", "Identification", "Main findings", "Limitations",
                 "Checked"]
 MEDICAL_MATRIX_HEADS = ["Paper", "Journal", "Question", "Population", "Intervention / exposure", "Outcomes",
@@ -315,6 +316,9 @@ def revised(entry: Dict[str, Any]) -> bool:
     return any(a != b for a, b in zip(decisions, decisions[1:]))
 
 
+_CORRECTIONS_CACHE: Dict[str, Tuple[tuple, Dict[str, Tuple[str, Dict[str, Any]]]]] = {}
+
+
 class Survey:
     def __init__(self, md_path: Path, data: Dict[str, Any], json_path: Optional[Path] = None):
         self.md_path = md_path
@@ -360,7 +364,7 @@ class Survey:
             "lang": lang,
             "depth": depth,
             "search_field": "medical" if medical else "social",
-            "scope": {k: scope.get(k, "") for k in ("question", "years", "fields", "inclusion", "exclusion")},
+            "scope": {k: scope.get(k, "") for k in SCOPE_KEYS},
             "next_number": 1,
             "papers": {},
             "searches": [],
@@ -491,7 +495,68 @@ class Survey:
         }
         self.data["next_number"] += 1
         self.data["papers"][entry["key"]] = entry
+        self.inherit_corrections(entry)
         return entry, True
+
+    def _corrections_elsewhere(self) -> Dict[str, Tuple[str, Dict[str, Any]]]:
+        """ワークスペースのほかのサーベイで、手で直した論文（キーと前のキー → (サーベイ名, その論文)）。
+        状態ファイルが変わったときだけ読み直す（検索で何百本も登録するので）。"""
+        state_dir = self.json_path.parent
+        files = sorted(p for p in state_dir.glob("*.json") if p != self.json_path)
+        stamp = tuple((p.name, p.stat().st_mtime_ns) for p in files)
+        cached = _CORRECTIONS_CACHE.get(str(self.json_path))
+        if cached and cached[0] == stamp:
+            return cached[1]
+        index: Dict[str, Tuple[str, Dict[str, Any]]] = {}
+        for p in files:
+            try:
+                data = json.loads(p.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            for e in data.get("papers", {}).values():
+                if e.get("fixed") or e.get("confirmed") or e.get("checked_warnings") or e.get("previous_keys"):
+                    for key in [e["key"], *e.get("previous_keys", [])]:
+                        index.setdefault(key, (p.stem, e))
+        _CORRECTIONS_CACHE[str(self.json_path)] = (stamp, index)
+        return index
+
+    def inherit_corrections(self, entry: Dict[str, Any]):
+        """ほかのサーベイで同じ論文を手で直していれば、それを引き継ぐ（書誌の直し・確かめた警告）。
+        ほかのサーベイが掲載版の DOI に替えた論文なら、そう注記する（替えるかはエージェントが決める）。"""
+        found = self._corrections_elsewhere().get(entry["key"])
+        if not found:
+            return
+        name, other = found
+        record = entry["record"]
+        if other["key"] != entry["key"]:
+            note = tl(self.lang, "Another survey ({survey}) replaced this DOI with {doi}: `priorwork fix {name} {number} "
+                                 "--id {doi}` does the same", survey=name, doi=other["record"].get("doi") or other["key"],
+                      name=self.name, number=entry["number"])
+            if note not in record.setdefault("notes", []):
+                record["notes"].append(note)
+            return
+        fixed = {k: v for k, v in (other.get("fixed") or {}).items() if v not in (None, "", [])}
+        if fixed:
+            entry["fixed"] = dict(fixed)
+            record.update(fixed)
+            if "journal_name" in fixed and not self.medical:
+                record["ssci"] = ssci.classify_paper(record)
+        confirmed = (other.get("confirmed") or {})
+        if confirmed.get("warnings"):
+            cleared = [w for w in record.get("warnings", []) if w in confirmed["warnings"]]
+            if cleared:
+                record["warnings"] = [w for w in record["warnings"] if w not in cleared]
+                entry["confirmed"] = {"at": now_iso(), "reason": f"{confirmed.get('reason', '')} ({name})",
+                                      "warnings": cleared}
+        if other.get("checked_warnings"):
+            entry["checked_warnings"] = [dict(c, reason=f"{c['reason']} ({name})") for c in other["checked_warnings"]]
+        carried = sorted(fixed) + (["confirmed"] if entry.get("confirmed") else []) + \
+            (["checked_warnings"] if entry.get("checked_warnings") else [])
+        if carried:
+            entry["inherited_from"] = name
+            note = tl(self.lang, "Corrections carried over from {survey}: {fields}", survey=name, fields=", ".join(carried))
+            if note not in record.setdefault("notes", []):
+                record["notes"].append(note)
 
     def replace_record(self, entry: Dict[str, Any], record: Dict[str, Any]):
         """書誌情報を差し替える（掲載版の DOI など）。キーが変われば、カードは previous_keys で新しいキーに付け替わる。
@@ -536,6 +601,23 @@ class Survey:
             e["confirmed"] = {"at": now_iso(), "reason": confirm,
                               "warnings": list(dict.fromkeys(old + e["record"].get("warnings", [])))}
             e["record"]["warnings"] = []
+        e["updated"] = now_iso()
+        return e
+
+    def confirm_warning(self, number: int, match: str, reason: str) -> Dict[str, Any]:
+        """`check` の WARN のうち、この論文の、match を含むものを確かめたと記録する（以後の `check` では出さない）。
+        reason を空にすると、その記録を消す。"""
+        e = self.get(number)
+        match = one_line(match or "")
+        if not match:
+            raise SurveyError(t("Give part of the warning's text (e.g. the number it names)"))
+        records = [c for c in e.get("checked_warnings", []) if c["match"] != match]
+        if reason.strip():
+            records.append({"match": match, "reason": one_line(reason), "at": now_iso()})
+        if records:
+            e["checked_warnings"] = records
+        else:
+            e.pop("checked_warnings", None)
         e["updated"] = now_iso()
         return e
 
@@ -1115,6 +1197,8 @@ def render_scope(data: Dict[str, Any], lang: str) -> str:
         medical_text += " + " + tl(lang, "checked against the Clarivate list ({file})", file=scie.path.name)
     unset = tl(lang, "(not set — set it with `priorwork scope`)")
     lines = [f"- **{tl(lang, k)}**: {v or unset}" for k, v in rows]
+    if sc.get("languages"):
+        lines.append(f"- **{tl(lang, 'Languages')}**: {sc['languages']}")
     if data.get("manuscript"):
         lines.append(f"- **{tl(lang, 'Manuscript')}**: `{data['manuscript']}`")
     depth = data.get("depth", DEFAULT_DEPTH)

@@ -3,6 +3,54 @@
 Priorwork's command-line tool (`priorwork` on PyPI) and this extension are
 released together, under one version number.
 
+## 0.2.2
+
+- **Each new survey in its own folder.** `new` now makes the survey in `worktrees/<slug>/` on a
+  branch named after it, from the latest main (fetched first when there is a remote), and leaves the
+  workspace folder on main, so a survey never switches the branch under another session. `--here`
+  makes it in the current folder as before; without Git, or before the first commit, `new` does that
+  and says so. AGENTS.md and the `priorwork-new` skill follow the new steps. In VS Code, "New survey"
+  offers to open the new folder in a new window. Surveys already on a branch carry on as they are.
+- **Fewer tokens for full texts.** `fulltext` keeps the references section apart (about 15% of a
+  paper; appendices after it stay), and the agent reads a paper by parts instead of whole:
+  `fulltext SURVEY N --outline` (headings and table and figure captions, with pages), `--pages 5-9`,
+  `--grep "<words>"` and `--references`, all from the saved text. The `priorwork-extract` skill reads
+  this way. A full text another survey in the workspace already has is used instead of fetched again
+  (`--refresh` fetches it).
+- **Docling, optional.** With `pip install "priorwork[docling]"`, a local layout model (no API key)
+  reads PDFs into Markdown that keeps tables and headings and drops page headers and footers, with
+  the same page breaks. `PRIORWORK_PDF_ENGINE` chooses (`auto`, `docling`, `pypdf`); `doctor` shows it.
+- **Corrections carry over between surveys.** A paper registered in one survey takes the corrections
+  another survey in the workspace made to it with `fix` (authors, year, title, journal, pages, checked
+  warnings), with a note naming that survey; a working-paper DOI another survey replaced gets a note
+  with the `fix --id` to run. A survey redone from a manuscript no longer needs every year fixed again.
+- **The year of the journal issue for searched papers.** `include` now sets the year of a paper with
+  a volume to the year of its journal issue, as `add` already did (papers found by `search` and
+  `snowball` kept the online year). `fix SURVEY --issue-years [--dry-run]` sets every included paper
+  that `check` lists at once, instead of one `fix --year` each.
+- **Recording a WARN you have checked.** `fix SURVEY N --confirm-warning "<part of the WARN>"
+  --reason "<what you checked>"` records that a WARN about a paper was checked against the source
+  and is wrong (a number the text extraction missed, say). `check` then leaves it out and says how
+  many it left out; ERRORs cannot be left out.
+- **Surnames with a lowercase prefix.** `check` read "ben-Aaron et al. (2017)" as "Aaron" and
+  reported an unregistered citation. Names such as ben-Aaron, d'Aspremont and al-Hassan are now read
+  whole, and match the paper whether the text writes ben-Aaron, Ben-Aaron or Aaron.
+- **"The DOI points to another title" when only the subtitle differs.** This is now an INFO, not an
+  ERROR, both in `check` and when searching. A DOI that OpenAlex does not know is a WARN that says how
+  to check it (`priorwork get <DOI>`), not an ERROR: it does not mean the DOI is wrong.
+- **The languages of the literature in the scope.** `new`/`scope --languages "English only;
+  Japanese-language studies left out"` puts the limit in the report's scope.
+- **Committing the report.** AGENTS.md now quotes the glob in `git add 'reports/<survey name>.*'`;
+  unquoted, the shell also passed the gitignored `.html` and git added nothing ("paths are ignored").
+- **A workspace with no surveys, only Octavo projects.** `status` and `doctor` now say so: the
+  AGENTS.md there tells every agent session it is a Priorwork workspace.
+- **When an Octavo project moves or is split.** The reference gives the steps (link the new
+  projects, unlink the old one, export to each), and `check`'s warning about a project that is gone
+  now says how to unlink it.
+- **`worktree --remove` after the pull request is merged.** When GitHub deleted the branch after
+  the merge, the commits were counted as "not pushed" and removal was refused. Now only commits on
+  no remote branch count.
+
 ## 0.2.1
 
 - **Notes under a card no longer pile up.** Each `render` (and each `card --set`) added the note

@@ -123,11 +123,12 @@ Audit only when the user asks for it. An audit is not a condition for a survey t
 The workspace is kept in a private GitHub repository. You may operate Git without asking, up to opening a pull request (if `AGENTS.local.md` decides otherwise, follow it). **The user merges.**
 
 - **The branch is named after the survey**, exactly as `./priorwork new` printed it (e.g. `20261015_statutory_text_analysis`; a redo is `20261015_v2_<slug>`). Do not make up branch names. For work not tied to a survey (editing `AGENTS.local.md`, say), ask the user for the branch name.
-- **Another survey may be in progress.** If the current branch is another survey's, there are uncommitted changes, or another session may be working in this folder (a clean status does not rule that out), do not switch branches. Start the new survey in its own folder: `./priorwork new ... --worktree`. It makes `worktrees/<slug>/` on a new branch named after the survey, and shares the keys, journal lists, Python and cache. Run everything for that survey from that folder (`cd worktrees/<slug>`), and commit, push and open the pull request as below. `./priorwork status` lists the worktrees; a survey in one is continued there, not with `git switch`. Remove one (`./priorwork worktree --remove <slug>`; the branch stays) only when the user asks.
-- **When you start**, look at `git status`. If there are uncommitted changes that are not this survey's, do not switch branches; ask in your report.
-  - A new survey: bring main up to date (`git switch main`, then `git pull --ff-only` if there is a remote), and after `./priorwork new`, run `git switch -c <survey name>`.
-  - Continuing or auditing: `git switch <survey name>` (create it from main if it does not exist), then `git pull --ff-only` if it is on the remote.
-- **Commit** at the end of each step (search, screening, cards, check, export, audit) and before you stop. Add only this survey's files (`git add reports/<survey name>.* .priorwork/surveys/<survey name>.json`), never `git add -A`. Write a one-line message in the report's language (e.g. "Screen the candidates (42 included)").
+- **Every survey has its own folder.** `./priorwork new` makes `worktrees/<slug>/` from the latest main (the remote's, if there is one), on a new branch named after the survey, and shares the keys, journal lists, Python and cache. The workspace folder stays on main and is never switched, so another session working there is not disturbed. Run everything for the survey from its folder (`cd worktrees/<slug>`), and commit, push and open the pull request there as below. Do not `git switch` in the workspace folder.
+  - A new survey: just `./priorwork new ...` from the workspace folder (no `git switch`, no `git pull`). If it says it made the survey in this folder instead (no Git, or no commit yet), run `git switch -c <survey name>` after it.
+  - Continuing or auditing: `./priorwork status` lists the worktrees; go to the survey's folder (`cd worktrees/<slug>`) and `git pull --ff-only` if its branch is on the remote. A survey made before this, on a branch and not in a folder, is continued as it was: `git switch <survey name>` only if the workspace folder has no uncommitted changes and no other session may be using it; otherwise ask.
+  - Look at `git status` in the survey's folder when you start. Uncommitted changes that are not this survey's: do not touch them; ask in your report.
+  - Remove a survey's folder (`./priorwork worktree --remove <slug>`; the branch stays) only when the user asks, after its pull request is merged.
+- **Commit** at the end of each step (search, screening, cards, check, export, audit) and before you stop. Add only this survey's files (`git add 'reports/<survey name>.*' .priorwork/surveys/<survey name>.json`; quote the `reports/…*`, or the shell passes the gitignored `.html` too and git adds nothing: "paths are ignored"), never `git add -A`. Write a one-line message in the report's language (e.g. "Screen the candidates (42 included)").
 - **Push** only the working branch (`git push -u origin <survey name>`). If there is no remote, do not push; say so in your report.
 - **Pull request**: once the report is exported, `gh pr create --base main --head <survey name> --title "<topic>" --body "<summary of your report>"`. If one is already open, do not open another (pushing updates it). If `gh` is missing or not logged in, do not open one; say so in your report. Give the URL of the pull request in your report.
 - **Never** merge (`git merge`, `gh pr merge`), commit or push to main, force-push, `git reset --hard`, `git rebase`, `git clean`, or delete branches. Never commit `.env` (API keys).
@@ -181,7 +182,7 @@ For clinical research, create the survey with `./priorwork new ... --discipline 
    - Every paper you mention in the text must be registered in `./priorwork`. Never write authors, years or DOIs from memory.
    - Write on a card only what the abstract or full text says, and always update its evidence level (unchecked / abstract only / full text checked). **Set "full text checked" only when you fetched the paper's full text with `./priorwork fulltext` and read it.** A card written from the abstract is "abstract only".
    - On a card checked against the full text, give the page (`(p. 12)`) for numbers, methods and main findings. If the full text has no page breaks, write "(page not checked)". `./priorwork check` gives a WARN for numbers not in the full text and pages not in the paper.
-   - Cite the year of the journal issue, not the year it came out online. `./priorwork add` changes a paper with a volume to its issue's year, and `./priorwork check` names included papers whose year differs, with the `fix --year` to run.
+   - Cite the year of the journal issue, not the year it came out online. `./priorwork add` and `include` change a paper with a volume to its issue's year, and `./priorwork check` names included papers whose year differs. Fix them all with `./priorwork fix <survey name> --issue-years` (no need for one `fix --year` each).
    - Write the cards **in the language of the report** (keep terms in the original in brackets). Do not copy the English abstract into a report in another language.
    - When the text cites the literature, make sure **the direction of the finding** (does / does not, rises / falls) matches the card's main findings.
    - **Never mix what the literature found with the framework and hypotheses of this study (the user's).** Write the user's typology or hypotheses only in the section "Hypotheses and implications for this study", never as a consensus of the literature.
@@ -200,7 +201,7 @@ For clinical research, create the survey with `./priorwork new ... --discipline 
 
 ```bash
 ./priorwork status [SURVEY]          # the list / progress and next steps
-./priorwork new "<topic>" --slug <slug> --by "<model>" [--discipline social|medical] [--worktree] [--mode standard|auto|manual] [--depth quick|full] [--manuscript PATH] [--question ... --years ... --fields ... --inclusion ... --exclusion ...]
+./priorwork new "<topic>" --slug <slug> --by "<model>" [--discipline social|medical] [--here] [--mode standard|auto|manual] [--depth quick|full] [--manuscript PATH] [--question ... --years ... --fields ... --inclusion ... --exclusion ... --languages ...]
 ./priorwork scope SURVEY [--question ...] [--mode standard|auto|manual] [--go-on] [--depth quick|full] [--search-field social|medical|all] [--manuscript PATH] [--by "<model>"]
 ./priorwork archive SURVEY [--undo]  # hide it from the list (the files stay); list the archived with status --archived
 ./priorwork search "<English query>" [--into SURVEY] [--bulk] [--sort citations|relevance|recent|cpy] [--year 2010-2024] [--journal "<full journal name>" ...] [--ssci-only] [--field social|medical|all] [--source auto|pubmed|s2] [--limit N]
@@ -208,6 +209,8 @@ For clinical research, create the survey with `./priorwork new ... --discipline 
 ./priorwork include SURVEY N... --reason "..."   ./priorwork exclude SURVEY N... --reason "..."   ./priorwork maybe SURVEY N... --reason "..."   ./priorwork reset SURVEY N...
 ./priorwork add SURVEY <DOI>... [--candidate]      ./priorwork add SURVEY --cited   # register the papers the manuscript cites (the DOIs in its .bib)
 ./priorwork fix SURVEY N [--id <published DOI>] [--authors "A; B"] [--year Y] [--journal J] [--pages P] [--confirm "<what you checked>"]
+./priorwork fix SURVEY N --confirm-warning "<part of the WARN>" --reason "<what you checked>"
+./priorwork fix SURVEY --issue-years [--dry-run]
 ./priorwork snowball SURVEY [--direction both|references|citations] [--limit N] [--min-links N]
 ./priorwork fulltext SURVEY N [--pdf PATH]
 ./priorwork card SURVEY N [--set KEY=VALUE ...]

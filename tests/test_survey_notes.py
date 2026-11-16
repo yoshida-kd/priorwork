@@ -106,7 +106,7 @@ def test_a_working_paper_is_told_from_its_cover(cover, expected):
 def test_the_published_pdf_is_chosen(monkeypatch):
     texts = {b"wp": "DISCUSSION PAPER SERIES\n" + "x" * 900, b"pub": "The Journal\n" + "x" * 800, b"bad": None}
 
-    def fake(pdf):
+    def fake(pdf, engine=None):
         if texts[pdf] is None:
             raise ValueError("broken")
         return texts[pdf], 10

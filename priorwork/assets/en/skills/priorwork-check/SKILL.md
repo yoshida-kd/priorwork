@@ -32,18 +32,20 @@ Follow the rules in [AGENTS.md](../../../AGENTS.md).
    | The full text has far fewer pages than the journal pages | The full text is incomplete (perhaps the publisher's preview). Do not fill the card from it; ask in your report for the whole PDF in Zotero (set the level to abstract only) |
    | Evidence level unchecked / empty fields | Fill them in as in `priorwork-extract` |
    | Citations not chased (full) | Do it as in `priorwork-snowball` |
-   | A number on a card is not in the full text / a cited page is not in the paper | Compare with the full text (the text from `./priorwork fulltext`) and fix it; remove it if the paper does not say it. If only the form differs (units, rounding), write it as the paper does |
+   | A number on a card is not in the full text / a cited page is not in the paper | Compare with the full text (the text from `./priorwork fulltext`) and fix it; remove it if the paper does not say it. If only the form differs (units, rounding), write it as the paper does. If you checked and the card is right (the number is in a table the text extraction missed, say), record it with `./priorwork fix <survey> N --confirm-warning "<the number>" --reason "<what you checked>"`; `check` then stops showing it |
    | "Full text checked" but no page / no full text fetched | Read the full text and add the pages. If you did not read it, lower the evidence level to "abstract only" |
    | A card is not in the report's language | Rewrite it in that language (keep terms in the original in brackets) |
    | A synthesis section cites no paper | Rewrite it from the included papers, citing them as Author (year). If it is this study's own view, move it to "Hypotheses and implications for this study" |
    | The text gives a wrong number of included papers | Delete the sentence with the count (the appendix gives it) |
    | Included papers not in Zotero | If Priorwork may write to Zotero (the next step is `zotero <survey> --add`), add them with `--add` as the mode says (full auto: just add; standard and manual: show `--dry-run` and add once the user agrees). Otherwise show the DOIs from `./priorwork zotero <survey> --dois` as they are in your report (also those whose full text you got) |
+   | The year differs from the journal issue's | `./priorwork fix <survey> --issue-years` (`--dry-run` first to see them) |
+   | The Octavo project is not found | If it moved or was split, link the new project(s) and unlink the old one as in `./priorwork docs octavo` |
    | The survey and the Octavo project use different Zotero collections | Ask the user which one to use. The survey's is set with `./priorwork zotero <survey> --collection "<name>"`; the user sets Octavo's with `octavo config set zotero_collection "<name>"` |
    | The draft cites papers not in the Octavo project's .bib | Give their DOIs in your report; the user puts them in the Zotero collection and runs `octavo bib pull`, then export again with `export --draft --octavo` |
    | The Markdown does not match the state | `./priorwork render <survey>` |
    | A managed block is missing | Restore the lost `<!-- BEGIN priorwork:… -->` / `<!-- END priorwork:… -->` from the git history or similar |
 
-3. Repeat 1–2 until there are no ERRORs. Mention the WARNs and INFOs you could not fix in your report.
+3. Repeat 1–2 until there are no ERRORs. Mention the WARNs and INFOs you could not fix in your report. Use `--confirm-warning` only for a WARN you checked against the source and found wrong, with the reason; never to make the count smaller.
 
 **Never tell the user it is finished while ERRORs remain.**
 

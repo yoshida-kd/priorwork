@@ -83,8 +83,10 @@ MESSAGES = {
     "list the surveys' worktrees, or remove one (--remove)": "サーベイの worktree を一覧する、または消す（--remove）",
     "remove this worktree; its branch stays": "この worktree を消す（ブランチは残る）",
     "with --remove: remove it even with uncommitted changes or commits not pushed, which are lost": "--remove と使い、未コミットの変更や未 push のコミットがあっても消す（それらは失われる）",
-    "make it in its own folder and branch (worktrees/<slug>), so that it runs alongside other surveys without switching branches":
-        "専用のフォルダとブランチ（worktrees/<slug>）に作る。ブランチを切り替えずに、ほかのサーベイと同時に進められる",
+    "make it in its own folder and branch (worktrees/<slug>); the default in a Git repository. With this, fail rather than make it here":
+        "専用のフォルダとブランチ（worktrees/<slug>）に作る。Git のリポジトリでは既定。付けると、作れないときにこのフォルダに作らず止まる",
+    "make it in this folder, on the current branch, instead of in a worktree": "worktree でなく、このフォルダの今のブランチに作る",
+    "Made in this folder, not in a worktree: {reason}": "worktree でなく、このフォルダに作りました: {reason}",
     "* The first page looks like a working paper or a manuscript, not the published version. Its numbers and pages may differ: attach the published PDF in Zotero, or say in the card's notes which version you read":
         "* 1 ページ目がワーキングペーパーか原稿の版に見えます。掲載版とは数値やページが違うことがあります。掲載版の PDF を Zotero に添付するか、読んだ版をカードのメモに書いてください",
     "Added, but Zotero does not show {numbers} in the collection \"{name}\" yet. If it stays so, the library may hold another item for the same paper: merge them in Zotero (Duplicate Items)":
@@ -943,8 +945,8 @@ MESSAGES = {
     "Zotero, and link it: `priorwork zotero {survey} --collection \"<path>\"` (Octavo pulls the collections under them too)":
         "Octavo のプロジェクトは {names} から .bib を取ります{others}。Zotero でそのどれかの下にこのサーベイのコレクションを作り、"
         "結び付けてください: `priorwork zotero {survey} --collection \"<パス>\"`（Octavo はその下のコレクションの文献も取ります）",
-    "The Octavo project {path} is not found. If it moved, link it again with `priorwork scope {name} --octavo <path>`":
-        "Octavo のプロジェクト {path} が見つかりません。移したなら `priorwork scope {name} --octavo <パス>` で結び付け直してください",
+    "The Octavo project {path} is not found. If it moved or was split, link the new {n|project|projects} with `priorwork scope {name} --octavo <path>` and remove this link with `priorwork scope {name} --unlink-octavo {path}`":
+        "Octavo のプロジェクト {path} が見つかりません。移したり分けたりしたなら、新しいプロジェクトを `priorwork scope {name} --octavo <パス>` で結び付け（{n} 個でも1つずつ）、このリンクを `priorwork scope {name} --unlink-octavo {path}` で外してください",
     "The Octavo project {project} does not name its Zotero collections. To pull its .bib from the survey's (\"{ours}\"), "
     "add it in Octavo (Choose the Zotero Collection, or `octavo config set zotero_collection \"{ours}\"`)":
         "Octavo のプロジェクト {project} には Zotero のコレクションが設定されていません。サーベイのコレクション（「{ours}」）から "
@@ -1131,4 +1133,81 @@ MESSAGES = {
     "./priorwork docs <number or words> shows a section (./priorwork docs 5.2, ./priorwork docs zotero); --search WORD finds a word; --all prints everything":
         "./priorwork docs <番号か言葉> で1つの節を表示します（./priorwork docs 5.2、./priorwork docs zotero）。--search 言葉 で探し、--all で全部を表示します",
     "no section called {name}: ./priorwork docs lists them": "{name} という節はありません。./priorwork docs で一覧が出ます",
+    "the year is now {new}, the year of the journal issue (it came out online in {old})":
+        "年を掲載号の年 {new} に直しました（オンラインでの公開は {old} 年）",
+    "Give the paper number (or --issue-years for all included papers)":
+        "論文の番号を指定してください（採用論文すべてなら --issue-years）",
+    "Crossref did not answer, so some years were not checked. Run it again later":
+        "Crossref が応答しなかったので、確かめていない年があります。しばらくしてからもう一度実行してください",
+    "Every included paper already has the year of its journal issue": "採用論文の年はどれも掲載号の年です",
+    "set the year of every included paper (or of the one numbered) to the year of its journal issue, as `check` suggests":
+        "採用論文すべて（番号を指定すればその論文）の年を、`check` の提案どおり掲載号の年に直す",
+    "with --issue-years: only show what would change": "--issue-years と一緒に: 変わるものを示すだけで、直さない",
+    "To set the years of all {n} to the journal issues at once: `priorwork fix {name} --issue-years` (`--dry-run` shows them first)":
+        "{n} 本の年をまとめて掲載号の年に直すには: `priorwork fix {name} --issue-years`（`--dry-run` で先に一覧を見られます）",
+    "(--dry-run: nothing was changed)": "（--dry-run なので、何も変えていません）",
+    "The DOI's title differs only in the subtitle: \"{title}\"": "DOI の題は副題だけが違う: \"{title}\"",
+    "{label}: the DOI's title differs only in the subtitle: \"{title}\"": "{label}: DOI の題は副題だけが違います: \"{title}\"",
+    " — not a sign that it points to another paper. Check that `priorwork get {doi}` gives this paper, then record it with `priorwork fix {name} {number} --confirm \"<reason>\"`":
+        "（別の論文を指しているということではありません。`priorwork get {doi}` でこの論文が引けるか確かめ、`priorwork fix {name} {number} --confirm \"<理由>\"` で記録してください）",
+    "{n|# warning was|# warnings were} checked by hand and recorded with the reason ({numbers}; `priorwork fix SURVEY N --confirm-warning`)":
+        "{n} 件の警告は、確かめたと理由付きで記録してあるので出していません（{numbers}。`priorwork fix SURVEY N --confirm-warning`）",
+    "Give part of the warning's text (e.g. the number it names)": "警告の文言の一部（警告が挙げている数値など）を指定してください",
+    "Say what you checked with --reason \"...\" (an empty reason removes the record)":
+        "何を確かめたかを --reason \"...\" で書いてください（空にすると記録を消します）",
+    "Warning checked by hand (\"{match}\"): {reason}": "確かめた警告（\"{match}\"）: {reason}",
+    "record that you checked the `check` WARN about this paper that contains TEXT (e.g. the number it names), with --reason; `check` no longer shows it":
+        "この論文についての `check` の WARN のうち TEXT（警告が挙げる数値など）を含むものを、確かめたと --reason 付きで記録する。以後の `check` では出ない",
+    "with --confirm-warning: what you checked (empty removes the record)": "--confirm-warning と一緒に: 何を確かめたか（空にすると記録を消す）",
+    "Languages": "文献の言語",
+    "the languages of the literature, when you limit them (e.g. \"English only; Japanese-language studies left out\"); the report states it":
+        "文献の言語を限るときの範囲（例: \"英語のみ。日本語の文献は対象外\"）。レポートに書かれる",
+    "No surveys here, only Octavo {n|project|projects} ({names}). The AGENTS.md here tells every agent session that this is a Priorwork workspace. If the repository is only for Octavo, keep the surveys in another workspace (`priorwork export --octavo` delivers them here) and remove AGENTS.md, .priorwork/ and the skills; otherwise start one with `priorwork new`":
+        "ここにはサーベイが無く、Octavo のプロジェクト {n} 個（{names}）だけがあります。ここの AGENTS.md は、どのエージェントのセッションにも「ここは Priorwork のワークスペース」と伝えます。Octavo だけのリポジトリなら、サーベイは別のワークスペースに置き（`priorwork export --octavo` でここに届けられます）、AGENTS.md・.priorwork/・スキルを外してください。ここでサーベイをするなら `priorwork new` で始めてください",
+    "Surveys here": "このワークスペースのサーベイ",
+    "#{number}: {pages} pages, {chars} characters ({path})":
+        "#{number}: {pages} ページ、{chars} 字（{path}）",
+    "(no headings found; read it by pages with --pages)":
+        "（見出しが見つかりません。--pages でページごとに読んでください）",
+    "* Read with Docling: headings and tables are kept as Markdown":
+        "※ Docling で読みました。見出しと表は Markdown のまま残っています",
+    "* The references ({chars} characters) are kept apart: `--references` shows them":
+        "※ 参照文献（{chars} 字）は別に分けてあります。`--references` で表示します",
+    "Docling could not read the PDF ({error}); using pypdf":
+        "Docling で PDF を読めなかったので（{error}）、pypdf で読みます",
+    "Give pages like 5, 5-9 or 3,7-8: {spec}":
+        "ページは 5・5-9・3,7-8 のように指定してください: {spec}",
+    "No full text for #{number} yet. Get it first: `priorwork fulltext {name} {number}`":
+        "#{number} の本文はまだありません。先に取得してください: `priorwork fulltext {name} {number}`",
+    "No references section was found in the full text":
+        "本文に参照文献の節は見つかりませんでした",
+    "No such pages (the full text has {pages})":
+        "そのページはありません（本文は {pages} ページ）",
+    "Not found: {pattern}":
+        "見つかりません: {pattern}",
+    "PRIORWORK_PDF_ENGINE=docling, but Docling is not installed (`pip install \"priorwork[docling]\"`)":
+        "PRIORWORK_PDF_ENGINE=docling ですが、Docling が入っていません（`pip install \"priorwork[docling]\"`）",
+    "To read only what you need: `priorwork fulltext {name} {number} --outline`, then `--pages 5-9` or `--grep \"<words>\"`":
+        "必要な所だけ読むには: `priorwork fulltext {name} {number} --outline` で目次を見て、`--pages 5-9` か `--grep \"<語>\"`",
+    "Using the full text that {survey} already fetched (`--refresh` fetches it again)":
+        "{survey} が取得済みの本文を使います（`--refresh` で取り直します）",
+    "fetch it again, even when another survey in the workspace already has it":
+        "ワークスペースのほかのサーベイが取得済みでも、取り直す",
+    "show the headings and the table and figure captions of the saved full text, with their pages":
+        "保存した本文の見出しと表・図の見出しを、ページとともに表示する",
+    "show the lines of the saved full text with these words (a regular expression), with their pages":
+        "保存した本文のうち、この語（正規表現）を含む行を、ページとともに表示する",
+    "show the references section, kept apart":
+        "別に分けた参照文献の節を表示する",
+    "show these pages of the saved full text (e.g. 5-9 or 3,7-8)":
+        "保存した本文のこのページを表示する（例: 5-9、3,7-8）",
+    "with --grep: lines to show before and after (default 1)":
+        "--grep と一緒に: 前後に表示する行数（既定は 1）",
+    "PDF reader": "PDF の読み取り",
+    "Docling (tables and headings are kept)": "Docling（表と見出しを残す）",
+    "pypdf (optional: `pip install \"priorwork[docling]\"` reads tables and headings with a local model)": "pypdf（任意: `pip install \"priorwork[docling]\"` で、手元のモデルが表と見出しを読む）",
+    "Another survey ({survey}) replaced this DOI with {doi}: `priorwork fix {name} {number} --id {doi}` does the same":
+        "別のサーベイ（{survey}）は、この DOI を {doi} に替えました。同じようにするなら `priorwork fix {name} {number} --id {doi}`",
+    "Corrections carried over from {survey}: {fields}":
+        "{survey} での直しを引き継ぎました: {fields}",
 }

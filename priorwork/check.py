@@ -13,7 +13,7 @@ from .i18n import t, tl
 from .survey import (
     CANDIDATE, EVIDENCE_ABSTRACT, EVIDENCE_FULLTEXT, EVIDENCE_KEYS, EVIDENCE_UNCHECKED, INCLUDED, MAYBE, Survey,
     SurveyError,
-    HYPHENS, evidence_key, evidence_label, extract_blocks, first_surname, parse_card_fields, parse_cards, strip_blocks,
+    HYPHENS, ascii_fold, display_surname, evidence_key, evidence_label, extract_blocks, parse_card_fields, parse_cards, strip_blocks,
     surname, year_labels,
 )
 
@@ -22,7 +22,10 @@ ERROR, WARN, INFO = "ERROR", "WARN", "INFO"
 # 本文中の著者年引用:
 #   叙述型   "Acemoglu et al. (2001)", "Acemoglu, Johnson and Robinson (2001, 2005)", "Dell (2010a, p. 3)"
 #   括弧型   "(Dell, 2010)", "(e.g., Dell 2010; Acemoglu et al., 2001a, 2005)"
-_NAME = r"(?:(?:[A-Z][A-Za-z\-]*\s+){1,5}(?:Group|Groups|Collaborators|Collaboration|Consortium|Investigators|Committee|Team|Trialists|Network)\b|(?:(?:[Vv]an|[Vv]on|[Dd]e|[Dd]er|[Dd]en|du|da|di|le|[Ll]a|[Dd]el|della|[Dd]os|das|ten|ter)\s+){0,3}[A-Z][A-Za-z'\-]+)"
+# 姓の前置詞: 空白で続くもの（"van der Gaag"・"Dal Bó"）と、小文字で始まり "-" や "'" でつながるもの（"ben-Aaron"・"d'Aspremont"・"al-Hassan"）
+_PARTICLE = r"(?:[Vv]an|[Vv]on|[Dd]e|[Dd]er|[Dd]en|[Dd]es|du|da|[Dd]i|le|[Ll]a|[Dd]el|[Dd]ella|[Dd]alla|[Dd]al|[Dd]os|das|dei|ten|ter|ben|bin|ibn)"
+_NAME = (r"(?:(?:[A-Z][A-Za-z\-]*\s+){1,5}(?:Group|Groups|Collaborators|Collaboration|Consortium|Investigators|Committee|Team|Trialists|Network)\b"
+         rf"|(?:{_PARTICLE}\s+){{0,3}}(?:[a-z]{{1,4}}['\-])?[A-Z][A-Za-z'\-]+)")
 _AUTHORS = rf"{_NAME}(?:\s+et\s+al\.?|(?:\s*,\s*{_NAME})*,?\s*(?:and|&)\s*{_NAME})?"
 _YEAR = r"\d{4}[a-z]?"
 _GAP = r"[\s\x00]"   # _fold が日本語などを \x00 にする。「Acemoglu ら (2001)」の「ら」を読み飛ばす
@@ -113,12 +116,79 @@ def find_citations(text: str) -> List[Citation]:
     return sorted(unique.values())
 
 
+_JOINED_PREFIX_RE = re.compile(r"^[a-z]{1,4}['\-](?=[A-Z])")
+
+
+def _surname_keys(author: str) -> List[str]:
+    """照合に使う姓。"ben-Aaron" のように小文字の前置詞でつながる姓は、前置詞の無い形（"aaron"）でも引けるようにする
+    （データベースや本文で前置詞が落ちたり大文字になったりする）。"""
+    keys = [surname(author)]
+    words = display_surname(author).split()
+    if words and _JOINED_PREFIX_RE.match(ascii_fold(words[-1])):
+        keys.append(surname(_JOINED_PREFIX_RE.sub("", ascii_fold(words[-1]))))
+    return keys
+
+
+def _not_known_hint(name: str, e: Dict[str, Any]) -> str:
+    return t(" — not a sign that it points to another paper. Check that `priorwork get {doi}` gives this paper, then "
+             "record it with `priorwork fix {name} {number} --confirm \"<reason>\"`",
+             doi=e["record"]["doi"], name=name, number=e["number"])
+
+
+def _templates(english: str) -> List[re.Pattern]:
+    """検索のときに記録した警告（その時の表示の言語で書いてある）を、英日のどちらでも読み返す。"""
+    from .lang_ja import MESSAGES
+    return [re.compile("^" + re.escape(x).replace(re.escape("{title}"), "(.+)") + "$")
+            for x in (english, MESSAGES.get(english, english))]
+
+
+_ANOTHER_TITLE = _templates("The DOI points to another title: \"{title}\" (verify the DOI)")
+_NOT_KNOWN = _templates("OpenAlex does not know the DOI (verify the DOI)")
+
+
+def _record_warning(w: str, r: Dict[str, Any], label: str, name: str) -> Finding:
+    """論文の書誌の警告。副題だけの違いは INFO、OpenAlex が DOI を知らないだけなら WARN、ほかは ERROR。"""
+    for pattern in _ANOTHER_TITLE:
+        m = pattern.match(w)
+        if m and ssci.same_main_title(m.group(1), r.get("title") or ""):
+            return INFO, t("{label}: the DOI's title differs only in the subtitle: \"{title}\"", label=label,
+                           title=m.group(1))
+    if any(p.match(w) for p in _NOT_KNOWN):
+        return WARN, f"{label}: ⚠️ {w}"
+    return ERROR, f"{label}: ⚠️ {w}"
+
+
 def ignored_citations(md: str) -> Set[Tuple[str, int]]:
     """`<!-- priorwork:ignore-citation World Bank (2010) -->` で検査から外した引用。"""
     return {(surname(m.group(1)), int(m.group(2))) for m in _IGNORE_RE.finditer(_fold(md))}
 
 
 def check_survey(survey: Survey, client: Optional[Any] = None) -> List[Finding]:
+    return _without_checked_warnings(survey, _check_survey(survey, client))
+
+
+_LABEL_NUMBER_RE = re.compile(r"^#(\d+)\b")
+
+
+def _without_checked_warnings(survey: Survey, findings: List[Finding]) -> List[Finding]:
+    """`fix --confirm-warning` で確かめたと記録した WARN を外し、外した数を INFO で伝える（ERROR は外さない）。"""
+    checked = {e["number"]: e["checked_warnings"] for e in survey.papers if e.get("checked_warnings")}
+    kept: List[Finding] = []
+    hidden: List[int] = []
+    for level, msg in findings:
+        m = _LABEL_NUMBER_RE.match(msg)
+        if level == WARN and m and any(c["match"] in msg for c in checked.get(int(m.group(1)), [])):
+            hidden.append(int(m.group(1)))
+            continue
+        kept.append((level, msg))
+    if hidden:
+        kept.append((INFO, t("{n|# warning was|# warnings were} checked by hand and recorded with the reason ({numbers}; "
+                             "`priorwork fix SURVEY N --confirm-warning`)", n=len(hidden),
+                             numbers=", ".join(f"#{n}" for n in sorted(set(hidden))))))
+    return kept
+
+
+def _check_survey(survey: Survey, client: Optional[Any] = None) -> List[Finding]:
     findings: List[Finding] = []
     md = survey.md_path.read_text(encoding="utf-8")
 
@@ -138,7 +208,7 @@ def check_survey(survey: Survey, client: Optional[Any] = None) -> List[Finding]:
     for e in included:
         r, label = e["record"], f"#{e['number']} {e['record']['title'][:50]}"
         for w in r.get("warnings", []):
-            findings.append((ERROR, f"{label}: ⚠️ {w}"))
+            findings.append(_record_warning(w, r, label, survey.name))
         if r.get("warnings"):
             findings.append((INFO, t("{label}: if you have checked the details and they are right, record why with "
                                      "`priorwork fix {name} {number} --confirm \"<reason>\"` (a working-paper DOI: add "
@@ -175,9 +245,10 @@ def check_survey(survey: Survey, client: Optional[Any] = None) -> List[Finding]:
     for e in survey.papers:
         r = e["record"]
         for a in r.get("authors", []):
-            entries = registered.setdefault((surname(a), r.get("year")), [])
-            if e not in entries:
-                entries.append(e)
+            for name in _surname_keys(a):
+                entries = registered.setdefault((name, r.get("year")), [])
+                if e not in entries:
+                    entries.append(e)
     labels = year_labels(included)
     # カードの記入欄も対象にする（要旨の <details> は論文側の文章なので除く）
     card_text = "\n".join(re.sub(r"<details>.*?</details>", "", body, flags=re.S) for body in cards.values())
@@ -205,7 +276,7 @@ def check_survey(survey: Survey, client: Optional[Any] = None) -> List[Finding]:
                                      statuses=", ".join(sorted({e["status"] for e in entries})))))
             continue
         # 筆頭著者と年が同じ採用論文が複数あると、参照文献では 2001a / 2001b で区別している
-        same = [e for e in adopted if first_surname(e["record"]) == c.name]
+        same = [e for e in adopted if e["record"].get("authors") and c.name in _surname_keys(e["record"]["authors"][0])]
         suffixed = {labels[e["key"]][-1]: e for e in same if labels[e["key"]][-1:].isalpha()}
         assigned = ", ".join(f"#{e['number']} = {labels[e['key']]}" for e in suffixed.values())
         if c.suffix and c.suffix not in suffixed:
@@ -242,8 +313,13 @@ def check_survey(survey: Survey, client: Optional[Any] = None) -> List[Finding]:
                 findings.append((ERROR, t("{label}: this paper has been retracted. Exclude it (if the survey is about "
                                           "the retraction itself, say so in your report)", label=label)))
             if not w:
-                findings.append((ERROR, t("{label}: OpenAlex does not know the DOI {doi}", label=label,
-                                          doi=e["record"]["doi"])))
+                # 知らないだけで、別の論文を指しているのではない（採用論文の DOI はデータベースから来ている）
+                findings.append((WARN, t("{label}: OpenAlex does not know the DOI {doi}", label=label,
+                                         doi=e["record"]["doi"]) + _not_known_hint(survey.name, e)))
+            elif ssci.same_main_title(w.get("title") or "", e["record"]["title"]):
+                if not ssci.same_title(w.get("title") or "", e["record"]["title"]):
+                    findings.append((INFO, t("{label}: the DOI's title differs only in the subtitle: \"{title}\"",
+                                             label=label, title=w.get("title"))))
             elif not ssci.same_title(w.get("title") or "", e["record"]["title"]):
                 findings.append((ERROR, t("{label}: the DOI points to another title: \"{title}\". If the DOI is right, "
                                           "record why with `priorwork fix {name} {number} --confirm \"<reason>\"`",
@@ -258,15 +334,21 @@ def check_survey(survey: Survey, client: Optional[Any] = None) -> List[Finding]:
             findings.append((WARN, t("The years of {n|# included paper|# included papers} could not be checked against "
                                      "the journal issues (Crossref did not answer). Run `priorwork check` again later",
                                      n=len(dated))))
+        mismatched = 0
         for e in dated:
             issue = years.get(e["record"]["doi"].lower())
             if issue and issue != e["record"]["year"]:
+                mismatched += 1
                 findings.append((WARN, t("#{number} {title}: registered as {year}, but the journal issue (vol. {volume}) "
                                          "is {issue} — {year} is probably when it came out online. Cite the issue's "
                                          "year: `priorwork fix {name} {number} --year {issue}`",
                                          number=e["number"], title=e["record"]["title"][:50],
                                          year=e["record"]["year"], volume=e["record"]["volume"], issue=issue,
                                          name=survey.name)))
+        if mismatched > 1:
+            findings.append((INFO, t("To set the years of all {n} to the journal issues at once: "
+                                     "`priorwork fix {name} --issue-years` (`--dry-run` shows them first)",
+                                     n=mismatched, name=survey.name)))
 
     # 4b. カードの書き方: サーベイの言語・本文の根拠
     findings += _check_cards(survey, included, cards)
@@ -547,8 +629,9 @@ def _check_one_octavo(survey: Survey, md: str, info: dict) -> List[Finding]:
     findings: List[Finding] = []
     project = info["name"]
     if info.get("missing"):
-        return [(WARN, t("The Octavo project {path} is not found. If it moved, link it again with "
-                         "`priorwork scope {name} --octavo <path>`", path=info["root"], name=survey.name))]
+        return [(WARN, t("The Octavo project {path} is not found. If it moved or was split, link the new "
+                         "{n|project|projects} with `priorwork scope {name} --octavo <path>` and remove this link with "
+                         "`priorwork scope {name} --unlink-octavo {path}`", path=info["root"], name=survey.name, n=2))]
     theirs = info["zotero_collections"]
     ours = survey.zotero_collection.get("name", "")
     shown = ", ".join(f'"{c}"' for c in theirs)

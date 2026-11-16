@@ -111,6 +111,7 @@ def test_the_extension_reads_only_keys_the_cli_writes():
         declared[name] = set(re.findall(r"^\s+(\w+)\??:", body, re.M))
     expected = {
         "WorkspaceStatus": {"version", "root", "workspace", "lang", "git", "sync", "zotero", "zotero_write", "requests", "surveys", "archived"},
+        "NewSurveyReport": {"worktree", "branch", "absent"},
         "GitInfo": {"repo", "remote", "branch", "other_surveys", "worktrees"},
         "WorktreeInfo": {"name", "path", "branch"},
         "SurveySummary": {"name", "topic", "created", "version", "discipline", "depth", "mode", "lang", "report", "manuscript", "purpose",
@@ -136,7 +137,7 @@ def test_the_extension_reads_only_keys_the_cli_writes():
         "ExportReport": {"path", "issues"},
         "SearchReport": {"query", "hits", "new", "added"},
         "Counts": {"candidate", "included", "excluded", "maybe"},
-        "Scope": {"question", "years", "fields", "inclusion", "exclusion"},
+        "Scope": {"question", "years", "fields", "inclusion", "exclusion", "languages"},
         "Ssci": {"status", "badge", "tier"},
         "HistoryItem": {"at", "status", "reason", "migrated"},
         "FulltextInfo": {"path", "source", "pages", "chars", "page_markers", "version"},

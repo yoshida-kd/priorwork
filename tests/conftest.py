@@ -1,6 +1,6 @@
 import pytest
 
-from priorwork import api, fulltext, ssci, survey, workspace, zotero
+from priorwork import api, cli, fulltext, ssci, survey, workspace, zotero
 from priorwork.api import from_openalex, from_s2
 
 
@@ -10,6 +10,8 @@ def isolated(tmp_path, monkeypatch):
     monkeypatch.setattr(ssci, "_list_cache", ssci.SSCIJournalList(None))
     monkeypatch.setattr(survey, "REPORTS_DIR", tmp_path / "reports")
     monkeypatch.setattr(survey, "ROOT", tmp_path)
+    # cli の既定の場所もここに。開発のリポジトリ（Git）のままだと、`new` がそこに worktree を作ってしまう
+    monkeypatch.setattr(cli, "ROOT", tmp_path)
     workspace.save_config(tmp_path, {"lang": "ja"})        # 既存のテストは日本語のワークスペースを見ている
     monkeypatch.setattr(survey, "STATE_DIR", tmp_path / "state")
     monkeypatch.setattr(api, "CACHE_DIR", tmp_path / "cache")

@@ -45,7 +45,7 @@ def made(root, slug="second"):
 
 
 def test_a_survey_in_its_own_worktree_leaves_the_other_alone(ws):
-    pw(ws, "new", "A first topic", "--slug", "first")
+    pw(ws, "new", "A first topic", "--slug", "first", "--here")
     git(ws, "switch", "-qc", "first_branch")
     (ws / "note.txt").write_text("in progress")
     out = made(ws)
@@ -109,6 +109,26 @@ def test_removal_refuses_to_lose_work(ws):
     assert json.loads(pw(ws, "worktree", "--json").stdout)["worktrees"] == []
 
 
+def test_a_merged_branch_whose_remote_branch_is_gone_can_be_removed(ws):
+    # PR のマージ後に GitHub がブランチを消しても、コミットはリモートの main にあるので消してよい
+    bare = ws.parent / "origin.git"
+    git(ws.parent, "init", "-q", "--bare", str(bare))
+    git(ws, "remote", "add", "origin", str(bare))
+    git(ws, "push", "-q", "-u", "origin", "main")
+    out = made(ws)
+    tree = Path(out["worktree"])
+    git(tree, "add", "reports", ".priorwork/surveys")
+    git(tree, "commit", "-qm", "survey")
+    done = pw(ws, "worktree", "--remove", "second", ok=False)     # どのリモートにも無い
+    assert done.returncode != 0 and "not pushed" in done.stderr
+    git(tree, "push", "-q", "-u", "origin", out["branch"])
+    git(tree, "push", "-q", "origin", f"{out['branch']}:main")        # マージ
+    git(tree, "push", "-q", "origin", "--delete", out["branch"])       # リモートのブランチを消す
+    git(ws, "fetch", "-q", "--prune", "origin")
+    pw(ws, "worktree", "--remove", "second")
+    assert not tree.exists()
+
+
 def test_force_removes_and_inside_is_refused(ws):
     tree = Path(made(ws)["worktree"])
     done = pw(tree, "worktree", "--remove", "second", "--force", ok=False)
@@ -125,3 +145,41 @@ def test_a_workspace_outside_git_says_so(tmp_path):
         shutil.rmtree(root / ".git")
     done = pw(root, "new", "T", "--slug", "x", "--worktree", ok=False)
     assert done.returncode != 0 and "Git" in done.stderr
+
+
+def test_new_makes_a_worktree_by_default_and_leaves_this_folder_on_main(ws):
+    out = json.loads(pw(ws, "new", "T", "--slug", "plain", "--json").stdout)
+    assert Path(out["worktree"]) == ws / "worktrees" / "plain"
+    assert git(ws, "branch", "--show-current") == "main" and not list((ws / "reports").glob("*plain*"))
+    assert git(Path(out["worktree"]), "branch", "--show-current") == out["name"]
+
+
+def test_here_makes_it_in_this_folder(ws):
+    out = json.loads(pw(ws, "new", "T", "--slug", "local", "--here", "--json").stdout)
+    assert "worktree" not in out and (ws / "reports" / f"{out['name']}.md").exists()
+    assert git(ws, "worktree", "list").count("\n") == 0
+
+
+def test_a_new_worktree_starts_from_the_remote_main(ws):
+    bare = ws.parent / "origin.git"
+    git(ws.parent, "init", "-q", "--bare", str(bare))
+    git(ws, "remote", "add", "origin", str(bare))
+    git(ws, "push", "-q", "-u", "origin", "main")
+    other = ws.parent / "other"
+    git(ws.parent, "clone", "-q", "-b", "main", str(bare), str(other))
+    (other / "later.txt").write_text("pushed by someone else")
+    git(other, "add", "later.txt")
+    git(other, "commit", "-qm", "later")
+    git(other, "push", "-q", "origin", "main")
+    out = json.loads(pw(ws, "new", "T", "--slug", "fresh", "--json").stdout)
+    assert (Path(out["worktree"]) / "later.txt").exists() and not (ws / "later.txt").exists()
+
+
+def test_without_git_it_is_made_here(tmp_path):
+    root = tmp_path / "plain"
+    root.mkdir()
+    scaffold.init(root)
+    shutil.rmtree(root / ".git", ignore_errors=True)
+    done = pw(root, "new", "T", "--slug", "nogit", "--json")
+    assert "worktree" not in json.loads(done.stdout) and "not in a worktree" in done.stderr
+    assert pw(root, "new", "T", "--slug", "nogit2", "--worktree", ok=False).returncode != 0

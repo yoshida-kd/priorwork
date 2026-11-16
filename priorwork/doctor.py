@@ -11,7 +11,7 @@ import subprocess
 from pathlib import Path
 from typing import Any, List, Optional, Tuple
 
-from . import __version__, i18n, scaffold, ssci
+from . import __version__, i18n, octavo, scaffold, ssci
 from .i18n import t
 from .workspace import meta_dir, reports_dir, state_dir, workspace_lang
 from .zotero import ZoteroClient, ZoteroError
@@ -70,6 +70,15 @@ def _only_medical_surveys(root: Path) -> bool:
     return bool(surveys) and all(d == "medical" for d in surveys)
 
 
+def octavo_only_note(root: Path, projects: List[Path]) -> str:
+    """サーベイが無く、Octavo のプロジェクトだけがあるワークスペースへの知らせ。"""
+    names = ", ".join(str(p.relative_to(root)) if p != root else "." for p in projects[:5]) + (" …" if len(projects) > 5 else "")
+    return t("No surveys here, only Octavo {n|project|projects} ({names}). The AGENTS.md here tells every agent session "
+             "that this is a Priorwork workspace. If the repository is only for Octavo, keep the surveys in another "
+             "workspace (`priorwork export --octavo` delivers them here) and remove AGENTS.md, .priorwork/ and the "
+             "skills; otherwise start one with `priorwork new`", n=len(projects), names=names)
+
+
 def run_checks(root: Path, client: Optional[Any] = None) -> List[Check]:
     """client を渡すと、Semantic Scholar・OpenAlex・Zotero にも接続して確認する。"""
     out: List[Check] = []
@@ -82,6 +91,10 @@ def run_checks(root: Path, client: Optional[Any] = None) -> List[Check]:
                                     dirs=", ".join(map(str, missing)))))
     else:
         out.append((OK, layout, t("reports/ and .priorwork/ are there ({root})", root=root)))
+    if not any(state_dir(root).glob("*.json")):
+        projects = octavo.projects_in(root)
+        if projects:
+            out.append((WARN, t("Surveys here"), octavo_only_note(root, projects)))
     lang = workspace_lang(root)
     out.append((OK, t("Workspace language"), t("{lang} (reports, AGENTS.md and the skills)", lang=lang)))
     out.append((OK, t("Display language"), t("{lang} (PRIORWORK_LANG, or the locale)", lang=i18n.language())))
@@ -133,6 +146,15 @@ def run_checks(root: Path, client: Optional[Any] = None) -> List[Check]:
                                                    "(ZOTERO_WRITE=1)") if zotero.write else "")) if zotero
                else (OK, "Zotero", t("Not set (optional; with it, priorwork can see what is in Zotero and fetch full texts)")))
 
+    from . import fulltext
+    reader = t("PDF reader")
+    try:
+        engine = fulltext.pdf_engine()
+    except fulltext.FulltextError as e:
+        out.append((WARN, reader, str(e)))
+    else:
+        out.append((OK, reader, t("Docling (tables and headings are kept)") if engine == "docling" else
+                    t("pypdf (optional: `pip install \"priorwork[docling]\"` reads tables and headings with a local model)")))
     if shutil.which("pandoc"):
         out.append((OK, "pandoc", t("Found (`priorwork export --format docx` works)")))
     else:

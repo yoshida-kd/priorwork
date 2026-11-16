@@ -123,11 +123,12 @@
 ワークスペースは GitHub の非公開リポジトリに置く。エージェントは、ユーザーに聞かずに PR を作るところまで Git を操作してよい（`AGENTS.local.md` で別に決めていれば、そちらに従う）。**マージはユーザーがする。**
 
 - **ブランチ名はサーベイ名そのもの**（`./priorwork new` が出した名前。例: `20261015_statutory_text_analysis`、やり直しなら `20261015_v2_<slug>`）。ブランチ名を自分で考えない。サーベイに結び付かない作業（`AGENTS.local.md` の直しなど）は、ブランチ名をユーザーに聞く。
-- **別のサーベイが進行中かもしれないとき。** 今のブランチが別のサーベイのものか、未コミットの変更があるか、別のセッションがこのフォルダで動いているかもしれないとき（変更が無くても、そうでないとは言えない）は、ブランチを切り替えない。新しいサーベイを専用のフォルダで始める: `./priorwork new ... --worktree`。サーベイの名前の新しいブランチで `worktrees/<slug>/` を作り、キー・雑誌のリスト・Python・キャッシュを共有する。そのサーベイのコマンドはすべてそのフォルダで実行し（`cd worktrees/<slug>`）、コミット・push・PR は下のとおり。`./priorwork status` が worktree を一覧する。worktree にあるサーベイはそこで続け、`git switch` しない。消す（`./priorwork worktree --remove <slug>`。ブランチは残る）のは、ユーザーに頼まれたときだけ。
-- **始めるとき**: `git status` を見る。このサーベイのものでない未コミットの変更があれば、ブランチを切り替えずに報告で聞く。
-  - 新しいサーベイ: main を最新にし（`git switch main` → リモートがあれば `git pull --ff-only`）、`./priorwork new` のあとに `git switch -c <サーベイ名>`。
-  - 続き・監査: `git switch <サーベイ名>`（無ければ main から作る）。リモートにあれば `git pull --ff-only`。
-- **コミット**: 工程の区切り（検索・選別・カード・検査・書き出し・監査）と、止まる前に。足すのはこのサーベイのファイルだけ（`git add reports/<サーベイ名>.* .priorwork/surveys/<サーベイ名>.json`）。`git add -A` は使わない。メッセージはレポートの言語で 1 行（例: 「候補の選別（採用 42 本）」）。
+- **サーベイごとに専用のフォルダで作業する。** `./priorwork new` は、最新の main（リモートがあればリモートのもの）から `worktrees/<slug>/` を、サーベイの名前の新しいブランチで作り、キー・雑誌のリスト・Python・キャッシュを共有する。ワークスペースのフォルダは main のまま置き、ブランチを切り替えないので、そこで動いている別のセッションを巻き込まない。そのサーベイのコマンドはすべてそのフォルダで実行し（`cd worktrees/<slug>`）、コミット・push・PR も下のとおりそこで行う。ワークスペースのフォルダで `git switch` しない。
+  - 新しいサーベイ: ワークスペースのフォルダで `./priorwork new ...` を実行するだけ（`git switch`・`git pull` は要らない）。「このフォルダに作りました」と出たら（Git が無い・まだコミットが無い）、そのあとに `git switch -c <サーベイ名>`。
+  - 続き・監査: `./priorwork status` が worktree を一覧する。そのサーベイのフォルダに移り（`cd worktrees/<slug>`）、ブランチがリモートにあれば `git pull --ff-only`。これより前にフォルダでなくブランチで作ったサーベイは、そのまま続ける: ワークスペースのフォルダに未コミットの変更が無く、別のセッションが使っていないと言えるときだけ `git switch <サーベイ名>`。そうでなければ聞く。
+  - 始めるときに、サーベイのフォルダで `git status` を見る。このサーベイのものでない未コミットの変更があれば、触らずに報告で聞く。
+  - サーベイのフォルダを消す（`./priorwork worktree --remove <slug>`。ブランチは残る）のは、PR のマージの後に、ユーザーに頼まれたときだけ。
+- **コミット**: 工程の区切り（検索・選別・カード・検査・書き出し・監査）と、止まる前に。足すのはこのサーベイのファイルだけ（`git add 'reports/<サーベイ名>.*' .priorwork/surveys/<サーベイ名>.json`。`reports/…*` は引用符で囲む。囲まないとシェルが gitignore された `.html` まで渡し、git が「paths are ignored」で何も足さない）。`git add -A` は使わない。メッセージはレポートの言語で 1 行（例: 「候補の選別（採用 42 本）」）。
 - **push**: 作業ブランチだけ（`git push -u origin <サーベイ名>`）。リモートが無ければ push せず、報告で伝える。
 - **PR**: 書き出しまで済んだら `gh pr create --base main --head <サーベイ名> --title "<テーマ>" --body "<報告の要約>"`。PR が既にあれば作らない（push で更新される）。`gh` が無い・ログインしていなければ PR は作らず、報告で伝える。報告に PR の URL を書く。
 - **しないこと**: マージ（`git merge`・`gh pr merge`）、main へのコミット・push、force push、`git reset --hard`・`git rebase`・`git clean`、ブランチの削除。`.env`（API キー）はコミットしない。
@@ -181,7 +182,7 @@ Zotero に書き込むのは、ユーザーが設定で許したとき（`.env` 
    - 文章中で論文に言及するときは、その論文が `./priorwork` に登録されていること。記憶だけで著者・年・DOI を書かない。
    - カードには要旨・本文に書かれていることだけを書き、確認レベル（未確認 / 要旨のみ / 本文確認済）を必ず更新する。**「本文確認済」は、その論文の本文を `./priorwork fulltext` で取得して読んだときだけ**にする。要旨から書いたものは「要旨のみ」。
    - 本文確認済のカードでは、数値・手法・主な結果にページ（`（p. 12）`）を添える。ページの分からない本文なら「（ページ未確認）」と書く。`./priorwork check` は、本文に無い数値・論文に無いページを WARN にする。
-   - 年は掲載号の年で引く（オンラインで先に公開された年ではない）。`./priorwork add` は巻のある論文の年を掲載号の年に直し、`./priorwork check` は食い違う採用論文を `fix --year` の形で知らせる。
+   - 年は掲載号の年で引く（オンラインで先に公開された年ではない）。`./priorwork add` と `include` は巻のある論文の年を掲載号の年に直し、`./priorwork check` は食い違う採用論文を知らせる。まとめて直すのは `./priorwork fix <サーベイ名> --issue-years`（1 本ずつの `fix --year` は要らない）。
    - カードは**レポートの言語**で書く（日本語のレポートなら日本語。用語の原語は括弧内に残す）。要旨の英文をそのまま写さない。
    - 文章で先行研究を引くときは、カードの「主な結果」と**結論の向き**（促す／促さない、増える／減る）が合っているか確かめる。
    - **先行研究の知見と、本研究（ユーザー）の枠組み・仮説を混ぜない。** ユーザーが示した分類や仮説は「本研究の仮説と示唆」の節にだけ書き、先行研究の合意のように書かない。
@@ -200,7 +201,7 @@ Zotero に書き込むのは、ユーザーが設定で許したとき（`.env` 
 
 ```bash
 ./priorwork status [SURVEY]          # 一覧 / 進捗と次にやること
-./priorwork new "<テーマ>" --slug <slug> --by "<モデル名>" [--discipline social|medical] [--worktree] [--mode standard|auto|manual] [--depth quick|full] [--manuscript PATH] [--question ... --years ... --fields ... --inclusion ... --exclusion ...]
+./priorwork new "<テーマ>" --slug <slug> --by "<モデル名>" [--discipline social|medical] [--here] [--mode standard|auto|manual] [--depth quick|full] [--manuscript PATH] [--question ... --years ... --fields ... --inclusion ... --exclusion ... --languages ...]
 ./priorwork scope SURVEY [--question ...] [--mode standard|auto|manual] [--go-on] [--depth quick|full] [--search-field social|medical|all] [--manuscript PATH] [--by "<モデル名>"]
 ./priorwork archive SURVEY [--undo]  # 一覧から隠す（ファイルは残る）。アーカイブの一覧は status --archived
 ./priorwork search "<English query>" [--into SURVEY] [--bulk] [--sort citations|relevance|recent|cpy] [--year 2010-2024] [--journal "<full journal name>" ...] [--ssci-only] [--field social|medical|all] [--source auto|pubmed|s2] [--limit N]
@@ -208,6 +209,8 @@ Zotero に書き込むのは、ユーザーが設定で許したとき（`.env` 
 ./priorwork include SURVEY N... --reason "..."   ./priorwork exclude SURVEY N... --reason "..."   ./priorwork maybe SURVEY N... --reason "..."   ./priorwork reset SURVEY N...
 ./priorwork add SURVEY <DOI>... [--candidate]      ./priorwork add SURVEY --cited   # 原稿が引いている論文（.bib の DOI）を登録
 ./priorwork fix SURVEY N [--id <掲載版の DOI>] [--authors "A; B"] [--year Y] [--journal J] [--pages P] [--confirm "<確かめたこと>"]
+./priorwork fix SURVEY N --confirm-warning "<WARN の文言の一部>" --reason "<確かめたこと>"
+./priorwork fix SURVEY --issue-years [--dry-run]
 ./priorwork snowball SURVEY [--direction both|references|citations] [--limit N] [--min-links N]
 ./priorwork fulltext SURVEY N [--pdf PATH]
 ./priorwork card SURVEY N [--set KEY=VALUE ...]

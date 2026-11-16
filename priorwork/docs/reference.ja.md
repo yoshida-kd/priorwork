@@ -86,6 +86,7 @@ my-surveys/
 - `--by` は書いたモデルを記録する（監査は同じモデルを断る）。
 - `--search-field social|medical|all`: その分野の外の検索結果を除く（既定は `social`。医学のサーベイでは `medical`）。
 - `--discipline medical`（`new` のみ）: 臨床のサーベイ。[2.4](#24-医学のサーベイ) を参照。
+- `--languages "..."`: ある言語の文献を対象外にするとき（例: 「英語のみ。日本語の文献は対象外」）に書く。レポートの範囲に出る。書かなければ何も出ない。
 
 ### 2.2 進め方と深さ
 
@@ -133,15 +134,16 @@ my-surveys/
 - 検索の記録には、各検索語を PubMed がどう解釈したかと全体の件数が残る。
 - レポートには、叙述的レビューであり、システマティックレビューでも診療指針でもないと書かれる。
 
-### 2.5 いくつものサーベイを同時に
+### 2.5 サーベイごとの専用のフォルダ
 
 ```bash
-./priorwork new "<topic>" --slug <slug> --by "<model>" --worktree
+./priorwork new "<topic>" --slug <slug> --by "<model>"          # worktrees/<slug>/ に（既定）
+./priorwork new "<topic>" --slug <slug> --by "<model>" --here   # このフォルダの今のブランチに
 ./priorwork worktree                       # worktree の一覧と、未コミット・未 push のもの
 ./priorwork worktree --remove <slug>       # ブランチは残る
 ```
 
-- `--worktree` は、今のフォルダとブランチに触らずに、main の先頭から `worktrees/<slug>/` を、サーベイの名前の新しいブランチで作る。そのサーベイのコマンドはそのフォルダで実行する。
+- `new` は、今のフォルダとブランチに触らずに、main の先頭（リモートがあれば、取ってきたリモートのもの）から `worktrees/<slug>/` を、サーベイの名前の新しいブランチで作る。そのサーベイのコマンドはそのフォルダで実行する。Git が無いか、まだコミットが無ければ、このフォルダに作ってそう知らせる（`--worktree` を付けると、そうせずに止まる）。`--here` を付けると、このフォルダに作る。
 - その中の `.env`・`.venv`・`.priorwork/data`・`.priorwork/cache` は本体へのリンクで、キー・雑誌のリスト・エンジン・取得した本文を共有する。更新はすべてに及ぶ。リンクと `worktrees/` は、コミットを増やさず、`git` の `info/exclude` で Git から除く。
 - `status` が一覧し、それらのブランチを「ほかのブランチ」から外す。
 - `--remove` は、未コミットの変更や未 push のコミットがあれば断る。`--force` を付けると、それらは失われる。
@@ -184,9 +186,16 @@ my-surveys/
 ./priorwork fix SURVEY 12 --id 10.1093/jopart/xyz --authors "A; B" --year 2019
 ./priorwork fix SURVEY 12 --journal "Labour Economics" --pages 101-122
 ./priorwork fix SURVEY 12 --confirm "checked the publisher's page"
+./priorwork fix SURVEY --issue-years [--dry-run]            # 採用論文の年をすべて掲載号の年に
 ```
 
 `fix` は、ワーキングペーパーの DOI を掲載版のものに替え、著者・年・題・誌名・ページを直し、確かめた警告を（何を確かめたかとともに）解除する。掲載された論文にデータベースが WP のシリーズ（SSRN）を誌名として返したときは誌名を、1 ページだけの範囲（`145-145`）を返したときはページを直す。`--id` で別の DOI が返ってきたら、データベースが 2 つの版を 1 本として持っている。`fix` はそれを知らせる。
+
+年は、オンラインで先に公開された年ではなく掲載号の年で引く。`add` と `include` は、巻のある論文の年を掲載号の年に直す（元の年は `online_year` に残る）。`check` はまだ食い違う採用論文を知らせ、`fix SURVEY --issue-years` がそれをまとめて直す（1 本ずつの `fix --year` と同じ。`--dry-run` で先に一覧を見る）。DOI の題が副題だけ違うものは ERROR でなく INFO、OpenAlex が DOI を知らないものは WARN にする（`priorwork get <DOI>` で確かめてから `fix --confirm`）。
+
+原典と突き合わせて誤りと分かった論文の WARN（本文のテキストが取りこぼした表にあるカードの数値など）は、`fix SURVEY N --confirm-warning "<WARN の文言の一部。数値など>" --reason "<確かめたこと>"` で記録する。以後の `check` は、#N についての WARN のうちその文言を含むものを出さず、外した件数を知らせる。`--reason ""` で記録を消す。ERROR はこの方法では外せない。
+
+直しはワークスペースの中で共有される: 論文を登録するとき（`add`・`search`・`snowball`）、ほかのサーベイがその論文を `fix` で直していれば（書誌の欄・`--confirm`・`--confirm-warning`）、その直しを引き継ぎ、どのサーベイからかを注記（ℹ️）する。ほかのサーベイが掲載版の DOI に替えた論文なら、同じことをする `fix --id` を注記する。
 
 ---
 
@@ -246,9 +255,17 @@ my-surveys/
 ```bash
 ./priorwork fulltext SURVEY 3
 ./priorwork fulltext SURVEY 3 --pdf path/to/paper.pdf
+./priorwork fulltext SURVEY 3 --outline            # 見出しと表・図の見出し（ページ付き）
+./priorwork fulltext SURVEY 3 --pages 5-9          # このページだけ
+./priorwork fulltext SURVEY 3 --grep "N =|Table 3" # この語（正規表現）のある行（ページ付き）
+./priorwork fulltext SURVEY 3 --references         # 別に分けた参照文献の節
 ```
 
 探す順: ローカルの Zotero の PDF（DOI で照合）、Zotero のウェブ API で見つかる PDF（WebDAV か Zotero のファイル同期。サーベイのコレクションが先）、Zotero が索引した本文（ページ無し）、オープンアクセスの PDF（OpenAlex の知るすべての所在と、ランディングページの `citation_pdf_url`）。残すのは取り出した文章だけで、`.priorwork/cache/fulltext/` に置く。取れなかったことも記録する。
+
+- **ファイル全体でなく、部分ごとに読む**（論文 1 本でおよそ 2 万トークン）。参照文献の節は別に分ける（`<ファイル>.refs.txt`）。その後ろの付録は残す。`--outline`・`--pages`・`--grep` は保存した本文を読み、取り直さない。これより前に保存した本文も、こうして読むときに分ける。
+- **ほかのサーベイの本文を使う。** ワークスペースのほかのサーベイに同じ論文の本文（欠けておらず WP 版でないもの）があれば、`fulltext` はそれを使う。`--refresh` で取り直す。
+- **PDF の読み取り。** Docling を入れると（`pip install "priorwork[docling]"`。PyTorch ごと入るので 1〜2 GB）、手元のレイアウトのモデルが PDF を Markdown にする: 表は表のまま、見出しに印が付き、ページのヘッダー・フッターは除かれる。CPU で 1 ページ 2〜3 秒ほどかかり、API キーは要らない。ページの区切りは pypdf と同じく `=== page N ===`。`PRIORWORK_PDF_ENGINE=pypdf|docling` で固定できる（既定は `auto`）。Docling で読めない PDF は pypdf で読む。どちらを使うかは `doctor` に出る。
 
 ---
 
@@ -367,6 +384,15 @@ my-surveys/
 - `.bib` に無い論文は `[@PRIORWORK:<DOI>]` と書く。利用者が Zotero に入れ、Octavo のプロジェクトで `octavo bib pull` と `octavo priorwork resolve` を実行する。
 - サーベイを Octavo のプロジェクトのコレクション（`zotero_collection`）の下のコレクションに結び付ければ、`octavo bib pull` がすべてのサーベイの採用論文を集める。
 - Octavo からの依頼は `.priorwork/requests/<id>.json` に届く。結果を記録する。
+- **Octavo のプロジェクトを移した・分けたとき**（1つのプロジェクトが2つになったなど）: 新しいプロジェクトをそれぞれ結び付けて古いものを外し、新しいプロジェクトのそれぞれに書き出す。古いプロジェクトの `literature/priorwork/` は動かしも消しもしないので、残っていることを利用者に伝える。
+
+  ```bash
+  ./priorwork scope SURVEY --octavo ../reorg --octavo ../hiring --unlink-octavo ../two_shocks
+  ./priorwork export SURVEY --octavo ../reorg
+  ./priorwork export SURVEY --octavo ../hiring
+  ```
+
+  結び付けたプロジェクトは `status SURVEY` に出る。プロジェクトが無くなったリンクは `check` が WARN で知らせる。古いプロジェクトの原稿から始めたサーベイなら、`scope SURVEY --manuscript <パス>` で新しい原稿を指す。Octavo のプロジェクトが `.bib` を別々の Zotero のコレクションから取るなら、採用論文をもう一方にも入れる（`zotero SURVEY --add --also "<コレクション>"`）。新しいプロジェクトに要るのにどのサーベイも扱っていないテーマは、古いサーベイの範囲を広げずに新しいサーベイにする（`priorwork new` の後に `scope --octavo <パス>`）。
 
 ---
 
@@ -409,7 +435,7 @@ SSCI の表示: ✅ リストで確認、🟡 約 100 誌の組み込みのリ�
 ./priorwork worktree [--remove NAME [--force]]
 ./priorwork status [SURVEY] [--archived]
 ./priorwork new "<topic>" --slug <slug> --by "<model>" [--mode standard|auto|manual] [--depth quick|full] [--manuscript PATH] [--question ... --years ... --fields ... --inclusion ... --exclusion ...]
-./priorwork scope SURVEY [--question ...] [--mode ...] [--go-on] [--depth ...] [--search-field social|medical|all] [--manuscript PATH] [--octavo PATH] [--by "<model>"]
+./priorwork scope SURVEY [--question ...] [--mode ...] [--go-on] [--depth ...] [--search-field social|medical|all] [--manuscript PATH] [--octavo PATH] [--unlink-octavo PATH] [--languages "..."] [--by "<model>"]
 ./priorwork archive SURVEY [--undo]
 ./priorwork read PATH [--out FILE]
 ./priorwork requests [ID] [--done --survey SURVEY | --decline --note "..."]
@@ -420,8 +446,10 @@ SSCI の表示: ✅ リストで確認、🟡 約 100 誌の組み込みのリ�
 ./priorwork reset SURVEY N...
 ./priorwork add SURVEY <DOI>... [--candidate] | --cited
 ./priorwork fix SURVEY N [--id <DOI>] [--authors "A; B"] [--year Y] [--title T] [--journal J] [--pages P] [--confirm "..."]
+./priorwork fix SURVEY [N] --issue-years [--dry-run]
+./priorwork fix SURVEY N --confirm-warning TEXT --reason "..."
 ./priorwork card SURVEY N [--set KEY=VALUE ...]
-./priorwork fulltext SURVEY N [--pdf PATH]
+./priorwork fulltext SURVEY N [--pdf PATH] [--refresh] | --outline | --pages N-M | --grep WORDS [--context N] | --references
 ./priorwork render SURVEY
 ./priorwork check SURVEY [--offline]
 ./priorwork audit SURVEY [--by "<model>" --note "..."]

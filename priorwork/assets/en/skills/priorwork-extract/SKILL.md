@@ -13,7 +13,7 @@ Follow the rules in [AGENTS.md](../../../AGENTS.md).
 ## By depth
 
 - `full`: for **every included paper**, get the full text (`./priorwork fulltext`), fill in the card from it and set the evidence level to "full text checked". Do not pick papers to read by whether they are "core". "Abstract only" is allowed only for papers whose full text `fulltext` tried and could not find (the failure is recorded, and `check` tells it apart from not trying).
-  - You need not read the full text from start to end. Focus on the data and sample, the identification, the main results (tables) and the limitations, and fill in the card's fields.
+  - Do not read the full text from start to end: it costs many tokens. Read it by parts, as in step 2: the outline, then the data and sample, the identification, the main results (tables) and the limitations.
 - `quick`: filling in from the abstracts is fine (evidence level "abstract only").
 
 Either way, write only what the abstract or full text says, and always update the evidence level. **Set "full text checked" only when you filled in the card from the full text you fetched with `./priorwork fulltext` and read.** A card written from the abstract is "abstract only", even if the full text is in the cache.
@@ -38,6 +38,16 @@ In a survey made from a manuscript (`priorwork-manuscript`), the papers the draf
    If there is none, fill in from the abstract and set the evidence level to "abstract only". In your final report, list the papers without a full text and say that attaching a PDF in Zotero would let you check them in the full text.
 
    If the source is "Zotero's index text (no page breaks)", do not give page numbers; write "(page not checked)".
+
+   **Read it by parts** rather than opening the whole file. The references are kept apart already.
+
+   ```bash
+   ./priorwork fulltext <survey> <number> --outline          # headings and table/figure captions, with pages
+   ./priorwork fulltext <survey> <number> --pages 5-9        # the pages you need (data, method, results)
+   ./priorwork fulltext <survey> <number> --grep "N =|sample|Table 3"   # where a number or word appears
+   ```
+
+   Start from the outline and the abstract; read the pages for the data and sample, the identification, the main results and the limitations; use `--grep` to find a number or a table. Read further pages only when a field is still unclear. A paper read this way is still "full text checked": what counts is that the card comes from the full text, with pages. A text with no page breaks has no outline by page: use `--grep`, or read the file.
 
    - If it says "The PDF has only N pages", the full text is incomplete (perhaps the publisher's preview). Do not fill the card from it; set it to abstract only, and ask in your report for the whole PDF in Zotero.
    - Give pages as the journal prints them on each page of the PDF. For a text without journal pages (an author's accepted manuscript or a working-paper version), give the PDF page (the N of `=== page N ===`) and write in the memo "pages are those of the accepted-manuscript PDF".

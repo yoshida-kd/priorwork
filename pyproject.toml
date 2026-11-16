@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "priorwork"
-version = "0.2.1"
+version = "0.2.2"
 description = "Build literature reviews for the social sciences and clinical research in conversation with an AI agent (Semantic Scholar + OpenAlex + PubMed)"
 readme = "README.md"
 license = "MIT"
@@ -30,6 +30,8 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+# PDF を手元のモデルで読む（表と見出しを Markdown に残す）。PyTorch ごと入るので重い（1〜2 GB）
+docling = ["docling>=2.40"]
 
 [project.urls]
 Homepage = "https://github.com/yoshida-kd/priorwork"

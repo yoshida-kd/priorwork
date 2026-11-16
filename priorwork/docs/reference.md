@@ -94,6 +94,9 @@ Most commands print JSON with `--json`.
 - `--by` records the model that wrote it (the audit refuses the same model).
 - `--search-field social|medical|all`: drop results outside that field (default `social`; `medical` in a medical survey).
 - `--discipline medical` (only on `new`): a clinical survey. See [2.4](#24-medical-surveys).
+- `--languages "..."`: when the survey leaves out literature in some languages (e.g. "English only;
+  Japanese-language studies left out"), say so here; the report's scope states it. Unset, nothing is
+  shown.
 
 ### 2.2 Modes and depth
 
@@ -142,15 +145,16 @@ surveys.
 - The search log keeps PubMed's reading of each query and its total count.
 - The report says it is a narrative review, neither a systematic review nor clinical guidance.
 
-### 2.5 Several surveys at once
+### 2.5 Each survey in its own folder
 
 ```bash
-./priorwork new "<topic>" --slug <slug> --by "<model>" --worktree
+./priorwork new "<topic>" --slug <slug> --by "<model>"          # in worktrees/<slug>/ (the default)
+./priorwork new "<topic>" --slug <slug> --by "<model>" --here   # in this folder, on the current branch
 ./priorwork worktree                       # the worktrees, with what is not committed or pushed
 ./priorwork worktree --remove <slug>       # the branch stays
 ```
 
-- `--worktree` makes `worktrees/<slug>/` from the top of main, on a new branch named after the survey, without touching the current folder or branch. Run that survey's commands from that folder.
+- `new` makes `worktrees/<slug>/` from the top of main (the remote's, fetched first, if there is one), on a new branch named after the survey, without touching the current folder or branch. Run that survey's commands from that folder. Without Git, or before the first commit, it makes the survey in this folder and says so; `--worktree` makes that an error instead. `--here` makes it in this folder.
 - `.env`, `.venv`, `.priorwork/data` and `.priorwork/cache` there are links to the workspace's, so keys, journal lists, the engine and fetched full texts are shared. An upgrade reaches all of them. `git`'s `info/exclude` keeps the links and `worktrees/` out of Git, with no commit.
 - `status` lists them, and leaves their branches out of "On other branches".
 - `--remove` refuses while there are uncommitted changes or commits not pushed. `--force` throws them away.
@@ -213,6 +217,7 @@ at least two are taken by default.
 ./priorwork fix SURVEY 12 --id 10.1093/jopart/xyz --authors "A; B" --year 2019
 ./priorwork fix SURVEY 12 --journal "Labour Economics" --pages 101-122
 ./priorwork fix SURVEY 12 --confirm "checked the publisher's page"
+./priorwork fix SURVEY --issue-years [--dry-run]            # every included paper's year → its journal issue's
 ```
 
 `fix` replaces a working-paper DOI with the published one, corrects authors, year, title, journal
@@ -220,6 +225,25 @@ or pages, or clears a warning you have checked (with what you checked). Correct 
 databases give a working-paper series (SSRN) for a published paper, and the pages when they give a
 single page (`145-145`). If `--id` comes back with another DOI, the databases hold the two versions as
 one paper; `fix` says so.
+
+Cite the year of the journal issue, not the year the paper came out online. `add` and `include` set
+it for papers with a volume (the online year is kept as `online_year`); `check` lists the included
+papers whose year still differs, and `fix SURVEY --issue-years` sets all of them at once (as one
+`fix --year` each; `--dry-run` lists them first). A DOI whose title differs from the paper's only in
+the subtitle is an INFO, not an error; a DOI that OpenAlex does not know is a WARN (check it with
+`priorwork get <DOI>`, then `fix --confirm`).
+
+A WARN about a paper that you checked against the source and found wrong (a number on the card that
+the text extraction missed, say) is recorded with `fix SURVEY N --confirm-warning "<part of the
+WARN, e.g. the number>" --reason "<what you checked>"`. `check` no longer shows a WARN about #N
+that contains that text, and says how many it left out. An empty `--reason ""` removes the record.
+ERRORs cannot be left out this way.
+
+Corrections are shared within the workspace: when a paper is registered (`add`, `search`,
+`snowball`) and another survey has corrected it with `fix` (the fields, `--confirm`,
+`--confirm-warning`), the new survey takes those corrections, with a note (ℹ️) naming the survey. If
+another survey replaced the paper's DOI with the published version's, the note gives the `fix --id`
+that does the same.
 
 ---
 
@@ -283,12 +307,27 @@ Never call a 🟡 (guessed) journal "in the SSCI": only ✅ is checked against t
 ```bash
 ./priorwork fulltext SURVEY 3
 ./priorwork fulltext SURVEY 3 --pdf path/to/paper.pdf
+./priorwork fulltext SURVEY 3 --outline            # headings and table/figure captions, with pages
+./priorwork fulltext SURVEY 3 --pages 5-9          # these pages only
+./priorwork fulltext SURVEY 3 --grep "N =|Table 3" # lines with these words (a regular expression), with pages
+./priorwork fulltext SURVEY 3 --references         # the references section, kept apart
 ```
 
 Looked for in this order: a PDF in the local Zotero (by DOI); a PDF found through the Zotero web
 API (WebDAV or Zotero's file sync, the survey's collection first); the text Zotero indexed (no
 pages); an open-access PDF (every location OpenAlex knows, and `citation_pdf_url` on landing
 pages). Only the extracted text is kept, in `.priorwork/cache/fulltext/`. A failure is recorded.
+
+- **Read by parts, not the whole file** (a paper is some 20,000 tokens). The references section is
+  kept apart (`<file>.refs.txt`); appendices after it stay. `--outline`, `--pages` and `--grep` read
+  the saved text without fetching it again. A text saved before this is split when first read so.
+- **Another survey's full text is used.** If a survey in the workspace already has the same paper's
+  full text (complete, not a working paper), `fulltext` uses it; `--refresh` fetches it again.
+- **PDF reader.** With Docling installed (`pip install "priorwork[docling]"`; it brings PyTorch,
+  1–2 GB), a local layout model reads the PDF into Markdown: tables stay tables, headings are marked,
+  page headers and footers go. It takes about 2–3 seconds a page on a CPU, and no API key. Page breaks
+  are kept as `=== page N ===`, as with pypdf. `PRIORWORK_PDF_ENGINE=pypdf|docling` fixes the choice
+  (default `auto`); if Docling fails on a PDF, pypdf reads it. `doctor` shows which one is used.
 
 ---
 
@@ -430,6 +469,22 @@ checked in the full text, and the length leaves out citations in parentheses unl
 - Link the survey to a Zotero collection under the Octavo project's (`zotero_collection`), so that
   `octavo bib pull` gathers every survey's included papers.
 - Requests from Octavo arrive in `.priorwork/requests/<id>.json`; record the outcome.
+- **When an Octavo project moves or is split** (one project becomes two): link each new project and
+  unlink the old one, then deliver to each new project. The old project's `literature/priorwork/`
+  is not moved or deleted; tell the user it is left there.
+
+  ```bash
+  ./priorwork scope SURVEY --octavo ../reorg --octavo ../hiring --unlink-octavo ../two_shocks
+  ./priorwork export SURVEY --octavo ../reorg
+  ./priorwork export SURVEY --octavo ../hiring
+  ```
+
+  `status SURVEY` lists the linked projects; `check` warns about a link whose project is gone. If
+  the survey started from a manuscript in the old project, point it to the new one with
+  `scope SURVEY --manuscript <path>`. If the Octavo projects pull their `.bib` from different Zotero
+  collections, add the included papers to the other one too (`zotero SURVEY --add --also
+  "<collection>"`). A topic the new project needs and no survey covers is a new survey
+  (`priorwork new`, then `scope --octavo <path>`), not a wider scope for the old one.
 
 ---
 
@@ -474,7 +529,7 @@ are left out of searches by default.
 ./priorwork worktree [--remove NAME [--force]]
 ./priorwork status [SURVEY] [--archived]
 ./priorwork new "<topic>" --slug <slug> --by "<model>" [--mode standard|auto|manual] [--depth quick|full] [--manuscript PATH] [--question ... --years ... --fields ... --inclusion ... --exclusion ...]
-./priorwork scope SURVEY [--question ...] [--mode ...] [--go-on] [--depth ...] [--search-field social|medical|all] [--manuscript PATH] [--octavo PATH] [--by "<model>"]
+./priorwork scope SURVEY [--question ...] [--mode ...] [--go-on] [--depth ...] [--search-field social|medical|all] [--manuscript PATH] [--octavo PATH] [--unlink-octavo PATH] [--languages "..."] [--by "<model>"]
 ./priorwork archive SURVEY [--undo]
 ./priorwork read PATH [--out FILE]
 ./priorwork requests [ID] [--done --survey SURVEY | --decline --note "..."]
@@ -485,8 +540,10 @@ are left out of searches by default.
 ./priorwork reset SURVEY N...
 ./priorwork add SURVEY <DOI>... [--candidate] | --cited
 ./priorwork fix SURVEY N [--id <DOI>] [--authors "A; B"] [--year Y] [--title T] [--journal J] [--pages P] [--confirm "..."]
+./priorwork fix SURVEY [N] --issue-years [--dry-run]
+./priorwork fix SURVEY N --confirm-warning TEXT --reason "..."
 ./priorwork card SURVEY N [--set KEY=VALUE ...]
-./priorwork fulltext SURVEY N [--pdf PATH]
+./priorwork fulltext SURVEY N [--pdf PATH] [--refresh] | --outline | --pages N-M | --grep WORDS [--context N] | --references
 ./priorwork render SURVEY
 ./priorwork check SURVEY [--offline]
 ./priorwork audit SURVEY [--by "<model>" --note "..."]

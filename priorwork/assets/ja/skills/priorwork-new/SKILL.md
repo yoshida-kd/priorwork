@@ -25,10 +25,10 @@ description: >-
 - 進め方（`standard` / `auto` / `manual`）: AGENTS.md「進め方」で決める。何も言われなければ `standard`。
 
 ```bash
-./priorwork new "<テーマ（日本語可）>" --slug <slug> --by "<自分のモデル名>" --mode standard|auto|manual --depth quick|full --question "..." --years "..." --fields "..." --inclusion "..." --exclusion "..."
+./priorwork new "<テーマ（日本語可）>" --slug <slug> --by "<自分のモデル名>" --mode standard|auto|manual --depth quick|full --question "..." --years "..." --fields "..." --inclusion "..." --exclusion "..." [--languages "..."]
 ```
 
-このフォルダで別のサーベイが進行中かもしれないなら、`--worktree` を付けて、作られたフォルダで作業する（AGENTS.md「Git」）。
+`new` は、サーベイを専用のフォルダ `worktrees/<slug>/` に、サーベイの名前のブランチで作る。ワークスペースのフォルダは main のまま。ここから先、そのサーベイのコマンドはすべてそのフォルダで実行する（`cd worktrees/<slug>`。AGENTS.md「Git」）。「このフォルダに作りました」と出たら（Git が無い・まだコミットが無い）、ここで `git switch -c <サーベイ名>`。
 
 `--by` には自分のモデル名（例: `"Gemini 3.1 Pro"`、`"Claude Opus 5.5"`）を書く。
 

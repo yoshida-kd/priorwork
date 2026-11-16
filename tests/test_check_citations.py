@@ -19,6 +19,9 @@ def pairs(text):
     ("Dell (2010) は（Fake, 2019；Card, 1994）と異なり", {("dell", 2010, ""), ("fake", 2019, ""), ("card", 1994, "")}),
     ("Acemoglu ら (2001)", {("acemoglu", 2001, "")}),
     ("IV (2SLS) で推定。In 2010 (Table 3)", set()),
+    ("ben-Aaron et al. (2017)", {("ben-aaron", 2017, "")}),
+    ("(ben-Aaron, 2017; d'Aspremont, 1979)", {("ben-aaron", 2017, ""), ("d'aspremont", 1979, "")}),
+    ("van der Gaag (2001) と Dal Bó et al. (2013)", {("gaag", 2001, ""), ("bo", 2013, "")}),
 ])
 def test_citation_forms(text, expected):
     assert pairs(text) == expected
@@ -85,3 +88,13 @@ def test_letter_suffixes_are_checked(s, s2_record):
 def test_suffix_without_ambiguity_is_warned(s):
     write_prose(s, "Dell (2010a)")
     assert any("a/b は不要" in m for m in messages(s, WARN))
+
+
+@pytest.mark.parametrize("prose", ["ben-Aaron et al. (2017)", "Ben-Aaron et al. (2017)", "Aaron et al. (2017)"])
+def test_lowercase_joined_prefix_matches_the_registered_paper(s, s2_record, prose):
+    s.upsert(s2_record(doi="10.1/ba", title="Transparency by conformity", authors=("Diana ben-Aaron", "B. Two"),
+                       year=2017), "search", status=INCLUDED)
+    s.save()
+    s.render()
+    write_prose(s, prose)
+    assert not any("Aaron" in m for m in messages(s, ERROR) + messages(s, WARN))

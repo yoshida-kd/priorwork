@@ -25,10 +25,10 @@ Settle these from the request. For anything the request does not say, decide som
 - The mode (`standard` / `auto` / `manual`): decide as in AGENTS.md, "Modes". If nothing says otherwise, `standard`.
 
 ```bash
-./priorwork new "<topic (any language)>" --slug <slug> --by "<your model name>" --mode standard|auto|manual --depth quick|full --question "..." --years "..." --fields "..." --inclusion "..." --exclusion "..."
+./priorwork new "<topic (any language)>" --slug <slug> --by "<your model name>" --mode standard|auto|manual --depth quick|full --question "..." --years "..." --fields "..." --inclusion "..." --exclusion "..." [--languages "..."]
 ```
 
-If another survey may be in progress in this folder, add `--worktree` and work in the folder it makes (AGENTS.md, "Git").
+`new` makes the survey in its own folder, `worktrees/<slug>/`, on a branch named after the survey; the workspace folder stays on main. From here on, run every command for the survey from that folder (`cd worktrees/<slug>`), as AGENTS.md, "Git" says. If it says it made the survey in this folder instead (no Git, or no commit yet), stay here and `git switch -c <survey name>`.
 
 Give your own model name with `--by` (e.g. `"Gemini 3.1 Pro"`, `"Claude Opus 5.5"`).
 

@@ -346,9 +346,9 @@ It is a **narrative review**. One agent's screening does not meet the standard o
 
 Optional, in **Settings**: a free NCBI key makes PubMed faster, and the SCIE list from the Master Journal List adds ✅ SCIE. The two kinds of survey can live in one workspace.
 
-### 3.10 Several surveys at once
+### 3.10 Each survey in its own folder
 
-To start a survey while another is in progress, say so: "start this in its own folder, another survey is in progress". The agent makes a folder under `worktrees/` on the survey's own branch, without touching the survey you have open. Your keys, journal lists and fetched full texts are shared.
+Each new survey gets its own folder under `worktrees/`, on its own branch. The workspace folder stays as it is, so several surveys (and several agent sessions) can go on at once without getting in each other's way. Your keys, journal lists and fetched full texts are shared. When you make a survey from the sidebar, Priorwork offers to open its folder in a new window.
 
 The sidebar lists such surveys. Click one to open its folder in a new window, and carry on there. When its pull request is merged, ask the agent to remove the folder; it refuses while anything is not committed and pushed.
 
@@ -491,6 +491,16 @@ sidebar (the agent gets them the same way). PDFs are never stored in the workspa
 
 Publishers usually refuse automated downloads, so for papers that are not open access, attach the PDF
 in Zotero first.
+
+
+The references section is kept apart, and the agent reads a full text by its outline, pages and words
+rather than whole, to save tokens. A full text another survey already fetched is not fetched again.
+
+To have papers with many tables read more exactly, install **Docling** (optional). A local model (no
+API key) reads the PDF keeping its tables and headings. In the workspace's terminal:
+`.venv/bin/pip install "priorwork[docling]"` (`.venv\Scripts\pip` on Windows). It brings PyTorch
+(1–2 GB) and takes 2–3 seconds a page. It is used from the next full text on; **Diagnose the Setup** shows which
+reader is used.
 
 ### 5.4 When a paper is no longer included
 

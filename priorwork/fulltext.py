@@ -117,7 +117,7 @@ def best_pdf(pdfs: List[bytes]) -> int:
     """同じ論文の PDF のうち、読むものの番号: ワーキングペーパー版でなく、読める文字の多いもの。"""
     def score(pdf: bytes) -> Tuple[bool, int]:
         try:
-            text, _ = extract_text(pdf)
+            text, _ = extract_text(pdf, "pypdf")   # 版を見分けるだけ（Docling は重い）
         except Exception:   # 壊れた PDF は選ばない
             return (False, -1)
         return (not working_paper_text(text), len(text))
@@ -161,7 +161,53 @@ def landing_pdf_url(html: str, base: str) -> Optional[str]:
     return None
 
 
-def extract_text(pdf: bytes) -> Tuple[str, int]:
+# PDF から文字を取り出す道具。auto: Docling（任意の依存。手元で動くレイアウト・表の認識モデル）が入っていれば
+# それで表と見出しのある Markdown に、無ければ pypdf で文字だけに。PRIORWORK_PDF_ENGINE=pypdf / docling で固定できる
+PDF_ENGINES = ("auto", "docling", "pypdf")
+_docling_converter: Any = None
+last_engine = ""   # 直前の extract_text が実際に使った道具（Docling が失敗すれば pypdf）
+
+
+def docling_available() -> bool:
+    try:
+        import docling.document_converter  # noqa: F401
+    except Exception:   # 入っていない・壊れている（torch が読めないなど）
+        return False
+    return True
+
+
+def pdf_engine() -> str:
+    """これから使う道具（docling / pypdf）。"""
+    chosen = (os.environ.get("PRIORWORK_PDF_ENGINE") or "auto").strip().lower()
+    if chosen not in PDF_ENGINES:
+        chosen = "auto"
+    if chosen == "pypdf":
+        return "pypdf"
+    if docling_available():
+        return "docling"
+    if chosen == "docling":
+        raise FulltextError(t("PRIORWORK_PDF_ENGINE=docling, but Docling is not installed "
+                              "(`pip install \"priorwork[docling]\"`)"))
+    return "pypdf"
+
+
+def extract_text(pdf: bytes, engine: Optional[str] = None) -> Tuple[str, int]:
+    """(ページを `=== page N ===` で区切ったテキスト, ページ数)。"""
+    global last_engine
+    engine = engine or pdf_engine()
+    if engine == "docling":
+        try:
+            last_engine = "docling"
+            return _extract_docling(pdf)
+        except Exception as e:   # モデルの読み込み・変換の失敗。pypdf で続ける
+            logging.getLogger(__name__).debug("docling failed", exc_info=True)
+            print("[Notice] " + t("Docling could not read the PDF ({error}); using pypdf", error=str(e)[:200]),
+                  file=__import__("sys").stderr)
+    last_engine = "pypdf"
+    return _extract_pypdf(pdf)
+
+
+def _extract_pypdf(pdf: bytes) -> Tuple[str, int]:
     from pypdf import PdfReader
 
     logging.getLogger("pypdf").setLevel(logging.ERROR)  # フォント関連の冗長な警告を抑える
@@ -170,6 +216,163 @@ def extract_text(pdf: bytes) -> Tuple[str, int]:
     for i, page in enumerate(reader.pages, 1):
         pages.append(f"\n\n=== page {i} ===\n\n" + (page.extract_text() or ""))
     return "".join(pages).strip(), len(reader.pages)
+
+
+def _extract_docling(pdf: bytes) -> Tuple[str, int]:
+    """Docling で、ページごとの Markdown（見出し・表。ページのヘッダー・フッターは除かれる）にする。
+    ページの印は pypdf と同じ形にする（カードのページと check の照合が使う）。"""
+    global _docling_converter
+    from docling.datamodel.base_models import DocumentStream
+    from docling.document_converter import DocumentConverter
+
+    if _docling_converter is None:      # モデルの読み込みは重いので、1 回だけ
+        _docling_converter = DocumentConverter()
+    doc = _docling_converter.convert(DocumentStream(name="paper.pdf", stream=io.BytesIO(pdf))).document
+    n = doc.num_pages()
+    pages = [f"\n\n=== page {i} ===\n\n" + compact_markdown(doc.export_to_markdown(page_no=i)) for i in range(1, n + 1)]
+    return "".join(pages).strip(), n
+
+
+def compact_markdown(md: str) -> str:
+    """Docling の Markdown を短くする: 表の列をそろえる空白と罫線を詰め、画像の印を除く（読む量を pypdf と同じくらいに）。"""
+    out = []
+    for ln in md.splitlines():
+        if ln.strip() == "<!-- image -->":
+            continue
+        if ln.lstrip().startswith("|"):
+            ln = re.sub(r"-{3,}", "---", re.sub(r" {2,}", " ", ln))
+        out.append(ln)
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(out)).strip()
+
+
+# ---- 参照文献の節を分ける（エージェントが読む量を減らす。参照文献は別のファイルに残す）----
+
+_REFS_HEAD = re.compile(r"^[ \t]*(?:#{1,6}[ \t]*)?(?:[0-9IVX]+\.?[ \t]+)?\**(?:References|REFERENCES|Reference List|"
+                        r"Bibliography|BIBLIOGRAPHY|Literature Cited|LITERATURE CITED|Works Cited|WORKS CITED|"
+                        r"参考文献|引用文献)\**[ \t]*:?[ \t]*$", re.M)
+# 参照文献の後ろの付録（表を含むことがある）は残す
+_AFTER_REFS = re.compile(r"^[ \t]*(?:#{1,6}[ \t]*)?\**(?:Online[ \t]+)?(?:Appendix|APPENDIX|Appendices|APPENDICES|"
+                         r"Supplementary|SUPPLEMENTARY|Supporting Information|付録)\b.{0,100}$", re.M)
+_YEAR_RE = re.compile(r"\b(?:19|20)\d{2}[a-z]?\b")
+_MARKER_RE = re.compile(r"\n*=== page \d+ ===\n*")
+
+
+def split_references(text: str) -> Tuple[str, str]:
+    """(本文, 参照文献の節)。本文の後半にある参照文献の見出しから、付録の見出し（無ければ終わり）まで。
+    ページの印は本文に残す（ページの数え方を変えない）。見つからなければ (text, "")。"""
+    heads = [m for m in _REFS_HEAD.finditer(text) if m.start() >= len(text) * 0.4]
+    if not heads:
+        return text, ""
+    start = heads[0].start()
+    after = _AFTER_REFS.search(text, heads[0].end())
+    end = after.start() if after else len(text)
+    refs = text[start:end]
+    if len(refs) < 500 or len(_YEAR_RE.findall(refs)) < 5:
+        return text, ""
+    markers = "".join(m.group(0) for m in _MARKER_RE.finditer(refs))
+    return text[:start] + REFS_NOTE + markers + text[end:], _MARKER_RE.sub("\n", refs).strip() + "\n"
+
+
+REFS_NOTE = "[References: moved to a separate file (`priorwork fulltext SURVEY N --references`)]\n"
+
+
+def save_text(text: str, out: Path) -> Dict[str, Any]:
+    """本文を保存する。参照文献の節は `<名前>.refs.txt` に分ける。保存したものの情報を返す。"""
+    body, refs = split_references(text)
+    out.write_text(body, encoding="utf-8")
+    refs_path = out.with_name(out.stem + ".refs.txt")
+    if refs:
+        refs_path.write_text(refs, encoding="utf-8")
+    elif refs_path.exists():
+        refs_path.unlink()
+    return {"chars": len(body), "references_chars": len(refs)}
+
+
+def references_path(text_path: Path) -> Path:
+    return text_path.with_name(text_path.stem + ".refs.txt")
+
+
+# ---- 保存した本文を部分ごとに読む（全文を読まずに済ませる）----
+
+_HEADING_WORDS = ("Introduction", "Background", "Literature", "Theory", "Theoretical", "Hypothes", "Data", "Method",
+                  "Methodology", "Research Design", "Empirical", "Identification", "Estimation", "Model", "Results",
+                  "Findings", "Analysis", "Robustness", "Discussion", "Conclusion", "Concluding", "Limitations",
+                  "Appendix", "Abstract", "Policy", "Implications")
+_HEADING_RE = re.compile(
+    r"^(?:#{1,6}\s+\S.{0,120}"                                         # Markdown（Docling）
+    r"|(?:\d+(?:\.\d+){0,3}\.?|[IVX]{1,5}\.)\s+[A-Z][^.!?]{2,90}"        # 1. / 2.1 / III. の付いた見出し
+    r"|(?:" + "|".join(_HEADING_WORDS) + r")[A-Za-z]*(?:\s+[A-Za-z&,:-]+){0,6}"
+    r"|[A-Z][A-Z0-9 ,:&\-]{4,70})$")
+_CAPTION_RE = re.compile(r"^(?:\*\*)?(?:Table|TABLE|Figure|FIGURE|Fig\.)\s+[A-Z]?\d+[A-Za-z]?\b(?![,;])")
+
+
+def pages_of(text: str) -> List[Tuple[int, str]]:
+    """[(ページ, そのページの文字)]。ページの印が無ければ [(0, 全体)]。"""
+    parts = re.split(r"=== page (\d+) ===", text)
+    if len(parts) == 1:
+        return [(0, text)]
+    return [(int(parts[i]), parts[i + 1]) for i in range(1, len(parts) - 1, 2)]
+
+
+def outline(text: str) -> List[Dict[str, Any]]:
+    """見出しと表・図の見出し（どのページか）。どのページにもある行（柱）は除く。"""
+    pages = pages_of(text)
+    folded = lambda x: re.sub(r"\d+", "#", re.sub(r"\s+", "", x))   # noqa: E731  柱のページ番号は毎ページ違う
+    counts: Dict[str, int] = {}
+    for _, body in pages:
+        for ln in {folded(x) for x in body.splitlines() if x.strip()}:
+            counts[ln] = counts.get(ln, 0) + 1
+    out: List[Dict[str, Any]] = []
+    seen_captions = set()
+    for page, body in pages:
+        for raw in body.splitlines():
+            ln = raw.strip()
+            if not ln or len(ln) > 130 or (len(pages) >= 4 and counts.get(folded(ln), 0) >= max(2, len(pages) // 4)):
+                continue
+            cap = _CAPTION_RE.match(ln)
+            if cap:
+                label = re.sub(r"[*\s]+", " ", cap.group(0)).strip().lower()
+                if label not in seen_captions:
+                    seen_captions.add(label)
+                    out.append({"page": page, "kind": "caption", "text": ln.strip("*# ")[:110]})
+            elif (_HEADING_RE.match(ln) and (ln.startswith("#") or len(ln) <= 60)
+                  and not re.search(r"\d{3,}|\(\d{4}\)|https?:|@|[,;]$", ln)):   # 脚注・住所・文の途中を除く
+                out.append({"page": page, "kind": "heading", "text": ln.strip("*# ")[:110]})
+    return out
+
+
+def parse_page_range(spec: str) -> List[int]:
+    pages: List[int] = []
+    for part in spec.replace(" ", "").split(","):
+        m = re.fullmatch(r"(\d+)(?:-(\d+))?", part)
+        if not m:
+            raise FulltextError(t("Give pages like 5, 5-9 or 3,7-8: {spec}", spec=spec))
+        a, b = int(m.group(1)), int(m.group(2) or m.group(1))
+        pages += range(min(a, b), max(a, b) + 1)
+    return pages
+
+
+def read_pages(text: str, spec: str) -> str:
+    wanted = set(parse_page_range(spec))
+    return "".join(f"=== page {p} ===\n{body.strip()}\n\n" for p, body in pages_of(text) if p in wanted)
+
+
+def grep(text: str, pattern: str, context: int = 1, limit: int = 40) -> List[Dict[str, Any]]:
+    """語（正規表現。大文字小文字を区別しない）の出てくる行と、その前後の行（どのページか）。"""
+    try:
+        rx = re.compile(pattern, re.IGNORECASE)
+    except re.error:
+        rx = re.compile(re.escape(pattern), re.IGNORECASE)
+    hits: List[Dict[str, Any]] = []
+    for page, body in pages_of(text):
+        lines = body.splitlines()
+        for i, ln in enumerate(lines):
+            if rx.search(ln):
+                lo, hi = max(0, i - context), min(len(lines), i + context + 1)
+                hits.append({"page": page, "text": "\n".join(x for x in lines[lo:hi] if x.strip())})
+                if len(hits) >= limit:
+                    return hits
+    return hits
 
 
 # 本文のある1ページの文字数はふつう 2,000 字を超える。繰り返しの行を除いてこれに満たないなら、
@@ -295,8 +498,9 @@ def fetch_fulltext(entry: Dict[str, Any], client: Any, pdf_path: Optional[str] =
         raise FulltextError(t("No full-text PDF was found:") + "\n  - " + "\n  - ".join(attempts) +
                             "\n  → " + t("Attach the PDF in Zotero, or give it with `--pdf <path>`"))
 
+    engine = pdf_engine() if pdf is not None else ""
     if pdf is not None:
-        text, n_pages = extract_text(pdf)
+        text, n_pages = extract_text(pdf, engine)
     if len(text) < 500:
         raise FulltextError(t("Could not extract text from the PDF (probably a scanned image): {source}", source=source))
     if pdf is not None:
@@ -309,7 +513,8 @@ def fetch_fulltext(entry: Dict[str, Any], client: Any, pdf_path: Optional[str] =
     out_dir.mkdir(parents=True, exist_ok=True)
     safe_key = re.sub(r"[^\w.-]+", "_", entry["key"])[:80]
     out = out_dir / f"{entry['number']:03d}_{safe_key}.txt"
-    out.write_text(text, encoding="utf-8")
+    saved = save_text(text, out)
     return {"path": str(out.relative_to(ROOT) if out.is_relative_to(ROOT) else out),
-            "source": source, "pages": n_pages, "chars": len(text), "page_markers": pdf is not None,
-            "version": version, "working_paper": pdf is not None and working_paper_text(text)}
+            "source": source, "pages": n_pages, "chars": saved["chars"], "page_markers": pdf is not None,
+            "version": version, "working_paper": pdf is not None and working_paper_text(text),
+            "references_chars": saved["references_chars"], "extractor": last_engine if pdf is not None else "text"}

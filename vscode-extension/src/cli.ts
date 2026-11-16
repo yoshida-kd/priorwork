@@ -53,6 +53,14 @@ export interface SurveySummary {
     searches: number;
 }
 
+/** `new --json` の結果。既定で worktree に作ったときだけ worktree・branch がある（次の版から。古い CLI には無い） */
+export interface NewSurveyReport extends SurveySummary {
+    worktree?: string;
+    branch?: string;
+    /** 本体に無いので worktree と共有しなかったもの（.env など） */
+    absent?: string[];
+}
+
 export interface GitInfo {
     repo: boolean;
     remote: boolean;
@@ -88,6 +96,8 @@ export interface Scope {
     fields: string;
     inclusion: string;
     exclusion: string;
+    /** 文献の言語の制限（決めたときだけ。古いサーベイには無い） */
+    languages?: string;
 }
 
 export interface NextStep {

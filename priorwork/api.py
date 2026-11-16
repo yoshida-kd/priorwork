@@ -830,7 +830,10 @@ class LiteratureClient:
                     mark_retracted(r)
                 continue
             added = []
-            if not ssci.same_title(oa["title"], r["title"]):
+            if ssci.same_main_title(oa["title"], r["title"]):
+                if not ssci.same_title(oa["title"], r["title"]):
+                    r["notes"].append(t("The DOI's title differs only in the subtitle: \"{title}\"", title=oa["title"]))
+            elif not ssci.same_title(oa["title"], r["title"]):
                 added.append(t("The DOI points to another title: \"{title}\" (verify the DOI)", title=oa["title"]))
                 r["warnings"].append(added[-1])
             # Zotero 取り込み・SSCI 照合に使う書誌情報は、DOI の実体（OpenAlex）側で丸ごと置き換える

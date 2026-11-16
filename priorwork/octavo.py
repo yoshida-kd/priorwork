@@ -54,6 +54,28 @@ def find_project(path: Path) -> Optional[Path]:
     return None
 
 
+_SKIP_DIRS = {".git", ".venv", "venv", "node_modules", ".priorwork", "__pycache__", "reports"}
+
+
+def projects_in(root: Path, depth: int = 3) -> List[Path]:
+    """root の下（depth 階層まで）にある Octavo のプロジェクトの根。"""
+    found: List[Path] = []
+    level = [Path(root)]
+    for _ in range(depth + 1):
+        nxt = []
+        for d in level:
+            if (d / CONFIG_NAME).is_file():
+                found.append(d)
+                continue
+            try:
+                nxt += [c for c in sorted(d.iterdir()) if c.is_dir() and c.name not in _SKIP_DIRS
+                        and not c.name.startswith(".")]
+            except OSError:
+                pass
+        level = nxt
+    return found
+
+
 def read_config(root: Path) -> Dict[str, Any]:
     """`CONFIG = {...}` のうち、値がリテラルで書かれた鍵だけを返す（実行はしない）。"""
     try:

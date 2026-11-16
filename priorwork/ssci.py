@@ -156,6 +156,20 @@ def same_title(a: str, b: str) -> bool:
     return extra[0] in short.split() and not _REPLY_WORDS & set(extra)
 
 
+_SUBTITLE_RE = re.compile(r"\s*[:：?？.]\s+|\s+[-–—]+\s+")
+
+
+def same_main_title(a: str, b: str) -> bool:
+    """主題（最初の「:」などの前）が同じで、副題だけが違う（片方に無い）か。主題が短い（3語未満）ものと、
+    "…: Reply" のような別の論文は同じとしない。"""
+    pa, pb = (_SUBTITLE_RE.split(x or "", maxsplit=1) for x in (a, b))
+    main = normalize_title(pa[0])
+    if len(main.split()) < 3 or main != normalize_title(pb[0]):
+        return False
+    rest = set(normalize_title(" ".join(pa[1:] + pb[1:])).split())
+    return not _REPLY_WORDS & rest
+
+
 _REPLY_WORDS = {"reply", "comment", "comments", "rejoinder", "response", "erratum", "corrigendum", "correction",
                 "retraction", "addendum"}
 
